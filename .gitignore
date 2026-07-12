@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Builds
+frontend/.next/
+backend/dist/
+
+# Environment — secrets never go into git
+.env
+.env.*
+!.env.example
+
+# Logs & OS noise
+*.log
+Thumbs.db
+.DS_Store
+
+# Prisma generated client lives in node_modules; nothing extra needed

@@ -1,0 +1,209 @@
+--- backend/prisma/schema.prisma
++++ backend/prisma/schema.prisma
+@@ -4,11 +4,11 @@
+ generator client {
+   provider = "prisma-client-js"
+ }
+ 
+ datasource db {
+-  provider = "sqlite"
++  provider = "postgresql"
+   url      = env("DATABASE_URL")
+ }
+ 
+ // ----------------------------------------------------------------------------
+ // Core Identity & Multi-tenancy
+@@ -23,24 +23,38 @@
+   updatedAt DateTime @updatedAt
+ 
+   memberships TenantMember[]
+ }
+ 
++enum TenantPlan {
++  STARTER
++  PRO
++  ENTERPRISE
++}
++
+ model Tenant {
+   id        String   @id @default(uuid())
+   name      String
+-  plan      String   @default("STARTER") // STARTER, PRO, ENTERPRISE
++  plan      TenantPlan @default(STARTER)
+   createdAt DateTime @default(now())
+   updatedAt DateTime @updatedAt
+ 
+   members     TenantMember[]
+   connections PlatformConnection[]
+   rules       AutoReplyRule[]
+   conversations Conversation[]
+ }
+ 
++enum TenantRole {
++  OWNER
++  ADMIN
++  MEMBER
++}
++
+ model TenantMember {
+   id        String   @id @default(uuid())
+   userId    String
+   tenantId  String
+-  role      String   @default("MEMBER") // OWNER, ADMIN, MEMBER
++  role      TenantRole @default(MEMBER)
+ 
+   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+ 
+   createdAt DateTime @default(now())
+   updatedAt DateTime @updatedAt
+ 
+   @@unique([userId, tenantId])
++  @@index([tenantId])
+ }
+ 
+ // ----------------------------------------------------------------------------
+ // Social Media Connections
+ // ----------------------------------------------------------------------------
+ 
+-// Enums are not supported in SQLite, use String instead.
++enum PlatformType {
++  FACEBOOK_PAGE
++  INSTAGRAM
++  WHATSAPP
++}
+ 
+ model PlatformConnection {
+   id            String       @id @default(uuid())
+   tenantId      String
+-  platform      String       // FACEBOOK_PAGE, INSTAGRAM, WHATSAPP
++  platform      PlatformType
+   platformId    String       // Page ID, IG Account ID, Phone Number ID
+   name          String       // Page Name or Number
+   accessToken   String?      // Encrypted token or System User Token
+   isActive      Boolean      @default(true)
+   
+   tenant        Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+   rules         AutoReplyRule[]
+   conversations Conversation[]
+ 
+   createdAt     DateTime     @default(now())
+   updatedAt     DateTime     @updatedAt
+ 
+   @@unique([platform, platformId])
++  @@index([tenantId])
++  @@index([platformId])
++  @@index([isActive])
+ }
+ 
+ // ----------------------------------------------------------------------------
+ // Automation Rules
+ // ----------------------------------------------------------------------------
+ 
++enum TriggerType {
++  KEYWORD
++  ANY_COMMENT
++  STORY_MENTION
++}
++
++enum MatchType {
++  EXACT
++  CONTAINS
++  AI_SEMANTIC
++}
++
+ model AutoReplyRule {
+   id            String             @id @default(uuid())
+   tenantId      String
+   connectionId  String?            // If null, applies to all connections of this tenant
+   postId        String?            // If null, applies globally. If set, applies only to this specific post
+   name          String
+-  triggerType   String             // KEYWORD, ANY_COMMENT, STORY_MENTION
++  triggerType   TriggerType
+   keywords      String             // Comma separated keywords
+-  matchType     String             @default("EXACT") // EXACT, CONTAINS, AI_SEMANTIC
++  matchType     MatchType          @default(EXACT)
+   
+   replyText     String?            // Public text reply to comment
+-  replyMedia    String?            // JSON string of media URLs (images/videos) for public reply
++  replyMedia    Json?              // JSON string of media URLs (images/videos) for public reply
+   privateText   String?            // Private text DM to send
+-  privateMedia  String?            // JSON string of media URLs (images/videos) for private DM
++  privateMedia  Json?              // JSON string of media URLs (images/videos) for private DM
+   
+   priority      Int                @default(0) // Higher number = higher priority for conflict resolution
+   isActive      Boolean            @default(true)
+ 
+   tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+   connection    PlatformConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+ 
+   createdAt     DateTime           @default(now())
+   updatedAt     DateTime           @updatedAt
++
++  @@index([tenantId])
++  @@index([connectionId])
++  @@index([triggerType])
++  @@index([isActive])
+ }
+ 
+ // ----------------------------------------------------------------------------
+ // Unified Inbox
+ // ----------------------------------------------------------------------------
+ 
++enum ConversationStatus {
++  OPEN
++  RESOLVED
++}
++
+ model Conversation {
+   id            String             @id @default(uuid())
+   tenantId      String
+   connectionId  String
+   customerName  String
+   customerId    String             // PSID (Page-Scoped ID) or WhatsApp Number
+   lastMessageAt DateTime           @default(now())
+-  status        String             @default("OPEN") // OPEN, RESOLVED
++  status        ConversationStatus @default(OPEN)
+ 
+   tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+   connection    PlatformConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+   messages      Message[]
+ 
+   createdAt     DateTime           @default(now())
+   updatedAt     DateTime           @updatedAt
+ 
+   @@unique([connectionId, customerId])
++  @@index([tenantId])
++  @@index([status])
++  @@index([lastMessageAt])
+ }
+ 
++enum MessageDirection {
++  INBOUND
++  OUTBOUND
++}
++
++enum MessageType {
++  TEXT
++  IMAGE
++  COMMENT
++}
++
+ model Message {
+   id             String       @id @default(uuid())
+   conversationId String
+-  direction      String       // INBOUND (from customer), OUTBOUND (from bot/agent)
++  direction      MessageDirection
+   content        String
+-  messageType    String       @default("TEXT") // TEXT, IMAGE, COMMENT
+-  metaData       String?      // JSON string of original payload
++  messageType    MessageType  @default(TEXT)
++  metaData       Json?        // JSON string of original payload
+ 
+   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+ 
+   createdAt      DateTime     @default(now())
++
++  @@index([conversationId])
++  @@index([createdAt])
+ }

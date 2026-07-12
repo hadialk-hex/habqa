@@ -1,0 +1,1 @@
+postgresql://postgres:postgrespassword@127.0.0.1:5433/hubqa_test?schema=public

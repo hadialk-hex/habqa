@@ -1,0 +1,58 @@
+# Hubqa Infrastructure Automation
+
+.PHONY: help build up down restart logs ps clean db-migrate db-seed db-generate
+
+# Default shell
+SHELL := /bin/bash
+
+help:
+	@echo "Available commands:"
+	@echo "  make build          - Build multi-arch Docker images"
+	@echo "  make up             - Spin up the entire stack in detached mode"
+	@echo "  make down           - Tear down the stack and stop all containers"
+	@echo "  make restart        - Restart the services"
+	@echo "  make logs           - Stream logs from all containers"
+	@echo "  make logs-backend   - Stream backend logs"
+	@echo "  make logs-frontend  - Stream frontend logs"
+	@echo "  make ps             - Show status of all services"
+	@echo "  make clean          - Remove all containers, volumes, and build cache"
+	@echo "  make db-migrate     - Run Prisma migrations inside the backend container"
+	@echo "  make db-seed        - Run database seed inside the backend container"
+	@echo "  make db-generate    - Regenerate Prisma client inside the backend container"
+
+build:
+	docker compose build
+
+up:
+	docker compose up -d
+
+down:
+	docker compose down
+
+restart:
+	docker compose restart
+
+logs:
+	docker compose logs -f
+
+logs-backend:
+	docker compose logs -f backend
+
+logs-frontend:
+	docker compose logs -f frontend
+
+ps:
+	docker compose ps
+
+clean:
+	docker compose down -v --remove-orphans
+	rm -rf backend/dist backend/node_modules frontend/.next frontend/node_modules
+
+db-migrate:
+	docker compose exec backend npx prisma migrate deploy
+
+db-seed:
+	docker compose exec backend npx prisma db seed
+
+db-generate:
+	docker compose exec backend npx prisma generate

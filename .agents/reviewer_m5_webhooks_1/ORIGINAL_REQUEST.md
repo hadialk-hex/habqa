@@ -1,0 +1,2 @@
+## 2026-07-11T10:01:16Z
+Review the webhooks service and controller updates (`backend/src/webhooks/webhooks.service.ts` and `webhooks.controller.ts`). Specifically, check the correctness and multi-tenant security of the priority sorting engine, database persistence (Conversation, Message, AuditLog, WebhookDeduplication), and Graph API fetch calls. Verify if the implementation is correct, secure, robust, and clean. Write your findings to handoff.md in your working directory.

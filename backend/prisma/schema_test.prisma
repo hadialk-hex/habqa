@@ -1,0 +1,489 @@
+// This is your Prisma schema file for Neqta
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Enums (Supported natively in PostgreSQL)
+// ----------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ----------------------------------------------------------------------------
+// Core Identity & Multi-tenancy
+// ----------------------------------------------------------------------------
+
+model User {
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  name                String?
+  password            String?              // nullable if using OAuth
+  isSuperAdmin        Boolean              @default(false) // Platform-level admin (site management)
+  emailVerifiedAt     DateTime?            // When the user confirmed their email via OTP code
+  verifyCode          String?              // 6-digit email verification code (hashed not needed: short-lived)
+  verifyCodeExpiresAt DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  memberships         TenantMember[]
+  passwordResetTokens PasswordResetToken[]
+  auditLogs           AuditLog[]
+}
+
+model Tenant {
+  id             String                 @id @default(uuid())
+  name           String
+  plan           String             @default("STARTER")
+  isSuspended    Boolean                @default(false) // Suspended by platform admin
+  aiEnabled      Boolean                @default(false) // AI fallback replies (Claude)
+  aiContext      String?                // Business description the AI uses to answer customers
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  members        TenantMember[]
+  connections    PlatformConnection[]
+  rules          AutoReplyRule[]
+  conversations  Conversation[]
+  campaigns      Campaign[]
+  auditLogs      AuditLog[]
+  webhooks       WebhookDeduplication[]
+  flows          Flow[]
+  flowExecutions FlowExecution[]
+  customRoles    CustomRole[]
+  subscribers    Subscriber[]
+  invitations    TeamInvitation[]
+  broadcasts     Broadcast[]
+}
+
+model TenantMember {
+  id         String      @id @default(uuid())
+  userId     String
+  tenantId   String
+  role       String  @default("MEMBER")
+  roleId     String?     // Nullable link to custom roles for granular RBAC
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customRole CustomRole? @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+}
+
+model CustomRole {
+  id          String         @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  permissions String       // PostgreSQL native text array
+
+  tenant      Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  members     TenantMember[]
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId])
+}
+
+// ----------------------------------------------------------------------------
+// Social Media Connections
+// ----------------------------------------------------------------------------
+
+model PlatformConnection {
+  id            String             @id @default(uuid())
+  tenantId      String
+  platform      String
+  platformId    String             // Page ID, IG Account ID, Phone Number ID
+  name          String             // Page Name or Number
+  accessToken   String?            // Encrypted token or System User Token
+  isActive      Boolean            @default(true)
+  
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rules         AutoReplyRule[]
+  conversations Conversation[]
+  campaigns     Campaign[]
+
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@unique([platform, platformId])
+  @@index([tenantId])
+  @@index([platformId])
+  @@index([isActive])
+}
+
+// ----------------------------------------------------------------------------
+// Automation Rules
+// ----------------------------------------------------------------------------
+
+model AutoReplyRule {
+  id            String              @id @default(uuid())
+  tenantId      String
+  connectionId  String?             // If null, applies to all connections of this tenant
+  postId        String?             // If null, applies globally. If set, applies only to this specific post
+  name          String
+  String   TriggerType
+  keywords      String              // Comma separated keywords
+  String     String           @default("EXACT")
+  
+  replyText     String?             // Public text reply to comment
+  replyMedia    String?               // PostgreSQL String representing media URLs (images/videos)
+  privateText   String?             // Private text DM to send
+  privateMedia  String?               // PostgreSQL String representing media URLs (images/videos)
+  
+  priority      Int                 @default(0) // Higher number = higher priority
+  isActive      Boolean             @default(true)
+  triggerCount    Int       @default(0)
+  lastTriggeredAt DateTime?
+  replyMessages   String?
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection    PlatformConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([tenantId])
+  @@index([connectionId])
+  @@index([triggerType])
+  @@index([isActive])
+}
+
+// ----------------------------------------------------------------------------
+// Unified Inbox
+// ----------------------------------------------------------------------------
+
+model Conversation {
+  id            String             @id @default(uuid())
+  tenantId      String
+  connectionId  String
+  customerName  String
+  customerId    String             // PSID (Page-Scoped ID) or WhatsApp Number
+  lastMessageAt DateTime           @default(now())
+  status        String @default("OPEN")
+
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection    PlatformConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  messages      Message[]
+
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@unique([connectionId, customerId])
+  @@index([tenantId])
+  @@index([status])
+  @@index([lastMessageAt])
+}
+
+model Message {
+  id             String           @id @default(uuid())
+  conversationId String
+  direction      String
+  content        String
+  String    String      @default("TEXT")
+  sentByName     String?          // Team member name who sent it; null = customer (inbound) . "الرد الآلي"/"رد ذكي" for bots
+  metaData       String?            // Native PostgreSQL String representing original payload
+
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime         @default(now())
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+// ----------------------------------------------------------------------------
+// Webhook Deduplication
+// ----------------------------------------------------------------------------
+
+model WebhookDeduplication {
+  id          String   @id @default(uuid())
+  eventId     String   @unique // External event ID (e.g. WhatsApp msg ID, Facebook entry ID + time)
+  platform    String   // e.g. "FACEBOOK", "WHATSAPP", "INSTAGRAM"
+  tenantId    String?
+  processedAt DateTime @default(now())
+  status      String   @default("PROCESSING") // PROCESSING, PROCESSED, FAILED
+  expiresAt   DateTime // Expiration timestamp for database pruning (e.g., now + 48 hours)
+
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([expiresAt])
+  @@index([tenantId])
+}
+
+// ----------------------------------------------------------------------------
+// Broadcasts / Campaign Management
+// ----------------------------------------------------------------------------
+
+model Campaign {
+  id           String             @id @default(uuid())
+  tenantId     String
+  connectionId String
+  name         String
+  description  String?
+  status       String     @default("DRAFT")
+  content      String
+  mediaUrl     String?              // PostgreSQL String representing media (images/videos)
+  scheduledAt  DateTime?          // Scheduled start time
+  sentAt       DateTime?          // Execution complete time
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection   PlatformConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  recipients   CampaignRecipient[]
+
+  @@index([tenantId])
+  @@index([connectionId])
+}
+
+model CampaignRecipient {
+  id           String    @id @default(uuid())
+  campaignId   String
+  customerId   String    // PSID or WhatsApp Number
+  customerName String?
+  status       String    @default("PENDING") // PENDING, SENT, DELIVERED, READ, FAILED
+  errorMessage String?
+  sentAt       DateTime?
+  deliveredAt  DateTime?
+  readAt       DateTime?
+
+  campaign     Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, customerId])
+  @@index([campaignId])
+  @@index([status])
+}
+
+// ----------------------------------------------------------------------------
+// Audit Logging
+// ----------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  tenantId   String
+  userId     String?
+  action     String   // e.g. "CAMPAIGN_CREATED", "RULE_UPDATED", "USER_LOGIN"
+  entityType String   // e.g. "Campaign", "AutoReplyRule", "PlatformConnection"
+  entityId   String?  // ID of the target record
+  oldValues  String?    // Native PostgreSQL String representing state before change
+  newValues  String?    // Native PostgreSQL String representing state after change
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([userId])
+}
+
+// ----------------------------------------------------------------------------
+// Flow Automation Engine
+// ----------------------------------------------------------------------------
+
+model Flow {
+  id          String          @id @default(uuid())
+  tenantId    String
+  name        String
+  description String?
+  isActive    Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  triggers    FlowTrigger[]
+  steps       FlowStep[]
+  executions  FlowExecution[]
+
+  @@index([tenantId])
+  @@index([isActive])
+}
+
+model FlowTrigger {
+  id            String   @id @default(uuid())
+  flowId        String
+  type          String   // e.g. "INCOMING_MESSAGE", "ANY_COMMENT", "CONTACT_TAGGED"
+  configuration String?    // Filtering/trigger criteria (e.g. keywords, page IDs)
+
+  flow          Flow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  @@index([flowId])
+}
+
+model FlowStep {
+  id            String       @id @default(uuid())
+  flowId        String
+  type          String       // e.g. "SEND_MESSAGE", "WAIT_DELAY", "CONDITIONAL_BRANCH", "ADD_TAG"
+  configuration String         // Node actions configuration (text payload, delays, rules)
+  metadata      String?        // Coordinates and editor metadata for UI builders
+
+  flow          Flow         @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  branches      FlowBranch[]
+
+  @@index([flowId])
+}
+
+model FlowBranch {
+  id          String    @id @default(uuid())
+  stepId      String
+  label       String    // e.g. "Yes", "No", "Default"
+  condition   String?     // Branch matching rules
+  nextStepId  String?   // FlowStep ID to execute if matched
+
+  step        FlowStep  @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@index([stepId])
+}
+
+model FlowExecution {
+  id            String             @id @default(uuid())
+  flowId        String
+  tenantId      String
+  customerId    String             // Recipient PSID or Phone Number
+  status        String             @default("RUNNING") // RUNNING, COMPLETED, FAILED, PAUSED
+  currentStepId String?
+  variables     String?              // Context values gathered during execution
+  pausedUntil   DateTime?          // Used to track delay execution wakeup
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  flow          Flow               @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  logs          FlowExecutionLog[]
+
+  @@index([tenantId])
+  @@index([flowId])
+  @@index([customerId])
+  @@index([status])
+  @@index([pausedUntil])
+}
+
+model FlowExecutionLog {
+  id          String        @id @default(uuid())
+  executionId String
+  stepId      String?
+  stepType    String?
+  executedAt  DateTime      @default(now())
+  status      String        // SUCCESS, FAILED
+  error       String?
+
+  execution   FlowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([executionId])
+}
+
+// ----------------------------------------------------------------------------
+// User-added Custom Feature Models
+// ----------------------------------------------------------------------------
+
+model Subscriber {
+  id        String        @id @default(uuid())
+  tenantId  String
+  name      String?
+  phone     String?
+  email     String?
+  tags      String
+  notes     String?
+  platform  String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+model TeamInvitation {
+  id        String     @id @default(uuid())
+  tenantId  String
+  email     String
+  role      String
+  token     String     @unique
+  expiresAt DateTime
+  createdAt DateTime   @default(now())
+  accepted  Boolean    @default(false)
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([token])
+}
+
+model Broadcast {
+  id             String    @id @default(uuid())
+  tenantId       String
+  name           String
+  content        String
+  segmentTarget  String?
+  status         String @default("DRAFT") // DRAFT, SCHEDULED, SENT, CANCELLED
+  scheduledAt    DateTime?
+  sentCount      Int       @default(0)
+  deliveredCount Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+}
+
+// Platform-wide configuration editable from the admin panel.
+// Secrets are stored AES-256 encrypted; env vars act as fallback defaults.
+model PlatformSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model RevokedToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  createdAt DateTime @default(now())
+
+  @@index([token])
+}
+

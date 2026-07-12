@@ -1,0 +1,3 @@
+## 2026-07-11T13:14:10+04:00
+You are teamwork_preview_reviewer. Your working directory is c:\Users\pc\Desktop\face bot\.agents\reviewer_m5_oauth_2\.
+Review the implemented Facebook OAuth and credentials changes in backend/src/channels/channels.service.ts and backend/src/channels/channels.controller.ts. Review the newly added E2E tests in backend/test/channels.e2e-spec.ts. Specifically, check if the decryption helper getDecryptedAccessToken works correctly and if the in-memory database mock in the tests is robust and doesn't hide issues. Check for correctness and completeness. Write your findings to handoff.md in your working directory.
