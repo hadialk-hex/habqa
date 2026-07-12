@@ -4,9 +4,10 @@ import { WebhooksService } from './webhooks.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ChannelsModule } from '../channels/channels.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { FlowsModule } from '../flows/flows.module';
 
 @Module({
-  imports: [PrismaModule, ChannelsModule, NotificationsModule],
+  imports: [PrismaModule, ChannelsModule, NotificationsModule, FlowsModule],
   controllers: [WebhooksController],
   providers: [WebhooksService],
 })

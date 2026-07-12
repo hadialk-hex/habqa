@@ -1,5 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { getPlanLimits } from '../common/plan-limits';
 import {
   CreateSubscriberDto,
   UpdateSubscriberDto,
@@ -10,6 +15,7 @@ export class SubscribersService {
   constructor(private prisma: PrismaService) {}
 
   async create(tenantId: string, dto: CreateSubscriberDto) {
+    await this.enforceSubscriberLimit(tenantId);
     const uniqueTags = dto.tags ? Array.from(new Set(dto.tags)) : [];
     return this.prisma.subscriber.create({
       data: {
@@ -22,6 +28,23 @@ export class SubscribersService {
         platform: dto.platform || null,
       },
     });
+  }
+
+  // Contact-based plan limit (like ManyChat): STARTER 1000 / PRO 10000 /
+  // ENTERPRISE unlimited. Throws when the tenant is at capacity.
+  async enforceSubscriberLimit(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+    if (!tenant) throw new NotFoundException('مساحة العمل غير موجودة');
+    const limits = getPlanLimits(tenant.plan);
+    if (limits.maxSubscribers === -1) return;
+    const count = await this.prisma.subscriber.count({ where: { tenantId } });
+    if (count >= limits.maxSubscribers) {
+      throw new ForbiddenException(
+        `وصلت للحد الأقصى من جهات الاتصال في خطتك (${limits.maxSubscribers}). قم بترقية الخطة لإضافة المزيد.`,
+      );
+    }
   }
 
   async findAll(

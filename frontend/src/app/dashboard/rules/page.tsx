@@ -50,6 +50,7 @@ interface PredefinedTemplate {
   replyText: string
   isSequentialEnabled: boolean
   replyMessages: any[]
+  sector?: string
 }
 
 const PREDEFINED_TEMPLATES: PredefinedTemplate[] = [
@@ -125,6 +126,109 @@ const PREDEFINED_TEMPLATES: PredefinedTemplate[] = [
         imageUrl: "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=500"
       }
     ]
+  },
+  // ═══════ 🍽️ قطاع المطاعم ═══════
+  {
+    sector: "مطاعم",
+    name: "المنيو والتوصيل",
+    description: "يرسل قائمة الطعام في الخاص مع خيارات التوصيل أو الاستلام عند أي سؤال عن المنيو.",
+    keywords: "منيو, المنيو, قائمة, الطعام, توصيل, دليفري, طلب, اطلب",
+    replyText: "أهلاً وسهلاً! 🍽️ أرسلنا لك المنيو كامل مع خيارات الطلب في الخاص ||| يا هلا بك! المنيو وتفاصيل التوصيل وصلتك على الخاص 📩",
+    isSequentialEnabled: true,
+    replyMessages: [
+      {
+        type: "TEXT",
+        text: "أهلاً بك في مطعمنا! 🍽️ تفضل قائمة الطعام: [رابط المنيو]. التوصيل متاح يومياً من 11 صباحاً حتى 12 منتصف الليل. ||| يا هلا وغلا! 😍 منيونا الكامل هنا: [رابط المنيو] — والتوصيل لباب البيت خلال 45 دقيقة."
+      },
+      {
+        type: "QUICK_REPLIES",
+        text: "كيف تحب تكمل طلبك؟",
+        replies: [
+          { title: "🛵 توصيل", payload: "delivery_order" },
+          { title: "🏃 استلام من الفرع", payload: "pickup_order" }
+        ]
+      }
+    ]
+  },
+  {
+    sector: "مطاعم",
+    name: "حجز طاولة",
+    description: "يستقبل طلبات حجز الطاولات ويطلب التفاصيل اللازمة تلقائياً.",
+    keywords: "حجز, طاولة, احجز, حجوزات, عائلات",
+    replyText: "أهلاً بك! 🪑 تم استلام طلب الحجز، راسلناك في الخاص لتأكيد التفاصيل ||| حياك الله! تفاصيل الحجز وصلتك على الخاص 📩",
+    isSequentialEnabled: true,
+    replyMessages: [
+      {
+        type: "TEXT",
+        text: "يسعدنا حجز طاولتك! 🎉 فضلاً أرسل لنا: عدد الأشخاص، التاريخ، والوقت المفضل — وسنؤكد الحجز فوراً. ||| أهلاً بك! لإتمام الحجز نحتاج: كم شخص؟ أي يوم؟ وأي ساعة؟ وبنأكد لك خلال دقائق ⏱️"
+      }
+    ]
+  },
+  // ═══════ 🩺 قطاع العيادات ═══════
+  {
+    sector: "عيادات",
+    name: "حجز موعد كشف",
+    description: "ينقل طلبات حجز المواعيد للخاص فوراً حفاظاً على خصوصية المرضى.",
+    keywords: "موعد, حجز, كشف, دكتور, عيادة, احجز, متى الدوام",
+    replyText: "أهلاً بك 🌟 حفاظاً على خصوصيتك أرسلنا لك تفاصيل حجز الموعد في الخاص ||| حياك الله! راسلناك على الخاص بخصوص الموعد 📩",
+    isSequentialEnabled: true,
+    replyMessages: [
+      {
+        type: "TEXT",
+        text: "أهلاً بك في عيادتنا 🩺 لحجز موعدك فضلاً أرسل: الاسم الكامل، رقم الجوال، والتخصص المطلوب — وسيتواصل معك فريق المواعيد خلال ساعات الدوام. ||| يسعدنا خدمتك! 🌟 أرسل لنا اسمك ورقمك والتخصص الذي تريده، وسنؤكد أقرب موعد متاح."
+      },
+      {
+        type: "QUICK_REPLIES",
+        text: "أو اختر مباشرة:",
+        replies: [
+          { title: "📅 أقرب موعد متاح", payload: "nearest_appointment" },
+          { title: "💬 استشارة سريعة", payload: "quick_consult" }
+        ]
+      }
+    ]
+  },
+  {
+    sector: "عيادات",
+    name: "أسعار الكشف والخدمات",
+    description: "يرد على استفسارات أسعار الكشف بلباقة وينقل التفاصيل للخاص.",
+    keywords: "سعر الكشف, كم الكشف, بكم الكشف, اسعار, التكلفة, كم سعر",
+    replyText: "أهلاً بك! أرسلنا لك تفاصيل الأسعار والعروض الحالية في الخاص 📩 ||| حياك الله! قائمة الأسعار وصلتك على الخاص 🌟",
+    isSequentialEnabled: true,
+    replyMessages: [
+      {
+        type: "TEXT",
+        text: "أهلاً بك 🌟 سعر الكشف يبدأ من [السعر] ريال، ولدينا حالياً عروض على باقات المتابعة. للحجز أرسل اسمك ورقم جوالك. ||| يسعدنا اهتمامك! الكشف يبدأ من [السعر] ريال وتوجد خصومات على الباقات العائلية 👨‍👩‍👧 — أرسل بياناتك وسنتواصل معك."
+      }
+    ]
+  },
+  // ═══════ 🛍️ قطاع المتاجر ═══════
+  {
+    sector: "متاجر",
+    name: "توفر المنتج والمقاسات",
+    description: "يرد فوراً على أسئلة توفر المنتجات والمقاسات والألوان.",
+    keywords: "متوفر, المقاس, مقاس, لون, الوان, موجود, متاح",
+    replyText: "أهلاً بك! ✨ تفاصيل التوفر والمقاسات أرسلناها لك في الخاص ||| حياك الله! راسلناك على الخاص بكل التفاصيل 📩",
+    isSequentialEnabled: true,
+    replyMessages: [
+      {
+        type: "TEXT",
+        text: "أهلاً بك! 🛍️ المنتج متوفر حالياً بجميع المقاسات والألوان الظاهرة في المنشور. اطلب الآن قبل نفاد الكمية: [رابط المتجر] ||| يا هلا! ✨ نعم متوفر، والمقاسات من S إلى XXL. تقدر تطلبه مباشرة من هنا: [رابط المتجر]"
+      }
+    ]
+  },
+  {
+    sector: "متاجر",
+    name: "الشحن والاسترجاع",
+    description: "يجيب تلقائياً على أسئلة الشحن ومدة التوصيل وسياسة الاسترجاع.",
+    keywords: "شحن, الشحن, توصيل, كم يوصل, استرجاع, استبدال, ارجاع",
+    replyText: "أهلاً بك! 🚚 تفاصيل الشحن والاسترجاع كاملة في رسالتك الخاصة ||| حياك الله! أرسلنا لك سياسة الشحن والاسترجاع في الخاص 📩",
+    isSequentialEnabled: true,
+    replyMessages: [
+      {
+        type: "TEXT",
+        text: "أهلاً بك! 🚚 الشحن لجميع المدن خلال 2-5 أيام عمل، والشحن مجاني للطلبات فوق 200 ريال. الاسترجاع متاح خلال 14 يوم بدون أسئلة. ||| يا هلا! التوصيل 2-5 أيام عمل 📦 ومجاني فوق 200 ريال — وتقدر تسترجع أو تستبدل خلال 14 يوم بكل سهولة."
+      }
+    ]
   }
 ]
 
@@ -150,6 +254,7 @@ export default function RulesPage() {
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null)
   const [name, setName] = useState("")
   const [ruleType, setRuleType] = useState("GLOBAL")
+  const [storyTrigger, setStoryTrigger] = useState("STORY_REPLY")
   const [postId, setPostId] = useState("")
   const [selectedPost, setSelectedPost] = useState<PickedPost | null>(null)
   const [isPickerOpen, setIsPickerOpen] = useState(false)
@@ -273,7 +378,10 @@ export default function RulesPage() {
       
       const payload: any = {
         name,
-        triggerType: keywords ? "KEYWORD" : "ANY_COMMENT",
+        triggerType:
+          ruleType === "STORY"
+            ? storyTrigger
+            : keywords ? "KEYWORD" : "ANY_COMMENT",
         postId: ruleType === "POST" && effectivePostId ? effectivePostId : null,
         keywords,
         replyText,
@@ -322,7 +430,12 @@ export default function RulesPage() {
   const handleEditRule = (rule: Rule) => {
     setEditingRuleId(rule.id)
     setName(rule.name)
-    setRuleType(rule.postId ? "POST" : "GLOBAL")
+    if (rule.triggerType === "STORY_REPLY" || rule.triggerType === "STORY_MENTION") {
+      setRuleType("STORY")
+      setStoryTrigger(rule.triggerType)
+    } else {
+      setRuleType(rule.postId ? "POST" : "GLOBAL")
+    }
     setPostId(rule.postId || "")
     if (rule.postId) {
       setSelectedPost({
@@ -424,6 +537,7 @@ export default function RulesPage() {
   const resetForm = () => {
     setName("")
     setRuleType("GLOBAL")
+    setStoryTrigger("STORY_REPLY")
     setPostId("")
     setSelectedPost(null)
     setShowManualId(false)
@@ -661,7 +775,7 @@ export default function RulesPage() {
                   <div className="grid gap-2">
                     <Label className="font-bold">نطاق عمل القاعدة</Label>
                     <Tabs value={ruleType} onValueChange={setRuleType} className="w-full">
-                      <TabsList className="grid w-full grid-cols-2 rounded-xl h-11">
+                      <TabsList className="grid w-full grid-cols-3 rounded-xl h-11">
                         <TabsTrigger value="GLOBAL" className="rounded-lg gap-2 font-bold cursor-pointer">
                           <Globe2 className="w-4 h-4" />
                           رد عام
@@ -670,7 +784,47 @@ export default function RulesPage() {
                           <Target className="w-4 h-4" />
                           مخصص لمنشور
                         </TabsTrigger>
+                        <TabsTrigger value="STORY" className="rounded-lg gap-2 font-bold cursor-pointer">
+                          <Play className="w-4 h-4" />
+                          ستوري
+                        </TabsTrigger>
                       </TabsList>
+                      <TabsContent value="STORY" className="pt-4 border-t mt-4">
+                        <div className="grid gap-2">
+                          <Label className="font-bold text-sm">نوع تفاعل الستوري</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setStoryTrigger("STORY_REPLY")}
+                              className={`flex items-center gap-2 p-3 rounded-xl border-2 text-sm font-bold transition-colors cursor-pointer ${
+                                storyTrigger === "STORY_REPLY"
+                                  ? "border-primary bg-primary/5 text-primary"
+                                  : "border-border text-muted-foreground hover:border-primary/40"
+                              }`}
+                            >
+                              <Send className="w-4 h-4 shrink-0" />
+                              رد على الستوري
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setStoryTrigger("STORY_MENTION")}
+                              className={`flex items-center gap-2 p-3 rounded-xl border-2 text-sm font-bold transition-colors cursor-pointer ${
+                                storyTrigger === "STORY_MENTION"
+                                  ? "border-primary bg-primary/5 text-primary"
+                                  : "border-border text-muted-foreground hover:border-primary/40"
+                              }`}
+                            >
+                              <Sparkles className="w-4 h-4 shrink-0" />
+                              منشن في ستوري
+                            </button>
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                            {storyTrigger === "STORY_REPLY"
+                              ? "عندما يرد أحد على ستوري حسابك، يصله الرد الخاص تلقائياً. اترك الكلمات المفتاحية فارغة للرد على أي تفاعل."
+                              : "عندما يذكرك أحد في ستوري حسابه، يصله رد شكر تلقائي — أقوى أداة لمكافأة المشاركة."}
+                          </p>
+                        </div>
+                      </TabsContent>
                       <TabsContent value="POST" className="pt-4 border-t mt-4">
                         <div className="grid gap-3">
                           {selectedPost ? (
@@ -1717,6 +1871,16 @@ export default function RulesPage() {
                           <span className="text-muted-foreground">كلمات:</span>
                           <span className="font-bold text-foreground bg-accent px-2 py-0.5 rounded-md text-xs">{rule.keywords}</span>
                         </span>
+                      ) : rule.triggerType === 'STORY_REPLY' ? (
+                        <span className="flex items-center gap-1.5">
+                          <Play className="w-3.5 h-3.5 text-muted-foreground" />
+                          الرد على تفاعل الستوري
+                        </span>
+                      ) : rule.triggerType === 'STORY_MENTION' ? (
+                        <span className="flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
+                          شكر تلقائي عند المنشن في ستوري
+                        </span>
                       ) : (
                         <span className="flex items-center gap-1.5">
                           <Globe2 className="w-3.5 h-3.5 text-muted-foreground" />
@@ -1867,31 +2031,46 @@ export default function RulesPage() {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-4">
-          {PREDEFINED_TEMPLATES.map((tpl, tIdx) => (
-            <Card key={tIdx} className="hover:border-primary/50 transition-all cursor-pointer bg-accent/15 border" onClick={() => applyTemplate(tpl)}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-black text-primary">{tpl.name}</CardTitle>
-                <CardDescription className="font-medium text-xs text-muted-foreground">{tpl.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2 text-xs font-medium">
-                <div>
-                  <span className="text-muted-foreground">الكلمات المفتاحية: </span>
-                  <span className="font-bold text-foreground">{tpl.keywords}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">الرد العلني: </span>
-                  <span className="text-foreground line-clamp-1">{tpl.replyText}</span>
-                </div>
-                <div className="flex gap-2 items-center">
-                  <span className="text-muted-foreground">نوع الرسائل المرفقة: </span>
-                  <span className="bg-primary/20 text-primary px-2 py-0.5 rounded font-black">
-                    متسلسل ({tpl.replyMessages.length} رسائل)
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="grid gap-6 py-4">
+          {["عام", "مطاعم", "عيادات", "متاجر"].map((sector) => {
+            const sectorTemplates = PREDEFINED_TEMPLATES.filter(
+              (t) => (t.sector || "عام") === sector
+            )
+            if (sectorTemplates.length === 0) return null
+            const sectorEmoji: Record<string, string> = { "عام": "⚡", "مطاعم": "🍽️", "عيادات": "🩺", "متاجر": "🛍️" }
+            return (
+              <div key={sector} className="space-y-3">
+                <h3 className="text-sm font-black text-muted-foreground flex items-center gap-2 border-b border-border/50 pb-2">
+                  <span>{sectorEmoji[sector]}</span>
+                  قوالب {sector === "عام" ? "عامة" : `قطاع ال${sector}`}
+                </h3>
+                {sectorTemplates.map((tpl, tIdx) => (
+                  <Card key={tIdx} className="hover:border-primary/50 transition-all cursor-pointer bg-accent/15 border" onClick={() => applyTemplate(tpl)}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg font-black text-primary">{tpl.name}</CardTitle>
+                      <CardDescription className="font-medium text-xs text-muted-foreground">{tpl.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-xs font-medium">
+                      <div>
+                        <span className="text-muted-foreground">الكلمات المفتاحية: </span>
+                        <span className="font-bold text-foreground">{tpl.keywords}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">الرد العلني: </span>
+                        <span className="text-foreground line-clamp-1">{tpl.replyText}</span>
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <span className="text-muted-foreground">نوع الرسائل المرفقة: </span>
+                        <span className="bg-primary/20 text-primary px-2 py-0.5 rounded font-black">
+                          متسلسل ({tpl.replyMessages.length} رسائل)
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )
+          })}
         </div>
 
         <DialogFooter className="sm:justify-end">

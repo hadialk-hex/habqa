@@ -37,6 +37,8 @@ enum PlatformType {
 enum TriggerType {
   KEYWORD
   ANY_COMMENT
+  STORY_REPLY
+  STORY_MENTION
 }
 
 enum MatchType {

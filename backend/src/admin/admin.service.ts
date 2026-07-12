@@ -102,10 +102,14 @@ export class AdminService {
     });
 
     const monthStart = startOfCurrentMonth();
+    const REPLY_ACTIONS = ['RULE_TRIGGERED', 'AI_REPLY_SENT', 'FLOW_TRIGGERED'];
     const [repliesThisMonth, quotaSkippedThisMonth] =
       await this.prisma.$transaction([
         this.prisma.auditLog.count({
-          where: { action: 'RULE_TRIGGERED', createdAt: { gte: monthStart } },
+          where: {
+            action: { in: REPLY_ACTIONS },
+            createdAt: { gte: monthStart },
+          },
         }),
         this.prisma.auditLog.count({
           where: {
@@ -118,7 +122,10 @@ export class AdminService {
     // Top 5 most active tenants this month by auto-replies sent
     const topUsage = await this.prisma.auditLog.groupBy({
       by: ['tenantId'],
-      where: { action: 'RULE_TRIGGERED', createdAt: { gte: monthStart } },
+      where: {
+        action: { in: REPLY_ACTIONS },
+        createdAt: { gte: monthStart },
+      },
       orderBy: { _count: { tenantId: 'desc' } },
       _count: true,
       take: 5,
@@ -194,7 +201,9 @@ export class AdminService {
 
     const logs = await this.prisma.auditLog.findMany({
       where: {
-        action: 'RULE_TRIGGERED',
+        action: {
+          in: ['RULE_TRIGGERED', 'AI_REPLY_SENT', 'FLOW_TRIGGERED'],
+        },
         createdAt: { gte: thirtyDaysAgo },
       },
       select: { createdAt: true },
@@ -266,7 +275,9 @@ export class AdminService {
       by: ['tenantId'],
       where: {
         tenantId: { in: tenants.map((t) => t.id) },
-        action: 'RULE_TRIGGERED',
+        action: {
+          in: ['RULE_TRIGGERED', 'AI_REPLY_SENT', 'FLOW_TRIGGERED'],
+        },
         createdAt: { gte: monthStart },
       },
       _count: true,
@@ -288,6 +299,7 @@ export class AdminService {
               usageRows.find((u) => u.tenantId === t.id)?._count || 0,
             maxRepliesPerMonth: limits.maxRepliesPerMonth,
             maxConnections: limits.maxConnections,
+            maxSubscribers: limits.maxSubscribers,
           },
         };
       }),

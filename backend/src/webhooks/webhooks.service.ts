@@ -4,6 +4,7 @@ import { ChannelsService } from '../channels/channels.service';
 import { AiService } from '../ai/ai.service';
 import { PlatformSettingsService } from '../settings/platform-settings.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { FlowEngineService } from '../flows/flow-engine.service';
 import { getPlanLimits, startOfCurrentMonth } from '../common/plan-limits';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class WebhooksService {
     @Optional() private aiService?: AiService,
     @Optional() private platformSettings?: PlatformSettingsService,
     @Optional() private notifications?: NotificationsService,
+    @Optional() private flowEngine?: FlowEngineService,
   ) {}
 
   // Creates an in-app notification without ever breaking webhook processing
@@ -171,22 +173,42 @@ export class WebhooksService {
       },
     });
 
+    const isNewSubscriber = !subscriber;
     if (!subscriber) {
-      subscriber = await this.prisma.subscriber.create({
-        data: {
-          tenantId: connection.tenantId,
-          name: senderName,
-          phone: senderId,
-          tags: [],
-          platform: 'WHATSAPP',
-        },
+      // Contact-based plan limit: over capacity → keep processing the
+      // message, just don't store a new contact.
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: connection.tenantId },
       });
-      await this.notify(
-        connection.tenantId,
-        'مشترك جديد',
-        `انضم ${senderName} عبر واتساب`,
-        'subscriber',
-      );
+      const subscriberLimit = getPlanLimits(tenant?.plan || 'STARTER')
+        .maxSubscribers;
+      const subscriberCount =
+        subscriberLimit === -1
+          ? 0
+          : await this.prisma.subscriber.count({
+              where: { tenantId: connection.tenantId },
+            });
+      if (subscriberLimit !== -1 && subscriberCount >= subscriberLimit) {
+        this.logger.warn(
+          `Tenant ${connection.tenantId} hit the subscriber limit (${subscriberLimit}) — contact not stored.`,
+        );
+      } else {
+        subscriber = await this.prisma.subscriber.create({
+          data: {
+            tenantId: connection.tenantId,
+            name: senderName,
+            phone: senderId,
+            tags: [],
+            platform: 'WHATSAPP',
+          },
+        });
+        await this.notify(
+          connection.tenantId,
+          'مشترك جديد',
+          `انضم ${senderName} عبر واتساب`,
+          'subscriber',
+        );
+      }
     }
 
     // 2. Create/Get Conversation
@@ -234,6 +256,26 @@ export class WebhooksService {
         messageType: 'TEXT',
         metaData: JSON.stringify(message),
       },
+    });
+
+    // 4. Run active flows: new-subscriber trigger first, then message triggers
+    if (isNewSubscriber) {
+      await this.flowEngine?.processEvent({
+        tenantId: connection.tenantId,
+        connection,
+        conversationId: conversation.id,
+        customerId: senderId,
+        text: messageText,
+        eventType: 'NEW_SUBSCRIBER',
+      });
+    }
+    await this.flowEngine?.processEvent({
+      tenantId: connection.tenantId,
+      connection,
+      conversationId: conversation.id,
+      customerId: senderId,
+      text: messageText,
+      eventType: 'MESSAGE',
     });
   }
 
@@ -445,8 +487,26 @@ export class WebhooksService {
         conversation,
       );
     } else {
-      // No rule matched â€” try the tenant's AI fallback reply
-      await this.maybeAiReply(commentText, commentId, connection, conversation);
+      // No rule matched — try active flows, then the AI fallback reply
+      const flowMatched =
+        (await this.flowEngine?.processEvent({
+          tenantId: connection.tenantId,
+          connection,
+          conversationId: conversation.id,
+          customerId: senderId,
+          commentId,
+          postId: value.post_id,
+          text: commentText,
+          eventType: 'COMMENT',
+        })) || false;
+      if (!flowMatched) {
+        await this.maybeAiReply(
+          commentText,
+          commentId,
+          connection,
+          conversation,
+        );
+      }
     }
   }
 
@@ -526,6 +586,113 @@ export class WebhooksService {
         newValues: JSON.stringify({ commentId, reply }),
       },
     });
+  }
+
+  // Handles Instagram story replies and story mentions: matches active
+  // STORY_REPLY / STORY_MENTION rules (highest priority first, optional
+  // keyword filter) and sends the rule's private reply as a DM.
+  private async handleStoryEvent(
+    triggerType: 'STORY_REPLY' | 'STORY_MENTION',
+    text: string,
+    senderId: string,
+    connection: any,
+    conversation: any,
+  ): Promise<boolean> {
+    const rules = await this.prisma.autoReplyRule.findMany({
+      where: {
+        tenantId: connection.tenantId,
+        isActive: true,
+        triggerType,
+        OR: [{ connectionId: null }, { connectionId: connection.id }],
+      },
+      orderBy: { priority: 'desc' },
+    });
+
+    const rule = rules.find((r) => {
+      const keywords = (r.keywords || '')
+        .split(/[,،]/)
+        .map((k) => k.trim())
+        .filter(Boolean);
+      if (keywords.length === 0) return true; // no filter → always match
+      const lower = (text || '').toLowerCase();
+      return keywords.some((k) => lower.includes(k.toLowerCase()));
+    });
+    if (!rule) return false;
+
+    if (!(await this.hasReplyQuota(connection.tenantId))) {
+      await this.prisma.auditLog.create({
+        data: {
+          tenantId: connection.tenantId,
+          action: 'RULE_SKIPPED_QUOTA',
+          entityType: 'AutoReplyRule',
+          entityId: rule.id,
+          newValues: JSON.stringify({ ruleId: rule.id, triggerType }),
+        },
+      });
+      return false;
+    }
+
+    const replyText = this.pickVariant(rule.privateText || rule.replyText);
+    if (!replyText) return false;
+
+    const token = this.channelsService.getDecryptedAccessToken(
+      connection.accessToken,
+    );
+    try {
+      const response = await fetch(
+        `https://graph.facebook.com/v19.0/me/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            recipient: { id: senderId },
+            message: { text: replyText },
+          }),
+        },
+      );
+      if (!response.ok) {
+        this.logger.error(
+          `Failed to send story ${triggerType} reply: ${response.statusText}`,
+        );
+        return false;
+      }
+    } catch (error) {
+      this.logger.error('Failed to send story reply (network)', error);
+      return false;
+    }
+
+    await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        direction: 'OUTBOUND',
+        content: replyText,
+        messageType: 'TEXT',
+        sentByName: 'الرد الآلي',
+      },
+    });
+    await this.prisma.autoReplyRule.update({
+      where: { id: rule.id },
+      data: { triggerCount: { increment: 1 }, lastTriggeredAt: new Date() },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: connection.tenantId,
+        action: 'RULE_TRIGGERED',
+        entityType: 'AutoReplyRule',
+        entityId: rule.id,
+        newValues: JSON.stringify({ ruleId: rule.id, triggerType }),
+      },
+    });
+    await this.notify(
+      connection.tenantId,
+      triggerType === 'STORY_REPLY' ? 'رد على ستوري' : 'منشن في ستوري',
+      `تم الرد آلياً على تفاعل ستوري جديد`,
+      'rule',
+    );
+    return true;
   }
 
   async processPrivateDM(value: any, platform: string, entryId?: string) {
@@ -615,15 +782,47 @@ export class WebhooksService {
       });
     }
 
+    // Story reply / story mention detection (Instagram messaging payloads)
+    const isStoryReply = !!value.message?.reply_to?.story;
+    const isStoryMention =
+      Array.isArray(value.message?.attachments) &&
+      value.message.attachments.some((a: any) => a?.type === 'story_mention');
+
     await this.prisma.message.create({
       data: {
         conversationId: conversation.id,
         direction: 'INBOUND',
-        content: messageText,
+        content:
+          messageText ||
+          (isStoryMention ? 'أشارك حسابك في ستوري 📢' : isStoryReply ? 'رد على ستوري' : ''),
         messageType: 'TEXT',
         metaData: JSON.stringify(value),
       },
     });
+
+    // Story interactions get their own rule types (STORY_REPLY/STORY_MENTION)
+    let storyHandled = false;
+    if (isStoryReply || isStoryMention) {
+      storyHandled = await this.handleStoryEvent(
+        isStoryReply ? 'STORY_REPLY' : 'STORY_MENTION',
+        messageText,
+        senderId,
+        connection,
+        conversation,
+      );
+    }
+
+    // Run active flows on incoming DMs (keyword / any-message triggers)
+    if (!storyHandled) {
+      await this.flowEngine?.processEvent({
+        tenantId: connection.tenantId,
+        connection,
+        conversationId: conversation.id,
+        customerId: senderId,
+        text: messageText,
+        eventType: 'MESSAGE',
+      });
+    }
   }
 
   // Returns true when the tenant still has reply quota left
@@ -641,7 +840,7 @@ export class WebhooksService {
       const usedLastHour = await this.prisma.auditLog.count({
         where: {
           tenantId,
-          action: { in: ['RULE_TRIGGERED', 'AI_REPLY_SENT'] },
+          action: { in: ['RULE_TRIGGERED', 'AI_REPLY_SENT', 'FLOW_TRIGGERED'] },
           createdAt: { gte: oneHourAgo },
         },
       });
@@ -658,7 +857,7 @@ export class WebhooksService {
     const usedThisMonth = await this.prisma.auditLog.count({
       where: {
         tenantId,
-        action: { in: ['RULE_TRIGGERED', 'AI_REPLY_SENT'] },
+        action: { in: ['RULE_TRIGGERED', 'AI_REPLY_SENT', 'FLOW_TRIGGERED'] },
         createdAt: { gte: startOfCurrentMonth() },
       },
     });

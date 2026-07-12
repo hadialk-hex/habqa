@@ -11,6 +11,8 @@ export interface PlanLimits {
   // Anti-ban throttle: Facebook flags pages that reply too fast for too long.
   // Applies to every plan — it protects the customer's page, not our infra.
   maxRepliesPerHour: number;
+  // Contact-based limit (like ManyChat): total stored subscribers/contacts.
+  maxSubscribers: number;
 }
 
 export const PLAN_LIMITS: Record<string, PlanLimits> = {
@@ -18,16 +20,19 @@ export const PLAN_LIMITS: Record<string, PlanLimits> = {
     maxConnections: 1,
     maxRepliesPerMonth: 100,
     maxRepliesPerHour: 20,
+    maxSubscribers: 1000,
   },
   PRO: {
     maxConnections: 5,
     maxRepliesPerMonth: -1,
     maxRepliesPerHour: 120,
+    maxSubscribers: 10000,
   },
   ENTERPRISE: {
     maxConnections: -1,
     maxRepliesPerMonth: -1,
     maxRepliesPerHour: 300,
+    maxSubscribers: -1,
   },
 };
 
