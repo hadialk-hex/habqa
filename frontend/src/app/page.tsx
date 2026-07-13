@@ -31,6 +31,8 @@ import {
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useEffect, useState, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useLanguage } from "@/lib/i18n/language-context";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 /* ──────────────────────────────────────────────
    ANIMATION VARIANTS
@@ -107,117 +109,37 @@ function useCounter(end: number, duration: number = 2000) {
 }
 
 /* ──────────────────────────────────────────────
-   DATA
+   DATA (built from the active locale's dictionary)
    ────────────────────────────────────────────── */
-const features = [
-  {
-    icon: Zap,
-    title: "رد تلقائي فوري",
-    description: "الرد على التعليقات والرسائل في أقل من ثانية بدون أي تأخير",
-    gradient: "from-yellow-400 to-orange-500",
-  },
-  {
-    icon: Smartphone,
-    title: "دعم متعدد المنصات",
-    description: "فيسبوك، انستغرام، وواتساب في مكان واحد بإدارة موحدة",
-    gradient: "from-blue-400 to-cyan-500",
-  },
-  {
-    icon: Inbox,
-    title: "صندوق وارد موحد",
-    description: "جميع محادثاتك من كل المنصات في مكان واحد سهل الإدارة",
-    gradient: "from-sky-400 to-blue-500",
-  },
-  {
-    icon: BarChart3,
-    title: "تحليلات ذكية",
-    description: "إحصائيات مفصلة عن أداء البوت والتفاعل مع العملاء",
-    gradient: "from-green-400 to-emerald-500",
-  },
-  {
-    icon: Target,
-    title: "قواعد مرنة",
-    description: "تخصيص الردود بالكلمات المفتاحية أو لمنشورات محددة بسهولة",
-    gradient: "from-red-400 to-orange-500",
-  },
-  {
-    icon: Shield,
-    title: "أمان وخصوصية",
-    description: "تشفير البيانات وحماية كاملة لمعلومات العملاء على مدار الساعة",
-    gradient: "from-slate-500 to-blue-600",
-  },
-];
+type TFn = (path: string, vars?: Record<string, string | number>) => string;
+type TListFn = (path: string) => string[];
 
-const steps = [
-  {
-    icon: Link2,
-    title: "اربط حساباتك",
-    description: "قم بربط صفحات فيسبوك وحسابات انستغرام وواتساب بسهولة",
-    step: "01",
-  },
-  {
-    icon: Settings2,
-    title: "أنشئ قواعد الرد",
-    description: "حدد الكلمات المفتاحية والردود المخصصة لكل منشور",
-    step: "02",
-  },
-  {
-    icon: Rocket,
-    title: "شاهد النتائج",
-    description: "البوت يرد تلقائياً ولا يفوت أي عميل بعد اليوم",
-    step: "03",
-  },
-];
+function getFeatures(t: TFn) {
+  return [
+    { icon: Zap, title: t("landing.features.items.instant.title"), description: t("landing.features.items.instant.description"), gradient: "from-yellow-400 to-orange-500" },
+    { icon: Smartphone, title: t("landing.features.items.multiPlatform.title"), description: t("landing.features.items.multiPlatform.description"), gradient: "from-blue-400 to-cyan-500" },
+    { icon: Inbox, title: t("landing.features.items.unifiedInbox.title"), description: t("landing.features.items.unifiedInbox.description"), gradient: "from-sky-400 to-blue-500" },
+    { icon: BarChart3, title: t("landing.features.items.analytics.title"), description: t("landing.features.items.analytics.description"), gradient: "from-green-400 to-emerald-500" },
+    { icon: Target, title: t("landing.features.items.flexibleRules.title"), description: t("landing.features.items.flexibleRules.description"), gradient: "from-red-400 to-orange-500" },
+    { icon: Shield, title: t("landing.features.items.security.title"), description: t("landing.features.items.security.description"), gradient: "from-slate-500 to-blue-600" },
+  ];
+}
 
-const pricingPlans = [
-  {
-    name: "مجاني",
-    price: "0",
-    period: "شهرياً",
-    description: "للتجربة والبداية",
-    popular: false,
-    features: [
-      "صفحة واحدة",
-      "100 رد شهرياً",
-      "1,000 جهة اتصال",
-      "دعم البريد الإلكتروني",
-      "الميزات الأساسية",
-      "تحليلات محدودة",
-    ],
-  },
-  {
-    name: "احترافي",
-    price: "99",
-    period: "شهرياً",
-    description: "للأعمال المتنامية",
-    popular: true,
-    features: [
-      "5 صفحات",
-      "ردود لا محدودة",
-      "10,000 جهة اتصال",
-      "صندوق وارد موحد",
-      "دعم أولوية",
-      "تحليلات متقدمة",
-      "قواعد رد مخصصة",
-    ],
-  },
-  {
-    name: "مؤسسات",
-    price: "299",
-    period: "شهرياً",
-    description: "للشركات الكبيرة",
-    popular: false,
-    features: [
-      "صفحات لا محدودة",
-      "جهات اتصال لا محدودة",
-      "API كامل",
-      "مدير حساب مخصص",
-      "دعم 24/7",
-      "تحليلات مؤسسية",
-      "تكاملات مخصصة",
-    ],
-  },
-];
+function getSteps(t: TFn) {
+  return [
+    { icon: Link2, title: t("landing.howItWorks.steps.connect.title"), description: t("landing.howItWorks.steps.connect.description"), step: "01" },
+    { icon: Settings2, title: t("landing.howItWorks.steps.createRules.title"), description: t("landing.howItWorks.steps.createRules.description"), step: "02" },
+    { icon: Rocket, title: t("landing.howItWorks.steps.seeResults.title"), description: t("landing.howItWorks.steps.seeResults.description"), step: "03" },
+  ];
+}
+
+function getPricingPlans(t: TFn, tList: TListFn) {
+  return [
+    { name: t("landing.pricing.plans.free.name"), price: "0", period: t("landing.pricing.perMonth"), description: t("landing.pricing.plans.free.description"), popular: false, features: tList("landing.pricing.plans.free.features") },
+    { name: t("landing.pricing.plans.pro.name"), price: "29", period: t("landing.pricing.perMonth"), description: t("landing.pricing.plans.pro.description"), popular: true, features: tList("landing.pricing.plans.pro.features") },
+    { name: t("landing.pricing.plans.enterprise.name"), price: "99", period: t("landing.pricing.perMonth"), description: t("landing.pricing.plans.enterprise.description"), popular: false, features: tList("landing.pricing.plans.enterprise.features") },
+  ];
+}
 
 /* ──────────────────────────────────────────────
    SECTION HEADING COMPONENT
@@ -256,6 +178,10 @@ function SectionHeading({
    MAIN PAGE COMPONENT
    ══════════════════════════════════════════════ */
 export default function Home() {
+  const { t, tList } = useLanguage();
+  const features = getFeatures(t);
+  const steps = getSteps(t);
+  const pricingPlans = getPricingPlans(t, tList);
   const [scrolled, setScrolled] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const heroRef = useRef<HTMLElement>(null);
@@ -310,40 +236,41 @@ export default function Home() {
               href="#features"
               className="hover:text-foreground transition-colors duration-200 relative after:absolute after:bottom-0 after:right-0 after:w-0 after:h-0.5 after:bg-primary after:transition-all hover:after:w-full"
             >
-              الميزات
+              {t("landing.nav.features")}
             </a>
             <a
               href="#pricing"
               className="hover:text-foreground transition-colors duration-200 relative after:absolute after:bottom-0 after:right-0 after:w-0 after:h-0.5 after:bg-primary after:transition-all hover:after:w-full"
             >
-              الأسعار
+              {t("landing.nav.pricing")}
             </a>
             <a
               href="#how-it-works"
               className="hover:text-foreground transition-colors duration-200 relative after:absolute after:bottom-0 after:right-0 after:w-0 after:h-0.5 after:bg-primary after:transition-all hover:after:w-full"
             >
-              كيف يعمل
+              {t("landing.nav.howItWorks")}
             </a>
             <a
               href="#about"
               className="hover:text-foreground transition-colors duration-200 relative after:absolute after:bottom-0 after:right-0 after:w-0 after:h-0.5 after:bg-primary after:transition-all hover:after:w-full"
             >
-              من نحن
+              {t("landing.nav.about")}
             </a>
             <a
               href="#contact"
               className="hover:text-foreground transition-colors duration-200 relative after:absolute after:bottom-0 after:right-0 after:w-0 after:h-0.5 after:bg-primary after:transition-all hover:after:w-full"
             >
-              تواصل معنا
+              {t("landing.nav.contact")}
             </a>
           </nav>
 
           {/* Actions */}
           <div className="flex items-center gap-3">
+            <LanguageSwitcher className="hidden sm:inline-flex" />
             <ThemeToggle />
             <Link href="/register" className="hidden sm:inline-block">
               <Button className="gap-2 rounded-full px-5 shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 transition-all duration-300">
-                ابدأ مجاناً
+                {t("landing.nav.startFree")}
                 <ArrowLeft className="w-4 h-4" />
               </Button>
             </Link>
@@ -361,18 +288,19 @@ export default function Home() {
                   <span className="text-lg font-bold">حبقة Hubqa</span>
                 </div>
                 <nav className="flex flex-col gap-4 text-base font-bold text-muted-foreground">
-                  <a href="#features" className="hover:text-foreground py-2 border-b border-border/30">الميزات</a>
-                  <a href="#pricing" className="hover:text-foreground py-2 border-b border-border/30">الأسعار</a>
-                  <a href="#how-it-works" className="hover:text-foreground py-2 border-b border-border/30">كيف يعمل</a>
-                  <a href="#about" className="hover:text-foreground py-2 border-b border-border/30">من نحن</a>
-                  <a href="#contact" className="hover:text-foreground py-2 border-b border-border/30">تواصل معنا</a>
+                  <a href="#features" className="hover:text-foreground py-2 border-b border-border/30">{t("landing.nav.features")}</a>
+                  <a href="#pricing" className="hover:text-foreground py-2 border-b border-border/30">{t("landing.nav.pricing")}</a>
+                  <a href="#how-it-works" className="hover:text-foreground py-2 border-b border-border/30">{t("landing.nav.howItWorks")}</a>
+                  <a href="#about" className="hover:text-foreground py-2 border-b border-border/30">{t("landing.nav.about")}</a>
+                  <a href="#contact" className="hover:text-foreground py-2 border-b border-border/30">{t("landing.nav.contact")}</a>
                 </nav>
                 <div className="mt-auto flex flex-col gap-3">
+                  <LanguageSwitcher className="w-full justify-center" />
                   <Link href="/login">
-                    <Button variant="outline" className="w-full rounded-xl font-bold">تسجيل الدخول</Button>
+                    <Button variant="outline" className="w-full rounded-xl font-bold">{t("landing.nav.login")}</Button>
                   </Link>
                   <Link href="/register">
-                    <Button className="w-full rounded-xl font-bold">ابدأ مجاناً</Button>
+                    <Button className="w-full rounded-xl font-bold">{t("landing.nav.startFree")}</Button>
                   </Link>
                 </div>
               </SheetContent>
@@ -408,7 +336,7 @@ export default function Home() {
             >
               <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary shadow-sm mb-8">
                 <Star className="w-4 h-4 fill-primary text-primary" />
-                ✨ منصة أتمتة الردود الأولى عربياً
+                {t("landing.hero.badge")}
               </span>
             </motion.div>
 
@@ -419,9 +347,9 @@ export default function Home() {
               transition={{ duration: 0.7, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
               className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-8 leading-[1.15]"
             >
-              أتمتة الردود الذكية
+              {t("landing.hero.titleLine1")}
               <br />
-              <span className="gradient-text">لوسائل التواصل</span>
+              <span className="gradient-text">{t("landing.hero.titleLine2")}</span>
             </motion.h1>
 
             {/* Subtitle */}
@@ -431,8 +359,7 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed"
             >
-              لا تفوّت أي عميل بعد اليوم. منصة حبقة تقوم بالرد التلقائي على
-              تعليقات ورسائل فيسبوك، انستغرام، وواتساب بشكل فوري واحترافي.
+              {t("landing.hero.subtitle")}
             </motion.p>
 
             {/* CTAs */}
@@ -447,7 +374,7 @@ export default function Home() {
                   size="lg"
                   className="h-13 px-8 text-base rounded-full shadow-xl shadow-primary/25 hover:shadow-2xl hover:shadow-primary/35 transition-all duration-300 w-full sm:w-auto gap-2 animate-pulse-glow"
                 >
-                  ابدأ مجاناً الآن
+                  {t("landing.hero.ctaPrimary")}
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
               </Link>
@@ -457,7 +384,7 @@ export default function Home() {
                   size="lg"
                   className="h-13 px-8 text-base rounded-full gap-2 w-full sm:w-auto border-primary/20 hover:border-primary/40 hover:bg-primary/5"
                 >
-                  تعرف على المزيد
+                  {t("landing.hero.ctaSecondary")}
                 </Button>
               </a>
             </motion.div>
@@ -472,7 +399,7 @@ export default function Home() {
               <Globe className="w-5 h-5" />
               <AtSign className="w-5 h-5" />
               <MessageCircle className="w-5 h-5" />
-              <span className="text-sm">متوافق مع جميع المنصات</span>
+              <span className="text-sm">{t("landing.hero.platformsNote")}</span>
             </motion.div>
           </motion.div>
 
@@ -489,28 +416,28 @@ export default function Home() {
                   {
                     value: stat1,
                     suffix: "+",
-                    label: "عميل نشط",
+                    label: t("landing.stats.activeCustomers"),
                     icon: Users,
                     format: (n: number) => n.toLocaleString(),
                   },
                   {
                     value: stat2,
                     suffix: "+",
-                    label: "رد تلقائي",
+                    label: t("landing.stats.autoReplies"),
                     icon: Send,
                     format: (n: number) => n.toLocaleString(),
                   },
                   {
                     value: stat3,
                     suffix: ".9%",
-                    label: "وقت التشغيل",
+                    label: t("landing.stats.uptime"),
                     icon: Clock,
                     format: (n: number) => String(n),
                   },
                   {
                     value: { count: 3, ref: null },
                     suffix: "",
-                    label: "منصات متصلة",
+                    label: t("landing.stats.connectedPlatforms"),
                     icon: Globe,
                     format: (n: number) => String(n),
                   },
@@ -549,9 +476,9 @@ export default function Home() {
 
           <div className="container mx-auto px-4 md:px-6">
             <SectionHeading
-              badge="الميزات"
-              title="كل ما تحتاجه لأتمتة ردودك"
-              subtitle="مجموعة متكاملة من الأدوات الذكية لإدارة تفاعلاتك مع العملاء على جميع المنصات"
+              badge={t("landing.features.badge")}
+              title={t("landing.features.title")}
+              subtitle={t("landing.features.subtitle")}
             />
 
             <motion.div
@@ -605,9 +532,9 @@ export default function Home() {
 
           <div className="container mx-auto px-4 md:px-6">
             <SectionHeading
-              badge="كيف يعمل"
-              title="ثلاث خطوات بسيطة فقط"
-              subtitle="ابدأ في دقائق معدودة واترك حبقة يتولى الردود عنك"
+              badge={t("landing.howItWorks.badge")}
+              title={t("landing.howItWorks.title")}
+              subtitle={t("landing.howItWorks.subtitle")}
             />
 
             <div className="max-w-4xl mx-auto">
@@ -665,9 +592,9 @@ export default function Home() {
 
           <div className="container mx-auto px-4 md:px-6">
             <SectionHeading
-              badge="الأسعار"
-              title="خطط تناسب الجميع"
-              subtitle="ابدأ مجاناً وقم بالترقية حسب احتياجات عملك"
+              badge={t("landing.pricing.badge")}
+              title={t("landing.pricing.title")}
+              subtitle={t("landing.pricing.subtitle")}
             />
 
             <motion.div
@@ -693,7 +620,7 @@ export default function Home() {
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-l from-primary to-blue-500 px-4 py-1.5 text-xs font-bold text-white shadow-lg shadow-primary/25">
                         <Star className="w-3.5 h-3.5 fill-white" />
-                        الأكثر شعبية
+                        {t("landing.pricing.popularBadge")}
                       </span>
                     </div>
                   )}
@@ -710,12 +637,15 @@ export default function Home() {
                     <p className="text-sm text-muted-foreground mb-5">
                       {plan.description}
                     </p>
-                    <div className="flex items-baseline justify-center gap-1">
+                    <div className="flex items-baseline justify-center gap-1" dir="ltr">
+                      <span className="text-2xl md:text-3xl font-extrabold gradient-text self-start mt-1">
+                        $
+                      </span>
                       <span className="text-4xl md:text-5xl font-extrabold gradient-text">
                         {plan.price}
                       </span>
-                      <span className="text-muted-foreground text-sm mr-1">
-                        ريال / {plan.period}
+                      <span className="text-muted-foreground text-sm ml-1">
+                        / {plan.period}
                       </span>
                     </div>
                   </div>
@@ -751,7 +681,7 @@ export default function Home() {
                       }`}
                       variant={plan.popular ? "default" : "outline"}
                     >
-                      {plan.price === "0" ? "ابدأ مجاناً" : "اشترك الآن"}
+                      {plan.price === "0" ? t("landing.pricing.ctaFree") : t("landing.pricing.ctaPaid")}
                     </Button>
                   </Link>
                 </motion.div>
@@ -781,11 +711,10 @@ export default function Home() {
               className="text-center max-w-3xl mx-auto"
             >
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white mb-6 leading-tight">
-                جاهز لأتمتة ردودك وزيادة مبيعاتك؟
+                {t("landing.ctaSection.title")}
               </h2>
               <p className="text-lg md:text-xl text-white/80 mb-10 leading-relaxed max-w-2xl mx-auto">
-                انضم إلى آلاف الأعمال التي تستخدم حبقة لتحويل كل تعليق ورسالة
-                إلى فرصة بيع حقيقية
+                {t("landing.ctaSection.subtitle")}
               </p>
               <div className="flex flex-col sm:flex-row justify-center gap-4">
                 <Link href="/register">
@@ -793,7 +722,7 @@ export default function Home() {
                     size="lg"
                     className="h-13 px-10 text-base rounded-full bg-white text-primary hover:bg-white/90 shadow-xl shadow-black/10 hover:shadow-2xl transition-all duration-300 w-full sm:w-auto gap-2 font-bold"
                   >
-                    ابدأ مجاناً الآن
+                    {t("landing.ctaSection.ctaPrimary")}
                     <ArrowLeft className="w-5 h-5" />
                   </Button>
                 </Link>
@@ -803,7 +732,7 @@ export default function Home() {
                     size="lg"
                     className="h-13 px-10 text-base rounded-full border-white/30 text-white hover:bg-white/10 w-full sm:w-auto"
                   >
-                    استعرض الأسعار
+                    {t("landing.ctaSection.ctaSecondary")}
                   </Button>
                 </a>
               </div>
@@ -828,34 +757,30 @@ export default function Home() {
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-blue-500 text-white mb-6 shadow-lg shadow-primary/20">
                   <Users className="w-8 h-8" />
                 </div>
-                <h2 className="text-3xl sm:text-4xl font-extrabold mb-4">من نحن</h2>
+                <h2 className="text-3xl sm:text-4xl font-extrabold mb-4">{t("landing.about.title")}</h2>
                 <div className="w-20 h-1 bg-gradient-to-l from-primary to-blue-500 mx-auto rounded-full" />
               </motion.div>
 
               <motion.div variants={fadeInUp} custom={1} className="grid md:grid-cols-2 gap-8">
                 <div className="bg-card rounded-2xl p-8 border shadow-lg hover:shadow-xl transition-all duration-300">
-                  <h3 className="text-xl font-bold mb-4 gradient-text">رؤيتنا</h3>
+                  <h3 className="text-xl font-bold mb-4 gradient-text">{t("landing.about.vision.title")}</h3>
                   <p className="text-muted-foreground leading-relaxed">
-                    نؤمن بأن كل عمل تجاري عربي يستحق أدوات أتمتة متقدمة بلغته الأم.
-                    حبقة هي المنصة العربية الأولى المصممة خصيصاً لأصحاب الأعمال في المنطقة العربية
-                    لتحويل كل تفاعل على وسائل التواصل إلى فرصة نمو حقيقية.
+                    {t("landing.about.vision.text")}
                   </p>
                 </div>
                 <div className="bg-card rounded-2xl p-8 border shadow-lg hover:shadow-xl transition-all duration-300">
-                  <h3 className="text-xl font-bold mb-4 gradient-text">مهمتنا</h3>
+                  <h3 className="text-xl font-bold mb-4 gradient-text">{t("landing.about.mission.title")}</h3>
                   <p className="text-muted-foreground leading-relaxed">
-                    نسعى لتمكين رواد الأعمال والشركات من أتمتة تواصلهم مع العملاء
-                    عبر فيسبوك وإنستغرام وواتساب بطريقة ذكية وفعالة — مع الحفاظ على
-                    الطابع الشخصي والإنساني في كل تفاعل.
+                    {t("landing.about.mission.text")}
                   </p>
                 </div>
               </motion.div>
 
               <motion.div variants={fadeInUp} custom={2} className="mt-8 grid sm:grid-cols-3 gap-6">
                 {[
-                  { num: "2026", label: "سنة التأسيس", icon: Rocket },
-                  { num: "12K+", label: "مستخدم نشط", icon: Users },
-                  { num: "3", label: "منصات مدعومة", icon: Globe },
+                  { num: "2026", label: t("landing.about.stats.founded"), icon: Rocket },
+                  { num: "12K+", label: t("landing.about.stats.activeUsers"), icon: Users },
+                  { num: "3", label: t("landing.about.stats.platforms"), icon: Globe },
                 ].map((stat, idx) => (
                   <div key={idx} className="text-center bg-muted/50 rounded-xl p-6 hover:bg-muted/80 transition-colors">
                     <stat.icon className="w-6 h-6 text-primary mx-auto mb-3" />
@@ -884,8 +809,8 @@ export default function Home() {
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-primary text-white mb-6 shadow-lg shadow-blue-500/20">
                   <Send className="w-8 h-8" />
                 </div>
-                <h2 className="text-3xl sm:text-4xl font-extrabold mb-4">تواصل معنا</h2>
-                <p className="text-muted-foreground text-lg">نسعد بسماع آرائكم واستفساراتكم</p>
+                <h2 className="text-3xl sm:text-4xl font-extrabold mb-4">{t("landing.contact.title")}</h2>
+                <p className="text-muted-foreground text-lg">{t("landing.contact.subtitle")}</p>
                 <div className="w-20 h-1 bg-gradient-to-l from-blue-500 to-primary mx-auto rounded-full mt-4" />
               </motion.div>
 
@@ -896,7 +821,7 @@ export default function Home() {
                       <Send className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">البريد الإلكتروني</p>
+                      <p className="text-sm text-muted-foreground">{t("landing.contact.emailLabel")}</p>
                       <a href="mailto:bwmcmedia@gmail.com" className="font-medium hover:text-primary transition-colors" dir="ltr">
                         bwmcmedia@gmail.com
                       </a>
@@ -907,18 +832,18 @@ export default function Home() {
                       <Clock className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">ساعات الدعم</p>
-                      <p className="font-medium">الأحد - الخميس، 9ص - 6م</p>
+                      <p className="text-sm text-muted-foreground">{t("landing.contact.supportHoursLabel")}</p>
+                      <p className="font-medium">{t("landing.contact.supportHoursValue")}</p>
                     </div>
                   </div>
                 </div>
                 <div className="text-center">
                   <p className="text-muted-foreground mb-4">
-                    يمكنك أيضاً التواصل معنا عبر منصات التواصل الاجتماعي أو فتح تذكرة دعم من لوحة التحكم
+                    {t("landing.contact.note")}
                   </p>
                   <Link href="/register">
                     <Button size="lg" className="rounded-full px-8 gap-2">
-                      ابدأ الآن مجاناً
+                      {t("landing.contact.cta")}
                       <ArrowLeft className="w-4 h-4" />
                     </Button>
                   </Link>
@@ -946,8 +871,7 @@ export default function Home() {
                 </span>
               </Link>
               <p className="text-muted-foreground leading-relaxed mb-6 max-w-sm">
-                منصة أتمتة الردود الذكية الأولى عربياً. نساعدك في الرد على
-                عملائك على فيسبوك وانستغرام وواتساب بشكل فوري واحترافي.
+                {t("landing.footer.description")}
               </p>
               {/* Social Icons */}
               <div className="flex gap-3">
@@ -969,67 +893,67 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Column: المنتج */}
+            {/* Column: Product */}
             <div>
-              <h4 className="font-bold mb-4 text-sm">المنتج</h4>
+              <h4 className="font-bold mb-4 text-sm">{t("landing.footer.columns.product.title")}</h4>
               <ul className="space-y-3 text-sm text-muted-foreground">
                 <li>
                   <a href="#features" className="hover:text-foreground transition-colors">
-                    الميزات
+                    {t("landing.footer.columns.product.features")}
                   </a>
                 </li>
                 <li>
                   <a href="#pricing" className="hover:text-foreground transition-colors">
-                    الأسعار
+                    {t("landing.footer.columns.product.pricing")}
                   </a>
                 </li>
                 <li>
                   <Link href="/dashboard" className="hover:text-foreground transition-colors">
-                    لوحة التحكم
+                    {t("landing.footer.columns.product.dashboard")}
                   </Link>
                 </li>
               </ul>
             </div>
 
-            {/* Column: الشركة */}
+            {/* Column: Company */}
             <div>
-              <h4 className="font-bold mb-4 text-sm">الشركة</h4>
+              <h4 className="font-bold mb-4 text-sm">{t("landing.footer.columns.company.title")}</h4>
               <ul className="space-y-3 text-sm text-muted-foreground">
                 <li>
                   <a href="#about" className="hover:text-foreground transition-colors">
-                    من نحن
+                    {t("landing.footer.columns.company.about")}
                   </a>
                 </li>
                 <li>
                   <a href="#contact" className="hover:text-foreground transition-colors">
-                    تواصل معنا
+                    {t("landing.footer.columns.company.contact")}
                   </a>
                 </li>
                 <li>
                   <a href="#how-it-works" className="hover:text-foreground transition-colors">
-                    كيف يعمل
+                    {t("landing.footer.columns.company.howItWorks")}
                   </a>
                 </li>
               </ul>
             </div>
 
-            {/* Column: قانوني */}
+            {/* Column: Legal */}
             <div>
-              <h4 className="font-bold mb-4 text-sm">قانوني</h4>
+              <h4 className="font-bold mb-4 text-sm">{t("landing.footer.columns.legal.title")}</h4>
               <ul className="space-y-3 text-sm text-muted-foreground">
                 <li>
                   <Link href="/privacy" className="hover:text-foreground transition-colors">
-                    سياسة الخصوصية
+                    {t("landing.footer.columns.legal.privacy")}
                   </Link>
                 </li>
                 <li>
                   <Link href="/terms" className="hover:text-foreground transition-colors">
-                    الشروط والأحكام
+                    {t("landing.footer.columns.legal.terms")}
                   </Link>
                 </li>
                 <li>
                   <Link href="/data-deletion" className="hover:text-foreground transition-colors">
-                    حذف البيانات
+                    {t("landing.footer.columns.legal.dataDeletion")}
                   </Link>
                 </li>
               </ul>
@@ -1038,9 +962,9 @@ export default function Home() {
 
           {/* Bottom Bar */}
           <div className="border-t pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-            <p>© {new Date().getFullYear()} حبقة Hubqa. جميع الحقوق محفوظة.</p>
+            <p>© {new Date().getFullYear()} {t("landing.footer.copyright")}</p>
             <p className="flex items-center gap-1.5">
-              صُنع بـ <span className="text-red-500">❤</span> للعالم العربي
+              {t("landing.footer.madeWith")}
             </p>
           </div>
         </div>
@@ -1056,7 +980,7 @@ export default function Home() {
             ? "opacity-100 translate-y-0"
             : "opacity-0 translate-y-4 pointer-events-none"
         }`}
-        aria-label="العودة للأعلى"
+        aria-label={t("landing.footer.backToTop")}
       >
         <ChevronUp className="w-5 h-5" />
       </button>

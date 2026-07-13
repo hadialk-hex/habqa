@@ -7,8 +7,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Bot, Loader2, Mail, CheckCircle2, ArrowRight, Sparkles } from "lucide-react"
 import api from "@/lib/api"
+import { useLanguage } from "@/lib/i18n/language-context"
+import { LanguageSwitcher } from "@/components/language-switcher"
 
 export default function ForgotPasswordPage() {
+  const { t } = useLanguage()
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
   const [sent, setSent] = useState(false)
@@ -24,11 +27,11 @@ export default function ForgotPasswordPage() {
     } catch (err: unknown) {
       const axiosErr = err as { response?: { status?: number; data?: { message?: string } } }
       if (axiosErr.response?.status === 429) {
-        setError("لقد تجاوزت الحد المسموح من المحاولات. انتظر دقيقة وحاول مجدداً.")
+        setError(t('auth.forgotPassword.errorRateLimit'))
       } else if (axiosErr.response?.status === 404) {
-        setError("لا يوجد حساب مسجل بهذا البريد الإلكتروني.")
+        setError(t('auth.forgotPassword.errorNotFound'))
       } else {
-        setError("حدث خطأ. حاول مرة أخرى.")
+        setError(t('auth.forgotPassword.errorGeneric'))
       }
     } finally {
       setLoading(false)
@@ -36,7 +39,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden" dir="rtl">
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
       {/* ===== Animated Gradient Background ===== */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-primary/10 animate-gradient" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_oklch(0.541_0.24_275_/_0.15),_transparent_50%)]" />
@@ -53,6 +56,9 @@ export default function ForgotPasswordPage() {
 
       {/* ===== Forgot Password Card ===== */}
       <div className="relative z-10 w-full max-w-md mx-4 animate-fade-in-up">
+        <div className="absolute -top-12 left-0">
+          <LanguageSwitcher />
+        </div>
         <div className="glass-strong rounded-3xl p-8 shadow-2xl shadow-primary/10">
           {/* Logo & Header */}
           <div className="flex flex-col items-center mb-8">
@@ -62,10 +68,10 @@ export default function ForgotPasswordPage() {
                 <Bot className="w-8 h-8 text-primary-foreground" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold gradient-text mb-1">استعادة كلمة المرور</h1>
+            <h1 className="text-3xl font-bold gradient-text mb-1">{t('auth.forgotPassword.title')}</h1>
             <p className="text-muted-foreground text-sm flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-primary" />
-              أدخل بريدك الإلكتروني لاستعادة حسابك
+              {t('auth.forgotPassword.tagline')}
             </p>
           </div>
 
@@ -74,18 +80,22 @@ export default function ForgotPasswordPage() {
               <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500" />
               </div>
-              <h2 className="font-black text-lg mb-2">تحقق من بريدك</h2>
+              <h2 className="font-black text-lg mb-2">{t('auth.forgotPassword.sentTitle')}</h2>
               <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-                إذا كان البريد <span className="font-bold" dir="ltr">{email}</span> مسجلاً لدينا، فسيصلك رابط إعادة التعيين خلال دقائق. الرابط صالح لمدة ساعة.
+                {(() => {
+                  const marker = "@@EMAIL@@";
+                  const [before, after] = t('auth.forgotPassword.sentMessage', { email: marker }).split(marker);
+                  return <>{before}<span className="font-bold" dir="ltr">{email}</span>{after}</>;
+                })()}
               </p>
               <Link href="/login" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 transition-colors duration-200">
-                العودة لتسجيل الدخول
+                {t('auth.forgotPassword.backToLogin')}
               </Link>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-foreground/80">البريد الإلكتروني</Label>
+                <Label htmlFor="email" className="text-sm font-medium text-foreground/80">{t('auth.forgotPassword.emailLabel')}</Label>
                 <div className="relative">
                   <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -115,16 +125,16 @@ export default function ForgotPasswordPage() {
                 {loading ? (
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    جارٍ الإرسال...
+                    {t('auth.forgotPassword.submitting')}
                   </span>
                 ) : (
-                  "إرسال رابط الاستعادة"
+                  t('auth.forgotPassword.submit')
                 )}
               </Button>
 
               <div className="text-center">
                 <Link href="/login" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors duration-200 group">
-                  العودة لتسجيل الدخول
+                  {t('auth.forgotPassword.backToLogin')}
                   <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
                 </Link>
               </div>
@@ -134,7 +144,7 @@ export default function ForgotPasswordPage() {
 
         {/* Bottom decorative text */}
         <p className="text-center text-xs text-muted-foreground/50 mt-6">
-          © {new Date().getFullYear()} حبقة Hubqa — جميع الحقوق محفوظة
+          © {new Date().getFullYear()} {t('auth.copyright')}
         </p>
       </div>
     </div>

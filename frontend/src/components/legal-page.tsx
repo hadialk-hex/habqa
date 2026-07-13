@@ -1,5 +1,9 @@
+"use client"
+
 import Link from "next/link"
 import { Bot, ArrowRight } from "lucide-react"
+import { useLanguage } from "@/lib/i18n/language-context"
+import { LanguageSwitcher } from "@/components/language-switcher"
 
 interface LegalSection {
   title: string
@@ -15,6 +19,7 @@ interface LegalPageProps {
 }
 
 export function LegalPage({ title, lastUpdated, intro, sections }: LegalPageProps) {
+  const { t } = useLanguage()
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card/50 sticky top-0 z-40 backdrop-blur-lg">
@@ -27,16 +32,19 @@ export function LegalPage({ title, lastUpdated, intro, sections }: LegalPageProp
               حبقة <span className="gradient-text">Hubqa</span>
             </span>
           </Link>
-          <Link href="/" className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
-            العودة للرئيسية
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+          <div className="flex items-center gap-4">
+            <LanguageSwitcher />
+            <Link href="/" className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5">
+              {t('legal.backToHome')}
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 md:px-6 py-12 max-w-3xl">
         <h1 className="text-4xl font-black tracking-tight mb-3">{title}</h1>
-        <p className="text-sm text-muted-foreground mb-8">آخر تحديث: {lastUpdated}</p>
+        <p className="text-sm text-muted-foreground mb-8">{t('legal.lastUpdated')}: {lastUpdated}</p>
 
         <p className="text-base leading-loose text-muted-foreground mb-10">{intro}</p>
 
@@ -69,18 +77,18 @@ export function LegalPage({ title, lastUpdated, intro, sections }: LegalPageProp
         </div>
 
         <div className="mt-14 pt-8 border-t text-sm text-muted-foreground leading-relaxed">
-          لأي استفسار حول هذه السياسات، تواصل معنا عبر البريد الإلكتروني:{" "}
+          {t('legal.contactNote')}{" "}
           <a href="mailto:bwmcmedia@gmail.com" className="text-primary font-bold hover:underline" dir="ltr">bwmcmedia@gmail.com</a>
         </div>
       </main>
 
       <footer className="border-t py-6 mt-8">
         <div className="container mx-auto px-4 md:px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} حبقة Hubqa. جميع الحقوق محفوظة.</p>
+          <p>© {new Date().getFullYear()} {t('legal.footerCopyright')}</p>
           <div className="flex gap-5">
-            <Link href="/terms" className="hover:text-foreground transition-colors">الشروط والأحكام</Link>
-            <Link href="/privacy" className="hover:text-foreground transition-colors">سياسة الخصوصية</Link>
-            <Link href="/data-deletion" className="hover:text-foreground transition-colors">حذف البيانات</Link>
+            <Link href="/terms" className="hover:text-foreground transition-colors">{t('legal.footerTerms')}</Link>
+            <Link href="/privacy" className="hover:text-foreground transition-colors">{t('legal.footerPrivacy')}</Link>
+            <Link href="/data-deletion" className="hover:text-foreground transition-colors">{t('legal.footerDataDeletion')}</Link>
           </div>
         </div>
       </footer>

@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Bot, Loader2, Lock, CheckCircle2, Sparkles } from "lucide-react"
 import api from "@/lib/api"
+import { useLanguage } from "@/lib/i18n/language-context"
+import { LanguageSwitcher } from "@/components/language-switcher"
 
 export default function ResetPasswordPage() {
   return (
@@ -18,6 +20,7 @@ export default function ResetPasswordPage() {
 }
 
 function ResetPasswordContent() {
+  const { t } = useLanguage()
   const searchParams = useSearchParams()
   const router = useRouter()
   const token = searchParams.get("token") || ""
@@ -32,11 +35,11 @@ function ResetPasswordContent() {
     e.preventDefault()
     setError("")
     if (password.length < 8) {
-      setError("كلمة المرور يجب أن تكون 8 أحرف على الأقل.")
+      setError(t('auth.resetPassword.errorTooShort'))
       return
     }
     if (password !== confirm) {
-      setError("كلمتا المرور غير متطابقتين.")
+      setError(t('auth.resetPassword.errorMismatch'))
       return
     }
     try {
@@ -46,14 +49,14 @@ function ResetPasswordContent() {
       setTimeout(() => router.push("/login"), 2500)
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } }
-      setError(axiosErr.response?.data?.message || "الرابط غير صالح أو منتهي الصلاحية.")
+      setError(axiosErr.response?.data?.message || t('auth.resetPassword.errorInvalidLink'))
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden" dir="rtl">
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
       {/* ===== Animated Gradient Background ===== */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-primary/10 animate-gradient" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_oklch(0.541_0.24_275_/_0.15),_transparent_50%)]" />
@@ -70,6 +73,9 @@ function ResetPasswordContent() {
 
       {/* ===== Reset Password Card ===== */}
       <div className="relative z-10 w-full max-w-md mx-4 animate-fade-in-up">
+        <div className="absolute -top-12 left-0">
+          <LanguageSwitcher />
+        </div>
         <div className="glass-strong rounded-3xl p-8 shadow-2xl shadow-primary/10">
           {/* Logo & Header */}
           <div className="flex flex-col items-center mb-8">
@@ -79,30 +85,30 @@ function ResetPasswordContent() {
                 <Bot className="w-8 h-8 text-primary-foreground" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold gradient-text mb-1">تعيين كلمة مرور جديدة</h1>
+            <h1 className="text-3xl font-bold gradient-text mb-1">{t('auth.resetPassword.title')}</h1>
             <p className="text-muted-foreground text-sm flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-primary" />
-              أدخل كلمة مرورك الجديدة
+              {t('auth.resetPassword.tagline')}
             </p>
           </div>
 
           {!token ? (
             <div className="text-center text-sm text-muted-foreground leading-relaxed">
-              الرابط غير مكتمل. استخدم الرابط المُرسل إلى بريدك، أو{" "}
-              <Link href="/forgot-password" className="text-primary font-bold hover:underline">اطلب رابطاً جديداً</Link>.
+              {t('auth.resetPassword.incompleteLink')}{" "}
+              <Link href="/forgot-password" className="text-primary font-bold hover:underline">{t('auth.resetPassword.requestNewLink')}</Link>.
             </div>
           ) : done ? (
             <div className="text-center">
               <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500" />
               </div>
-              <h2 className="font-black text-lg mb-2">تم تغيير كلمة المرور</h2>
-              <p className="text-sm text-muted-foreground">جارٍ تحويلك لتسجيل الدخول...</p>
+              <h2 className="font-black text-lg mb-2">{t('auth.resetPassword.doneTitle')}</h2>
+              <p className="text-sm text-muted-foreground">{t('auth.resetPassword.doneMessage')}</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-foreground/80">كلمة المرور الجديدة</Label>
+                <Label htmlFor="password" className="text-sm font-medium text-foreground/80">{t('auth.resetPassword.newPasswordLabel')}</Label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -119,7 +125,7 @@ function ResetPasswordContent() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirm" className="text-sm font-medium text-foreground/80">تأكيد كلمة المرور</Label>
+                <Label htmlFor="confirm" className="text-sm font-medium text-foreground/80">{t('auth.resetPassword.confirmPasswordLabel')}</Label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -149,10 +155,10 @@ function ResetPasswordContent() {
                 {loading ? (
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    جارٍ الحفظ...
+                    {t('auth.resetPassword.submitting')}
                   </span>
                 ) : (
-                  "حفظ كلمة المرور"
+                  t('auth.resetPassword.submit')
                 )}
               </Button>
             </form>
@@ -161,7 +167,7 @@ function ResetPasswordContent() {
 
         {/* Bottom decorative text */}
         <p className="text-center text-xs text-muted-foreground/50 mt-6">
-          © {new Date().getFullYear()} حبقة Hubqa — جميع الحقوق محفوظة
+          © {new Date().getFullYear()} {t('auth.copyright')}
         </p>
       </div>
     </div>

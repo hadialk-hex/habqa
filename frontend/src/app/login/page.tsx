@@ -8,8 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Bot, Loader2, Mail, Lock, ArrowLeft, Sparkles } from 'lucide-react';
+import { useLanguage } from '@/lib/i18n/language-context';
+import { LanguageSwitcher } from '@/components/language-switcher';
 
 export default function LoginPage() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -27,7 +30,7 @@ export default function LoginPage() {
       router.push('/dashboard');
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || 'حدث خطأ أثناء تسجيل الدخول. تأكد من بياناتك وحاول مرة أخرى.');
+      setError(error.response?.data?.message || t('auth.login.errorGeneric'));
     } finally {
       setLoading(false);
     }
@@ -51,6 +54,9 @@ export default function LoginPage() {
 
       {/* ===== Login Card ===== */}
       <div className="relative z-10 w-full max-w-md mx-4 animate-fade-in-up">
+        <div className="absolute -top-12 left-0">
+          <LanguageSwitcher />
+        </div>
         <div className="glass-strong rounded-3xl p-8 shadow-2xl shadow-primary/10">
           {/* Logo & Header */}
           <div className="flex flex-col items-center mb-8">
@@ -63,7 +69,7 @@ export default function LoginPage() {
             <h1 className="text-3xl font-bold gradient-text mb-1">حبقة Hubqa</h1>
             <p className="text-muted-foreground text-sm flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-primary" />
-              منصة الرد الآلي الذكي
+              {t('auth.login.tagline')}
             </p>
           </div>
 
@@ -72,7 +78,7 @@ export default function LoginPage() {
             {/* Email Field */}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium text-foreground/80">
-                البريد الإلكتروني
+                {t('auth.login.emailLabel')}
               </Label>
               <div className="relative">
                 <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -94,10 +100,10 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-sm font-medium text-foreground/80">
-                  كلمة المرور
+                  {t('auth.login.passwordLabel')}
                 </Label>
                 <Link href="/forgot-password" className="text-xs text-primary hover:underline font-bold">
-                  نسيت كلمة المرور؟
+                  {t('auth.login.forgotPassword')}
                 </Link>
               </div>
               <div className="relative">
@@ -132,10 +138,10 @@ export default function LoginPage() {
               {loading ? (
                 <span className="flex items-center gap-2">
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  جارٍ تسجيل الدخول...
+                  {t('auth.login.submitting')}
                 </span>
               ) : (
-                'تسجيل الدخول'
+                t('auth.login.submit')
               )}
             </Button>
           </form>
@@ -143,26 +149,26 @@ export default function LoginPage() {
           {/* Divider */}
           <div className="my-6 flex items-center gap-3">
             <div className="flex-1 h-px bg-border/50" />
-            <span className="text-xs text-muted-foreground">أو</span>
+            <span className="text-xs text-muted-foreground">{t('auth.or')}</span>
             <div className="flex-1 h-px bg-border/50" />
           </div>
 
           {/* Register Link */}
           <div className="text-center">
-            <p className="text-sm text-muted-foreground mb-2">ليس لديك حساب؟</p>
+            <p className="text-sm text-muted-foreground mb-2">{t('auth.login.noAccount')}</p>
             <Link
               href="/register"
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 transition-colors duration-200 group"
             >
               <ArrowLeft className="w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1" />
-              إنشاء حساب جديد
+              {t('auth.login.createAccount')}
             </Link>
           </div>
         </div>
 
         {/* Bottom decorative text */}
         <p className="text-center text-xs text-muted-foreground/50 mt-6">
-          © {new Date().getFullYear()} حبقة Hubqa — جميع الحقوق محفوظة
+          © {new Date().getFullYear()} {t('auth.copyright')}
         </p>
       </div>
     </div>

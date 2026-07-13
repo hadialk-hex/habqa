@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Bot, Loader2, Lock, User, CheckCircle2, Sparkles } from "lucide-react"
 import api from "@/lib/api"
+import { useLanguage } from "@/lib/i18n/language-context"
+import { LanguageSwitcher } from "@/components/language-switcher"
 
 export default function AcceptInvitePage() {
   return (
@@ -18,6 +20,7 @@ export default function AcceptInvitePage() {
 }
 
 function AcceptInviteContent() {
+  const { t } = useLanguage()
   const searchParams = useSearchParams()
   const router = useRouter()
   const token = searchParams.get("token") || ""
@@ -32,7 +35,7 @@ function AcceptInviteContent() {
     e.preventDefault()
     setError("")
     if (password.length < 8) {
-      setError("كلمة المرور يجب أن تكون 8 أحرف على الأقل.")
+      setError(t('auth.acceptInvite.errorTooShort'))
       return
     }
     try {
@@ -42,14 +45,14 @@ function AcceptInviteContent() {
       setTimeout(() => router.push("/login"), 2500)
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } }
-      setError(axiosErr.response?.data?.message || "الدعوة غير صالحة أو منتهية الصلاحية.")
+      setError(axiosErr.response?.data?.message || t('auth.acceptInvite.errorInvalidInvite'))
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center overflow-hidden" dir="rtl">
+    <div className="min-h-screen relative flex items-center justify-center overflow-hidden">
       {/* ===== Animated Gradient Background ===== */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-primary/10 animate-gradient" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_oklch(0.541_0.24_275_/_0.15),_transparent_50%)]" />
@@ -66,6 +69,9 @@ function AcceptInviteContent() {
 
       {/* ===== Accept Invite Card ===== */}
       <div className="relative z-10 w-full max-w-md mx-4 animate-fade-in-up">
+        <div className="absolute -top-12 left-0">
+          <LanguageSwitcher />
+        </div>
         <div className="glass-strong rounded-3xl p-8 shadow-2xl shadow-primary/10">
           {/* Logo & Header */}
           <div className="flex flex-col items-center mb-8">
@@ -75,29 +81,29 @@ function AcceptInviteContent() {
                 <Bot className="w-8 h-8 text-primary-foreground" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold gradient-text mb-1">قبول دعوة الفريق</h1>
+            <h1 className="text-3xl font-bold gradient-text mb-1">{t('auth.acceptInvite.title')}</h1>
             <p className="text-muted-foreground text-sm flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-primary" />
-              أكمل بياناتك للانضمام إلى فريقك على منصة حبقة
+              {t('auth.acceptInvite.tagline')}
             </p>
           </div>
 
           {!token ? (
             <div className="text-center text-sm text-muted-foreground leading-relaxed">
-              رابط الدعوة غير مكتمل. استخدم الرابط المُرسل إلى بريدك الإلكتروني.
+              {t('auth.acceptInvite.incompleteLink')}
             </div>
           ) : done ? (
             <div className="text-center">
               <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 className="w-8 h-8 text-emerald-500" />
               </div>
-              <h2 className="font-black text-lg mb-2">تم الانضمام بنجاح 🎉</h2>
-              <p className="text-sm text-muted-foreground">جارٍ تحويلك لتسجيل الدخول...</p>
+              <h2 className="font-black text-lg mb-2">{t('auth.acceptInvite.doneTitle')}</h2>
+              <p className="text-sm text-muted-foreground">{t('auth.acceptInvite.doneMessage')}</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-medium text-foreground/80">اسمك</Label>
+                <Label htmlFor="name" className="text-sm font-medium text-foreground/80">{t('auth.acceptInvite.nameLabel')}</Label>
                 <div className="relative">
                   <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -105,14 +111,14 @@ function AcceptInviteContent() {
                     required
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder="الاسم الكامل"
+                    placeholder={t('auth.acceptInvite.namePlaceholder')}
                     className="pr-10 h-12 rounded-xl bg-background/50 border-border/50 focus:border-primary/50 focus:ring-primary/20 transition-all duration-300 placeholder:text-muted-foreground/50"
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-foreground/80">كلمة المرور</Label>
+                <Label htmlFor="password" className="text-sm font-medium text-foreground/80">{t('auth.acceptInvite.passwordLabel')}</Label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -142,16 +148,16 @@ function AcceptInviteContent() {
                 {loading ? (
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    جارٍ الانضمام...
+                    {t('auth.acceptInvite.submitting')}
                   </span>
                 ) : (
-                  "الانضمام للفريق"
+                  t('auth.acceptInvite.submit')
                 )}
               </Button>
 
               <p className="text-center text-[11px] text-muted-foreground">
-                بانضمامك فأنت توافق على{" "}
-                <Link href="/terms" className="text-primary hover:underline font-bold">الشروط والأحكام</Link>
+                {t('auth.acceptInvite.termsNotice')}{" "}
+                <Link href="/terms" className="text-primary hover:underline font-bold">{t('auth.acceptInvite.terms')}</Link>
               </p>
             </form>
           )}
@@ -159,7 +165,7 @@ function AcceptInviteContent() {
 
         {/* Bottom decorative text */}
         <p className="text-center text-xs text-muted-foreground/50 mt-6">
-          © {new Date().getFullYear()} حبقة Hubqa — جميع الحقوق محفوظة
+          © {new Date().getFullYear()} {t('auth.copyright')}
         </p>
       </div>
     </div>

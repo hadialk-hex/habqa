@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { Tajawal } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/lib/auth-context";
 import { ToastProvider } from "@/components/ui/toast";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
+import { LanguageProvider, type Locale } from "@/lib/i18n/language-context";
 import "./globals.css";
 
 const tajawal = Tajawal({
@@ -28,13 +30,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const locale: Locale = cookieStore.get("locale")?.value === "en" ? "en" : "ar";
+  const dir = locale === "ar" ? "rtl" : "ltr";
+
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning>
+    <html lang={locale} dir={dir} suppressHydrationWarning>
       <body className={`${tajawal.variable} font-sans min-h-screen flex flex-col bg-background text-foreground antialiased`}>
         <ThemeProvider
           attribute="class"
@@ -42,13 +48,15 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-            <ToastProvider>
-              <ConfirmProvider>
-                {children}
-              </ConfirmProvider>
-            </ToastProvider>
-          </AuthProvider>
+          <LanguageProvider initialLocale={locale}>
+            <AuthProvider>
+              <ToastProvider>
+                <ConfirmProvider>
+                  {children}
+                </ConfirmProvider>
+              </ToastProvider>
+            </AuthProvider>
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

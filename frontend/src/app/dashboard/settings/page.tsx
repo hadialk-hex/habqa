@@ -429,7 +429,7 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <p className="font-black text-lg gradient-text">الخطة الاحترافية</p>
-                      <p className="text-sm text-muted-foreground mt-1">99 ريال/شهر</p>
+                      <p className="text-sm text-muted-foreground mt-1" dir="ltr">$29 / month</p>
                     </div>
                     <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-lg text-xs font-bold">نشط</span>
                   </div>
