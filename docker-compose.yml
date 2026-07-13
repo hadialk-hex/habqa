@@ -75,6 +75,12 @@ services:
         limits:
           cpus: '1.0'
           memory: 1G
+    labels:
+      icon: "https://cdn-icons-png.flaticon.com/512/4712/4712035.png"
+      casaos.name: "Habqa Backend (API)"
+      casaos.category: "Developer"
+      casaos.main.port.number: "1999"
+      casaos.main.port.protocol: "http"
 
   frontend:
     build:
@@ -98,6 +104,16 @@ services:
         limits:
           cpus: '1.0'
           memory: 1G
+    labels:
+      icon: "https://cdn-icons-png.flaticon.com/512/4712/4712035.png"
+      casaos.name: "Habqa"
+      casaos.description: "منصة إدارة التواصل الاجتماعي والردود الآلية"
+      casaos.category: "Business"
+      casaos.main.port.number: "1998"
+      casaos.main.port.protocol: "http"
+      casaos.main.port.path: "/"
+      casaos.thumbnail: "https://cdn-icons-png.flaticon.com/512/4712/4712035.png"
+
 
 volumes:
   postgres_data:
