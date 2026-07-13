@@ -34,6 +34,10 @@ const nextConfig: NextConfig = {
         source: '/webhooks/:path*',
         destination: `${process.env.BACKEND_URL || 'http://backend:3001'}/webhooks/:path*`,
       },
+      {
+        source: '/channels/:path*',
+        destination: `${process.env.BACKEND_URL || 'http://backend:3001'}/channels/:path*`,
+      },
     ];
   },
   async headers() {
