@@ -267,6 +267,22 @@ export class ChannelsService {
             name: page.name,
             accessToken: page.access_token,
           });
+
+          // Subscribe the app to this page's webhook events
+          try {
+            const subscribeUrl = `https://graph.facebook.com/v18.0/${page.id}/subscribed_apps`;
+            await fetch(subscribeUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({
+                subscribed_fields: 'messages,messaging_postbacks,feed,message_reactions',
+                access_token: page.access_token,
+              }).toString(),
+            });
+          } catch (_) {
+            // non-fatal: webhook subscription failure shouldn't block page connection
+          }
+
           connected++;
         } catch (error) {
           // Plan limit reached or page owned by another tenant — skip the
