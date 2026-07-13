@@ -1,6 +1,31 @@
 version: '3.8'
 
+# ─── CasaOS App Metadata ────────────────────────────────────────────────────
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: frontend
+  title:
+    en_us: Habqa
+  description:
+    en_us: Social media management platform with automated replies, unified inbox, and AI-powered responses.
+    ar_sa: منصة إدارة التواصل الاجتماعي مع الردود الآلية، صندوق الوارد الموحد، والردود الذكية بالذكاء الاصطناعي.
+  tagline:
+    en_us: Automate your social media responses
+    ar_sa: أتمت ردودك على وسائل التواصل الاجتماعي
+  developer: hadialk-hex
+  author: hadialk-hex
+  icon: https://cdn-icons-png.flaticon.com/512/4712/4712035.png
+  thumbnail: https://cdn-icons-png.flaticon.com/512/4712/4712035.png
+  screenshot_link:
+    - https://cdn-icons-png.flaticon.com/512/4712/4712035.png
+  category: Business
+  port_map: "1998"
+
+# ─── Services ────────────────────────────────────────────────────────────────
 services:
+
   postgres:
     image: postgres:17-alpine
     container_name: hubqa_postgres
@@ -24,6 +49,11 @@ services:
         limits:
           cpus: '1.0'
           memory: 1G
+    labels:
+      icon: "https://cdn-icons-png.flaticon.com/512/8617/8617551.png"
+      casaos.name: "Habqa - قاعدة البيانات"
+      casaos.description.en_us: "PostgreSQL database for Habqa"
+      casaos.description.ar_sa: "قاعدة بيانات PostgreSQL لتطبيق Habqa"
 
   redis:
     image: redis:7-alpine
@@ -42,6 +72,11 @@ services:
         limits:
           cpus: '0.5'
           memory: 512M
+    labels:
+      icon: "https://cdn-icons-png.flaticon.com/512/6132/6132222.png"
+      casaos.name: "Habqa - التخزين المؤقت"
+      casaos.description.en_us: "Redis cache for Habqa"
+      casaos.description.ar_sa: "ذاكرة التخزين المؤقت Redis لتطبيق Habqa"
 
   backend:
     build:
@@ -77,8 +112,9 @@ services:
           memory: 1G
     labels:
       icon: "https://cdn-icons-png.flaticon.com/512/4712/4712035.png"
-      casaos.name: "Habqa Backend (API)"
-      casaos.category: "Developer"
+      casaos.name: "Habqa - الخادم (API)"
+      casaos.description.en_us: "Habqa backend API server (NestJS)"
+      casaos.description.ar_sa: "خادم API الخلفي لتطبيق Habqa (NestJS)"
       casaos.main.port.number: "1999"
       casaos.main.port.protocol: "http"
 
@@ -93,8 +129,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      # API calls go through the Next.js same-origin proxy (/api/backend)
-      # which forwards to the backend container internally
       BACKEND_URL: http://backend:3001
     depends_on:
       backend:
@@ -106,14 +140,13 @@ services:
           memory: 1G
     labels:
       icon: "https://cdn-icons-png.flaticon.com/512/4712/4712035.png"
-      casaos.name: "Habqa"
-      casaos.description: "منصة إدارة التواصل الاجتماعي والردود الآلية"
-      casaos.category: "Business"
+      casaos.name: "Habqa - الواجهة"
+      casaos.description.en_us: "Habqa frontend web application (Next.js)"
+      casaos.description.ar_sa: "واجهة تطبيق Habqa (Next.js)"
       casaos.main.port.number: "1998"
       casaos.main.port.protocol: "http"
       casaos.main.port.path: "/"
       casaos.thumbnail: "https://cdn-icons-png.flaticon.com/512/4712/4712035.png"
-
 
 volumes:
   postgres_data:
