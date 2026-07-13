@@ -48,13 +48,13 @@ async function main() {
   console.log(`Seeded Tenant: ${demoTenant.name}`);
 
   // 3. Seed Users & Hashes
-  const adminPasswordHash = await bcrypt.hash('password123', 10);
+  const adminPasswordHash = await bcrypt.hash('x123x123', 10);
   const agentPasswordHash = await bcrypt.hash('agentpass123', 10);
 
   const adminUser = await prisma.user.create({
     data: {
       id: 'user-admin-id',
-      email: 'admin@neqta.com',
+      email: 'hadialk3@gmail.com',
       name: 'Admin User',
       password: adminPasswordHash,
       isSuperAdmin: true, // Platform admin — can access /admin
@@ -69,7 +69,7 @@ async function main() {
       password: agentPasswordHash,
     },
   });
-  console.log('Seeded Users (admin@neqta.com, agent@neqta.com)');
+  console.log('Seeded Users (hadialk3@gmail.com, agent@neqta.com)');
 
   // 4. Seed Custom Roles
   const campaignManagerRole = await prisma.customRole.create({
