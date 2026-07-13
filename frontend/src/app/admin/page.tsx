@@ -57,6 +57,7 @@ interface AdminUser {
   email: string
   name: string | null
   isSuperAdmin: boolean
+  emailVerified: boolean
   createdAt: string
   tenants: { id: string; name: string; plan: string; role: string }[]
 }
@@ -405,6 +406,84 @@ export default function AdminPage() {
     }
   }
 
+  /* ─── User actions: verify email / reset password / delete ─── */
+  const [userActionMsg, setUserActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null)
+
+  const handleVerifyUserEmail = async (u: AdminUser) => {
+    try {
+      await api.post(`/admin/users/${u.id}/verify-email`)
+      setUsers(prev => prev.map(x => x.id === u.id ? { ...x, emailVerified: true } : x))
+      setUserActionMsg({ type: "success", text: `تم تفعيل بريد ${u.email} يدوياً` })
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } }
+      setUserActionMsg({ type: "error", text: e.response?.data?.message || "فشل التفعيل" })
+    }
+  }
+
+  const handleResetUserPassword = async (u: AdminUser) => {
+    const confirmed = await confirm({
+      title: "إرسال رابط إعادة تعيين كلمة المرور",
+      message: `سيصل ${u.email} رابط آمن لاختيار كلمة مرور جديدة (صالح لساعة). أنت لن ترى كلمة المرور. متابعة؟`,
+      confirmText: "إرسال الرابط",
+      cancelText: "إلغاء",
+    })
+    if (!confirmed) return
+    try {
+      const res = await api.post(`/admin/users/${u.id}/reset-password`)
+      setUserActionMsg({ type: "success", text: res.data.message || "تم إرسال الرابط" })
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } }
+      setUserActionMsg({ type: "error", text: e.response?.data?.message || "فشل الإرسال" })
+    }
+  }
+
+  const handleDeleteUser = async (u: AdminUser) => {
+    const confirmed = await confirm({
+      title: "حذف المستخدم نهائياً",
+      message: `سيتم حذف "${u.name || u.email}" نهائياً، وأي مساحة عمل يملكها بالكامل. لا يمكن التراجع. متابعة؟`,
+      variant: "destructive",
+      confirmText: "تأكيد الحذف",
+      cancelText: "إلغاء",
+    })
+    if (!confirmed) return
+    try {
+      await api.delete(`/admin/users/${u.id}`)
+      setUserActionMsg({ type: "success", text: `تم حذف ${u.email}` })
+      fetchUsers(usersPage, userSearch)
+      fetchStats()
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } }
+      setUserActionMsg({ type: "error", text: e.response?.data?.message || "فشل الحذف" })
+    }
+  }
+
+  /* ─── Email a tenant's owner from the drawer ─── */
+  const [tenantEmailSubject, setTenantEmailSubject] = useState("")
+  const [tenantEmailBody, setTenantEmailBody] = useState("")
+  const [tenantEmailSending, setTenantEmailSending] = useState(false)
+  const [tenantEmailResult, setTenantEmailResult] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [showEmailForm, setShowEmailForm] = useState(false)
+
+  const handleEmailTenant = async () => {
+    if (!selectedTenant || !tenantEmailSubject.trim() || !tenantEmailBody.trim()) return
+    try {
+      setTenantEmailSending(true)
+      setTenantEmailResult(null)
+      const res = await api.post(`/admin/tenants/${selectedTenant.id}/email`, {
+        subject: tenantEmailSubject,
+        body: tenantEmailBody,
+      })
+      setTenantEmailResult({ type: "success", text: res.data.message || "تم الإرسال" })
+      setTenantEmailSubject("")
+      setTenantEmailBody("")
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } }
+      setTenantEmailResult({ type: "error", text: e.response?.data?.message || "فشل الإرسال" })
+    } finally {
+      setTenantEmailSending(false)
+    }
+  }
+
   /* ─── Inline tenant name edit ─── */
   const handleTenantNameDoubleClick = (tenant: AdminTenant) => {
     setEditingTenantId(tenant.id)
@@ -459,6 +538,10 @@ export default function AdminPage() {
     setTenantNotifTitle("")
     setTenantNotifMessage("")
     setTenantNotifResult(null)
+    setShowEmailForm(false)
+    setTenantEmailSubject("")
+    setTenantEmailBody("")
+    setTenantEmailResult(null)
   }
 
   /* ─── CSV Export handlers ─── */
@@ -631,45 +714,77 @@ export default function AdminPage() {
   return (
     <div className="flex flex-col gap-8">
       {/* ─── Hero Header ─── */}
-      <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6 lg:p-8 border border-primary/10 ${mounted ? 'animate-fade-in-up' : 'opacity-0'}`}>
-        <div className="absolute top-0 left-0 w-64 h-64 bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-        <div className="relative flex items-center justify-between gap-4 flex-wrap">
+      <div className={`relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/12 via-primary/5 to-transparent p-6 lg:p-8 border border-primary/15 ${mounted ? 'animate-fade-in-up' : 'opacity-0'}`}>
+        <div className="absolute top-0 left-0 w-72 h-72 bg-gradient-to-br from-primary/15 to-transparent rounded-full blur-3xl -translate-x-1/3 -translate-y-1/2" />
+        <div className="absolute bottom-0 right-0 w-56 h-56 bg-gradient-to-tl from-[#22d3ee]/10 to-transparent rounded-full blur-3xl translate-x-1/4 translate-y-1/3" />
+        <div className="relative flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
-            <div className="bg-gradient-to-br from-primary to-[oklch(0.62_0.15_230)] p-3.5 rounded-2xl shadow-lg shadow-primary/25 animate-pulse-glow">
+            <div className="bg-gradient-to-br from-primary to-[#22d3ee] p-3.5 rounded-2xl shadow-lg shadow-primary/30 animate-pulse-glow">
               <ShieldCheck className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-black tracking-tight">
-                لوحة إدارة <span className="gradient-text">المنصة</span>
-              </h1>
-              <p className="text-muted-foreground mt-1 text-sm lg:text-base">إدارة مساحات العمل، المستخدمين، ومراقبة نشاط المنصة بالكامل.</p>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-3xl font-black tracking-tight">
+                  مركز <span className="gradient-text">التحكم</span>
+                </h1>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                  </span>
+                  <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400">مباشر</span>
+                </span>
+              </div>
+              <p className="text-muted-foreground mt-1 text-sm lg:text-base">تحكّم كامل بمساحات العمل، المستخدمين، الاشتراكات، وإعدادات المنصة.</p>
+              <p className="text-[11px] text-muted-foreground/70 mt-1.5 flex items-center gap-1.5">
+                <Clock className="w-3 h-3" />
+                آخر تحديث: {lastStatsRefresh.toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              </p>
             </div>
           </div>
 
-          {/* Auto-refresh toggle */}
-          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-muted/50 border border-border/50">
-            <Timer className="w-4 h-4 text-muted-foreground" />
-            <span className="text-xs font-bold text-muted-foreground">تحديث تلقائي</span>
-            <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
-            {autoRefresh && (
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#4d9fff] animate-pulse" />
-                <span className="text-[10px] text-[#4d9fff] font-bold">كل ٣٠ ثانية</span>
-              </span>
-            )}
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <Button
+              variant="outline" size="sm"
+              onClick={() => { fetchStats(); fetchTenants(tenantsPage, tenantSearch); fetchUsers(usersPage, userSearch); fetchLogs(logsPage); checkHealth() }}
+              className="rounded-xl gap-2 h-10 font-bold border-border/50 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all cursor-pointer"
+            >
+              <RefreshCw className="w-4 h-4" />
+              تحديث الآن
+            </Button>
+            <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-card/60 backdrop-blur-sm border border-border/50">
+              <Timer className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs font-bold text-muted-foreground">تلقائي</span>
+              <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
+              {autoRefresh && (
+                <span className="text-[10px] text-primary font-bold">٣٠ث</span>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* ─── Tabs ─── */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="flex overflow-x-auto no-scrollbar md:grid md:grid-cols-6 w-full max-w-3xl rounded-2xl h-auto md:h-12 p-1 bg-muted/70 backdrop-blur-sm gap-1">
-          <TabsTrigger value="overview" className="rounded-xl font-bold data-[state=active]:shadow-md transition-all duration-200 shrink-0">نظرة عامة</TabsTrigger>
-          <TabsTrigger value="tenants" className="rounded-xl font-bold data-[state=active]:shadow-md transition-all duration-200 shrink-0">مساحات العمل</TabsTrigger>
-          <TabsTrigger value="announcements" className="rounded-xl font-bold data-[state=active]:shadow-md transition-all duration-200 shrink-0">النشرة</TabsTrigger>
-          <TabsTrigger value="settings" className="rounded-xl font-bold data-[state=active]:shadow-md transition-all duration-200 shrink-0">إعدادات المنصة</TabsTrigger>
-          <TabsTrigger value="users" className="rounded-xl font-bold data-[state=active]:shadow-md transition-all duration-200 shrink-0">المستخدمون</TabsTrigger>
-          <TabsTrigger value="logs" className="rounded-xl font-bold data-[state=active]:shadow-md transition-all duration-200 shrink-0">السجلات</TabsTrigger>
+        <TabsList className="flex overflow-x-auto no-scrollbar md:grid md:grid-cols-6 w-full max-w-4xl rounded-2xl h-auto md:h-13 p-1.5 bg-muted/70 backdrop-blur-sm gap-1 border border-border/40">
+          <TabsTrigger value="overview" className="rounded-xl font-bold gap-1.5 data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
+            <BarChart3 className="w-4 h-4" /> نظرة عامة
+          </TabsTrigger>
+          <TabsTrigger value="tenants" className="rounded-xl font-bold gap-1.5 data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
+            <Building2 className="w-4 h-4" /> مساحات العمل
+          </TabsTrigger>
+          <TabsTrigger value="users" className="rounded-xl font-bold gap-1.5 data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
+            <Users className="w-4 h-4" /> المستخدمون
+          </TabsTrigger>
+          <TabsTrigger value="announcements" className="rounded-xl font-bold gap-1.5 data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
+            <Megaphone className="w-4 h-4" /> النشرة
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="rounded-xl font-bold gap-1.5 data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
+            <ShieldCheck className="w-4 h-4" /> الإعدادات
+          </TabsTrigger>
+          <TabsTrigger value="logs" className="rounded-xl font-bold gap-1.5 data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
+            <ScrollText className="w-4 h-4" /> السجلات
+          </TabsTrigger>
         </TabsList>
 
         {/* ==================== Overview ==================== */}
@@ -1408,6 +1523,59 @@ export default function AdminPage() {
                           </div>
                         )}
 
+                        {/* Email the owner */}
+                        <button
+                          className="flex items-center gap-3 bg-[#161b22] rounded-xl p-3 border border-[#30363d] hover:bg-[#4d9fff]/5 hover:border-[#4d9fff]/20 transition-all duration-200 w-full text-right cursor-pointer"
+                          onClick={() => setShowEmailForm(!showEmailForm)}
+                        >
+                          <Mail className="w-4 h-4 text-[#4d9fff]" />
+                          <span className="text-xs font-bold text-white flex-1">مراسلة المالك بالبريد</span>
+                          <ChevronLeft className={`w-3.5 h-3.5 text-[#9ca3af] transition-transform duration-200 ${showEmailForm ? "-rotate-90" : ""}`} />
+                        </button>
+
+                        {showEmailForm && (
+                          <div className="bg-[#161b22] rounded-xl p-4 border border-[#4d9fff]/20 space-y-3 animate-fade-in">
+                            <p className="text-[10px] text-[#9ca3af]">يُرسل إلى: <span dir="ltr" className="font-bold text-white">{selectedTenant.owner?.email || "—"}</span></p>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-[#9ca3af]">الموضوع</label>
+                              <Input
+                                value={tenantEmailSubject}
+                                onChange={e => setTenantEmailSubject(e.target.value)}
+                                placeholder="موضوع الرسالة..."
+                                className="rounded-lg h-9 text-xs bg-[#0d1117] border-[#30363d] text-white placeholder:text-[#484f58]"
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[10px] font-bold text-[#9ca3af]">نص الرسالة</label>
+                              <Textarea
+                                value={tenantEmailBody}
+                                onChange={e => setTenantEmailBody(e.target.value)}
+                                placeholder="اكتب رسالتك... (كل سطر يصبح فقرة)"
+                                className="rounded-lg min-h-[80px] text-xs bg-[#0d1117] border-[#30363d] text-white placeholder:text-[#484f58]"
+                              />
+                            </div>
+                            {tenantEmailResult && (
+                              <div className={`flex items-center gap-2 p-3 rounded-lg text-xs font-bold border ${
+                                tenantEmailResult.type === "success"
+                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                  : "bg-red-500/10 text-red-400 border-red-500/20"
+                              }`}>
+                                {tenantEmailResult.type === "success" ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
+                                {tenantEmailResult.text}
+                              </div>
+                            )}
+                            <Button
+                              size="sm"
+                              disabled={tenantEmailSending || !tenantEmailSubject.trim() || !tenantEmailBody.trim()}
+                              className="w-full rounded-lg gap-2 font-bold text-xs h-9 bg-gradient-to-r from-[#4d9fff] to-[#22d3ee] text-[#0d1117] hover:opacity-90 transition-all duration-200 cursor-pointer"
+                              onClick={handleEmailTenant}
+                            >
+                              {tenantEmailSending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                              إرسال البريد
+                            </Button>
+                          </div>
+                        )}
+
                         {/* Delete */}
                         <button
                           className="flex items-center gap-3 bg-red-500/5 rounded-xl p-3 border border-red-500/20 hover:bg-red-500/10 transition-all duration-200 w-full text-right cursor-pointer"
@@ -1549,8 +1717,19 @@ export default function AdminPage() {
               </div>
             </CardHeader>
             <CardContent>
+              {userActionMsg && (
+                <div className={`mb-4 flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-bold border ${
+                  userActionMsg.type === "success"
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                    : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
+                }`}>
+                  {userActionMsg.type === "success" ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
+                  {userActionMsg.text}
+                  <button onClick={() => setUserActionMsg(null)} className="mr-auto text-xs opacity-60 hover:opacity-100 cursor-pointer">إغلاق</button>
+                </div>
+              )}
               {usersLoading ? (
-                <div className="grid gap-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-xl" />)}</div>
+                <div className="grid gap-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}</div>
               ) : users.length === 0 ? (
                 <div className="text-center py-16">
                   <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
@@ -1563,45 +1742,88 @@ export default function AdminPage() {
                     return (
                       <div
                         key={u.id}
-                        className={`border border-border/50 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3 bg-card hover:bg-accent/30 hover:shadow-md transition-all duration-200 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}
+                        className={`group border border-border/50 rounded-2xl p-4 bg-card hover:border-primary/30 hover:shadow-lg transition-all duration-200 ${mounted ? 'animate-fade-in' : 'opacity-0'}`}
                         style={{ animationDelay: `${idx * 50}ms` }}
                       >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 shadow-sm ${
-                            u.isSuperAdmin
-                              ? 'bg-gradient-to-br from-amber-400 to-orange-500'
-                              : 'bg-gradient-to-br from-primary/60 to-primary'
-                          }`}>
-                            {u.isSuperAdmin ? (
-                              <Crown className="w-5 h-5 text-white" />
-                            ) : (
-                              <span className="text-white font-bold text-xs">{initials}</span>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-black">{u.name || "بدون اسم"}</span>
-                              {u.isSuperAdmin && (
-                                <Badge className="gap-1 h-5 text-[10px] font-bold bg-gradient-to-r from-amber-500 to-orange-500 border-0 text-white">
-                                  <ShieldCheck className="w-3 h-3" />
-                                  أدمن المنصة
-                                </Badge>
+                        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
+                              u.isSuperAdmin
+                                ? 'bg-gradient-to-br from-amber-400 to-orange-500'
+                                : 'bg-gradient-to-br from-primary/60 to-primary'
+                            }`}>
+                              {u.isSuperAdmin ? (
+                                <Crown className="w-5 h-5 text-white" />
+                              ) : (
+                                <span className="text-white font-bold text-sm">{initials}</span>
                               )}
                             </div>
-                            <p className="text-xs text-muted-foreground mt-0.5 truncate" dir="ltr">{u.email}</p>
-                            <div className="flex gap-1.5 mt-2 flex-wrap">
-                              {u.tenants.map(t => (
-                                <Badge key={t.id} variant="secondary" className={`text-[10px] h-5 rounded-lg border ${planColors[t.plan]?.badge || ''}`}>
-                                  {t.name} · {t.role}
-                                </Badge>
-                              ))}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-black">{u.name || "بدون اسم"}</span>
+                                {u.isSuperAdmin && (
+                                  <Badge className="gap-1 h-5 text-[10px] font-bold bg-gradient-to-r from-amber-500 to-orange-500 border-0 text-white">
+                                    <ShieldCheck className="w-3 h-3" />
+                                    أدمن المنصة
+                                  </Badge>
+                                )}
+                                {u.emailVerified ? (
+                                  <Badge className="gap-1 h-5 text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    بريد مفعّل
+                                  </Badge>
+                                ) : (
+                                  <Badge className="gap-1 h-5 text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    بريد غير مفعّل
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5 truncate" dir="ltr">{u.email}</p>
+                              <div className="flex gap-1.5 mt-2 flex-wrap">
+                                {u.tenants.map(t => (
+                                  <Badge key={t.id} variant="secondary" className={`text-[10px] h-5 rounded-lg border ${planColors[t.plan]?.badge || ''}`}>
+                                    {t.name} · {t.role}
+                                  </Badge>
+                                ))}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2.5 shrink-0 px-3 py-2 rounded-xl bg-muted/40">
-                          <UserCheck className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-xs font-bold text-muted-foreground">صلاحية أدمن</span>
-                          <Switch checked={u.isSuperAdmin} onCheckedChange={() => handleToggleAdmin(u)} />
+
+                          {/* Control cluster */}
+                          <div className="flex flex-wrap items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/40 border border-border/40">
+                              <UserCheck className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span className="text-[11px] font-bold text-muted-foreground">أدمن</span>
+                              <Switch checked={u.isSuperAdmin} onCheckedChange={() => handleToggleAdmin(u)} />
+                            </div>
+                            {!u.emailVerified && (
+                              <Button
+                                variant="outline" size="sm"
+                                onClick={() => handleVerifyUserEmail(u)}
+                                className="rounded-xl gap-1.5 h-9 font-bold text-xs border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                تفعيل البريد
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline" size="sm"
+                              onClick={() => handleResetUserPassword(u)}
+                              className="rounded-xl gap-1.5 h-9 font-bold text-xs border-border/50 hover:bg-primary/10 hover:text-primary hover:border-primary/30 cursor-pointer"
+                            >
+                              <Mail className="w-3.5 h-3.5" />
+                              إعادة كلمة السر
+                            </Button>
+                            <Button
+                              variant="outline" size="sm"
+                              onClick={() => handleDeleteUser(u)}
+                              className="rounded-xl gap-1.5 h-9 font-bold text-xs border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              حذف
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     )

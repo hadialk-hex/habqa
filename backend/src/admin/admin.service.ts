@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { getPlanLimits, startOfCurrentMonth } from '../common/plan-limits';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class AdminService {
@@ -364,6 +365,7 @@ export class AdminService {
           email: true,
           name: true,
           isSuperAdmin: true,
+          emailVerifiedAt: true,
           createdAt: true,
           memberships: {
             include: {
@@ -381,6 +383,7 @@ export class AdminService {
         email: u.email,
         name: u.name,
         isSuperAdmin: u.isSuperAdmin,
+        emailVerified: !!u.emailVerifiedAt,
         createdAt: u.createdAt,
         tenants: u.memberships.map((m) => ({
           id: m.tenant.id,
@@ -418,6 +421,110 @@ export class AdminService {
       data: { isSuperAdmin: Boolean(data.isSuperAdmin) },
       select: { id: true, email: true, name: true, isSuperAdmin: true },
     });
+  }
+
+  // Permanently delete a user. Tenants they solely own are removed with them
+  // (cascade). An admin cannot delete their own account here.
+  async deleteUser(id: string, currentAdminId: string) {
+    if (id === currentAdminId) {
+      throw new BadRequestException('لا يمكنك حذف حسابك الخاص من هنا');
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        memberships: { where: { role: 'OWNER' }, select: { tenantId: true } },
+      },
+    });
+    if (!user) throw new NotFoundException('المستخدم غير موجود');
+
+    // Remove workspaces this user owns (their data cascades away)
+    const ownedTenantIds = user.memberships.map((m) => m.tenantId);
+    if (ownedTenantIds.length > 0) {
+      await this.prisma.tenant.deleteMany({
+        where: { id: { in: ownedTenantIds } },
+      });
+    }
+    // User row may already be gone if the owned tenant cascade removed the
+    // membership + user; guard with deleteMany so it's idempotent.
+    await this.prisma.user.deleteMany({ where: { id } });
+    return { success: true };
+  }
+
+  // Manually mark a user's email as verified (support action)
+  async verifyUserEmail(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('المستخدم غير موجود');
+    await this.prisma.user.update({
+      where: { id },
+      data: {
+        emailVerifiedAt: user.emailVerifiedAt || new Date(),
+        verifyCode: null,
+        verifyCodeExpiresAt: null,
+      },
+    });
+    return { success: true, message: 'تم تفعيل البريد يدوياً' };
+  }
+
+  // Issue a password-reset link to the user and email it to them. The admin
+  // never sees or sets the password — the user chooses it via the secure link.
+  async sendUserPasswordReset(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('المستخدم غير موجود');
+
+    const mail = this.mailService;
+    if (!mail || !(await mail.isConfigured())) {
+      throw new BadRequestException(
+        'خدمة البريد غير مفعّلة. اضبط إعدادات SMTP أولاً لإرسال رابط إعادة التعيين.',
+      );
+    }
+
+    const token = crypto.randomBytes(32).toString('hex');
+    await this.prisma.passwordResetToken.create({
+      data: { token, userId: user.id, expiresAt: new Date(Date.now() + 3600000) },
+    });
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const result = await mail.sendPasswordReset(
+      user.email,
+      `${frontendUrl}/reset-password?token=${token}`,
+    );
+    if (!result.sent) {
+      throw new BadRequestException('فشل إرسال البريد. تحقق من إعدادات SMTP.');
+    }
+    return { success: true, message: `تم إرسال رابط إعادة التعيين إلى ${user.email}` };
+  }
+
+  // Send a one-off email to a tenant's owner from the admin panel
+  async emailTenant(tenantId: string, subject: string, body: string) {
+    if (!subject?.trim() || !body?.trim()) {
+      throw new BadRequestException('العنوان والمحتوى مطلوبان');
+    }
+    const mail = this.mailService;
+    if (!mail || !(await mail.isConfigured())) {
+      throw new BadRequestException(
+        'خدمة البريد غير مفعّلة. اضبط إعدادات SMTP أولاً.',
+      );
+    }
+    const owner = await this.prisma.tenantMember.findFirst({
+      where: { tenantId, role: 'OWNER' },
+      include: { user: { select: { email: true } } },
+    });
+    if (!owner?.user?.email) {
+      throw new NotFoundException('لا يوجد مالك لهذه المساحة');
+    }
+    const bodyHtml = body
+      .split(/\r?\n/)
+      .filter((line) => line.trim() !== '')
+      .map((line) => `<p>${line}</p>`)
+      .join('');
+    const result = await mail.sendAnnouncement(
+      owner.user.email,
+      subject.trim(),
+      bodyHtml,
+    );
+    if (!result.sent) {
+      throw new BadRequestException('فشل إرسال البريد. تحقق من إعدادات SMTP.');
+    }
+    return { success: true, message: `تم إرسال الرسالة إلى ${owner.user.email}` };
   }
 
   async getAuditLogs(page = 1, pageSize = 50, tenantId?: string) {

@@ -106,6 +106,29 @@ export class AdminController {
     return this.adminService.updateUser(id, req.user.id, body);
   }
 
+  @Delete('users/:id')
+  async deleteUser(@Request() req: any, @Param('id') id: string) {
+    return this.adminService.deleteUser(id, req.user.id);
+  }
+
+  @Post('users/:id/verify-email')
+  async verifyUserEmail(@Param('id') id: string) {
+    return this.adminService.verifyUserEmail(id);
+  }
+
+  @Post('users/:id/reset-password')
+  async resetUserPassword(@Param('id') id: string) {
+    return this.adminService.sendUserPasswordReset(id);
+  }
+
+  @Post('tenants/:id/email')
+  async emailTenant(
+    @Param('id') id: string,
+    @Body() body: { subject: string; body: string },
+  ) {
+    return this.adminService.emailTenant(id, body.subject, body.body);
+  }
+
   @Post('announcements')
   async sendAnnouncement(
     @Body() body: { subject: string; body: string },
