@@ -58,7 +58,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: supersecretjwtkey1234567890
-      ALLOWED_ORIGINS: http://localhost:3000
+      ALLOWED_ORIGINS: http://localhost:1998
     depends_on:
       postgres:
         condition: service_healthy
@@ -83,7 +83,7 @@ services:
     container_name: hubqa_frontend
     restart: always
     ports:
-      - "3000:3000"
+      - "1998:3000"
     environment:
       NODE_ENV: production
       PORT: 3000
