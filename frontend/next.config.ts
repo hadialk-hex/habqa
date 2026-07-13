@@ -26,6 +26,14 @@ const nextConfig: NextConfig = {
         source: '/api/backend/:path*',
         destination: `${process.env.BACKEND_URL || 'http://backend:3001'}/:path*`,
       },
+      {
+        source: '/webhooks',
+        destination: `${process.env.BACKEND_URL || 'http://backend:3001'}/webhooks`,
+      },
+      {
+        source: '/webhooks/:path*',
+        destination: `${process.env.BACKEND_URL || 'http://backend:3001'}/webhooks/:path*`,
+      },
     ];
   },
   async headers() {
