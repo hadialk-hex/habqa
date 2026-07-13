@@ -93,7 +93,10 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: supersecretjwtkey1234567890
-      ALLOWED_ORIGINS: http://localhost:1998
+      ENCRYPTION_KEY: "super-secret-encryption-key-32ch"
+      APP_SECRET: "facebook-app-secret-key"
+      ALLOWED_ORIGINS: "http://localhost:1998,https://hubqa.hex-tic.xyz"
+      FRONTEND_URL: "https://hubqa.hex-tic.xyz"
     depends_on:
       postgres:
         condition: service_healthy
