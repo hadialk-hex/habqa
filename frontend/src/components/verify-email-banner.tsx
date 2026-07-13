@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { MailWarning, CheckCircle2, RefreshCw } from "lucide-react"
 import api from "@/lib/api"
+import { useLanguage } from "@/lib/i18n/language-context"
 
 // Shown at the top of the dashboard until the user confirms their email
 // with the 6-digit OTP code. Hidden entirely once verified.
 export function VerifyEmailBanner() {
+  const { t } = useLanguage()
   const [status, setStatus] = useState<"loading" | "unverified" | "verified">("loading")
   const [code, setCode] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -31,7 +33,7 @@ export function VerifyEmailBanner() {
       setStatus("verified")
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } }
-      setMessage(axiosErr.response?.data?.message || "رمز غير صحيح")
+      setMessage(axiosErr.response?.data?.message || t('verifyEmailBanner.errorInvalidCode'))
     } finally {
       setIsSubmitting(false)
     }
@@ -42,9 +44,9 @@ export function VerifyEmailBanner() {
       setIsResending(true)
       setMessage(null)
       await api.post("/auth/verify-email/resend")
-      setMessage("تم إرسال رمز جديد إلى بريدك.")
+      setMessage(t('verifyEmailBanner.resendSuccess'))
     } catch {
-      setMessage("تعذر إرسال الرمز. حاول لاحقاً.")
+      setMessage(t('verifyEmailBanner.resendError'))
     } finally {
       setIsResending(false)
     }
@@ -55,9 +57,9 @@ export function VerifyEmailBanner() {
       <div className="flex items-center gap-3 flex-1 min-w-0">
         <MailWarning className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
         <div className="min-w-0">
-          <p className="text-sm font-bold text-amber-700 dark:text-amber-300">فعّل بريدك الإلكتروني</p>
+          <p className="text-sm font-bold text-amber-700 dark:text-amber-300">{t('verifyEmailBanner.title')}</p>
           <p className="text-xs text-amber-700/80 dark:text-amber-300/80">
-            {message || "أرسلنا رمز تفعيل من 6 أرقام إلى بريدك. أدخله هنا لتأمين حسابك."}
+            {message || t('verifyEmailBanner.subtitle')}
           </p>
         </div>
       </div>
@@ -72,10 +74,10 @@ export function VerifyEmailBanner() {
         />
         <Button size="sm" className="rounded-lg h-9 gap-1.5 font-bold" disabled={code.length !== 6 || isSubmitting} onClick={handleVerify}>
           {isSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-          تفعيل
+          {t('verifyEmailBanner.verify')}
         </Button>
         <Button size="sm" variant="ghost" className="rounded-lg h-9 text-xs" disabled={isResending} onClick={handleResend}>
-          {isResending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : "إعادة إرسال"}
+          {isResending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : t('verifyEmailBanner.resend')}
         </Button>
       </div>
     </div>

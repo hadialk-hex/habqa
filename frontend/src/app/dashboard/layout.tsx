@@ -8,6 +8,8 @@ import AuthGuard from "@/components/auth-guard"
 import { VerifyEmailBanner } from "@/components/verify-email-banner"
 import { useState, useRef, useEffect } from "react"
 import api from "@/lib/api"
+import { useLanguage } from "@/lib/i18n/language-context"
+import { LanguageSwitcher } from "@/components/language-switcher"
 
 interface Notification {
   id: string
@@ -34,15 +36,15 @@ function NotificationIcon({ type }: { type: Notification['type'] }) {
   )
 }
 
-function formatTimeAgo(dateStr: string): string {
+function formatTimeAgo(dateStr: string, t: (path: string, vars?: Record<string, string | number>) => string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return "الآن"
-  if (mins < 60) return `منذ ${mins} دقيقة`
+  if (mins < 1) return t('notifications.timeNow')
+  if (mins < 60) return t('notifications.timeMinutesAgo', { n: mins })
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `منذ ${hours} ساعة`
+  if (hours < 24) return t('notifications.timeHoursAgo', { n: hours })
   const days = Math.floor(hours / 24)
-  return `منذ ${days} يوم`
+  return t('notifications.timeDaysAgo', { n: days })
 }
 
 export default function DashboardLayout({
@@ -50,6 +52,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
+  const { t } = useLanguage()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -122,17 +125,17 @@ export default function DashboardLayout({
               </button>
 
               {isOpen && (
-                <div className="absolute left-0 top-full mt-2 w-80 sm:w-96 bg-card border border-border/50 rounded-2xl shadow-2xl z-50 overflow-hidden animate-fade-in-up" dir="rtl">
+                <div className="absolute left-0 top-full mt-2 w-80 sm:w-96 bg-card border border-border/50 rounded-2xl shadow-2xl z-50 overflow-hidden animate-fade-in-up">
                   {/* Header */}
                   <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
-                    <h3 className="font-black text-sm">الإشعارات</h3>
+                    <h3 className="font-black text-sm">{t('notifications.title')}</h3>
                     {unreadCount > 0 && (
                       <button
                         onClick={markAllAsRead}
                         className="text-[11px] font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1"
                       >
                         <Check className="w-3 h-3" />
-                        تحديد الكل كمقروء
+                        {t('notifications.markAllRead')}
                       </button>
                     )}
                   </div>
@@ -142,7 +145,7 @@ export default function DashboardLayout({
                     {notifications.length === 0 ? (
                       <div className="py-10 text-center">
                         <Bell className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                        <p className="text-sm text-muted-foreground">لا توجد إشعارات</p>
+                        <p className="text-sm text-muted-foreground">{t('notifications.empty')}</p>
                       </div>
                     ) : (
                       notifications.map((notif) => (
@@ -164,7 +167,7 @@ export default function DashboardLayout({
                               )}
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5 truncate">{notif.message}</p>
-                            <p className="text-[10px] text-muted-foreground/60 mt-1">{formatTimeAgo(notif.createdAt)}</p>
+                            <p className="text-[10px] text-muted-foreground/60 mt-1">{formatTimeAgo(notif.createdAt, t)}</p>
                           </div>
                           <button
                             onClick={(e) => { e.stopPropagation(); dismissNotification(notif.id) }}
@@ -180,6 +183,7 @@ export default function DashboardLayout({
               )}
             </div>
             
+            <LanguageSwitcher />
             <ThemeToggle />
           </header>
 

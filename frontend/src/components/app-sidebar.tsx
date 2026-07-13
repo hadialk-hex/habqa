@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { BrandMark } from "@/components/brand-logo"
+import { useLanguage } from "@/lib/i18n/language-context"
 
 import {
   Sidebar,
@@ -26,35 +27,36 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-const mainItems = [
-  { title: "الرئيسية", url: "/dashboard", icon: LayoutDashboard },
-  { title: "صندوق الوارد", url: "/dashboard/inbox", icon: Inbox },
-  { title: "قواعد الرد الآلي", url: "/dashboard/rules", icon: MessageSquareText },
-  { title: "مخطط التدفق", url: "/dashboard/flows", icon: Workflow },
-]
-
-const toolItems = [
-  { title: "الحملات", url: "/dashboard/broadcasts", icon: Megaphone },
-  { title: "القنوات", url: "/dashboard/channels", icon: Share2 },
-  { title: "المشتركون", url: "/dashboard/subscribers", icon: Users },
-]
-
-const systemItems = [
-  { title: "الفريق", url: "/dashboard/team", icon: UserCog },
-  { title: "الإعدادات", url: "/dashboard/settings", icon: Settings },
-]
-
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuth()
+  const { t } = useLanguage()
+
+  const mainItems = [
+    { title: t('nav.home'), url: "/dashboard", icon: LayoutDashboard },
+    { title: t('nav.inbox'), url: "/dashboard/inbox", icon: Inbox },
+    { title: t('nav.rules'), url: "/dashboard/rules", icon: MessageSquareText },
+    { title: t('nav.flows'), url: "/dashboard/flows", icon: Workflow },
+  ]
+
+  const toolItems = [
+    { title: t('nav.broadcasts'), url: "/dashboard/broadcasts", icon: Megaphone },
+    { title: t('nav.channels'), url: "/dashboard/channels", icon: Share2 },
+    { title: t('nav.subscribers'), url: "/dashboard/subscribers", icon: Users },
+  ]
+
+  const systemItems = [
+    { title: t('nav.team'), url: "/dashboard/team", icon: UserCog },
+    { title: t('nav.settings'), url: "/dashboard/settings", icon: Settings },
+  ]
 
   const handleLogout = () => {
     logout()
     router.push('/login')
   }
 
-  const userInitials = user?.name ? user.name.substring(0, 2) : "م"
+  const userInitials = user?.name ? user.name.substring(0, 2) : t('nav.user').substring(0, 1)
   const isItemActive = (url: string) => pathname === url || (pathname.startsWith(url) && url !== '/dashboard')
 
   const renderMenuItems = (items: typeof mainItems) => (
@@ -102,7 +104,7 @@ export function AppSidebar() {
               حبقة <span className="bg-gradient-to-l from-[#4d9fff] to-[#22d3ee] bg-clip-text text-transparent">Hubqa</span>
             </span>
             <span className="text-[10px] text-muted-foreground font-medium">
-              منصة الأتمتة الذكية
+              {t('nav.tagline')}
             </span>
           </div>
         </Link>
@@ -112,7 +114,7 @@ export function AppSidebar() {
         {/* ─── Main Navigation ─────────────────────────────────────── */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-[0.14em] px-4 mb-0.5">
-            الأدوات الأساسية
+            {t('nav.coreTools')}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             {renderMenuItems(mainItems)}
@@ -122,7 +124,7 @@ export function AppSidebar() {
         {/* ─── Growth Tools ────────────────────────────────────────── */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-[0.14em] px-4 mb-0.5">
-            أدوات النمو
+            {t('nav.growthTools')}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             {renderMenuItems(toolItems)}
@@ -132,7 +134,7 @@ export function AppSidebar() {
         {/* ─── System ──────────────────────────────────────────────── */}
         <SidebarGroup>
           <SidebarGroupLabel className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-[0.14em] px-4 mb-0.5">
-            النظام
+            {t('nav.system')}
           </SidebarGroupLabel>
           <SidebarGroupContent>
             {renderMenuItems(systemItems)}
@@ -143,7 +145,7 @@ export function AppSidebar() {
         {user?.isSuperAdmin && (
           <SidebarGroup>
             <SidebarGroupLabel className="text-[10px] font-bold text-red-400/60 uppercase tracking-[0.14em] px-4 mb-0.5">
-              إدارة المنصة
+              {t('nav.platformAdmin')}
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -151,7 +153,7 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     render={<Link href="/admin" />}
                     isActive={pathname.startsWith('/admin')}
-                    tooltip="لوحة الأدمن"
+                    tooltip={t('nav.adminPanel')}
                     className={`relative mx-2 h-9 rounded-lg transition-colors duration-200 ${
                       pathname.startsWith('/admin')
                         ? 'bg-red-500/10 text-red-400 font-bold'
@@ -162,7 +164,7 @@ export function AppSidebar() {
                       <span className="absolute -right-2 top-1/2 -translate-y-1/2 w-[3px] h-4.5 rounded-l-full bg-red-400" />
                     )}
                     <ShieldCheck className={`w-[18px] h-[18px] ${pathname.startsWith('/admin') ? 'text-red-400' : 'text-muted-foreground/70'}`} />
-                    <span className="text-[13px]">لوحة الأدمن</span>
+                    <span className="text-[13px]">{t('nav.adminPanel')}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -179,7 +181,7 @@ export function AppSidebar() {
               <span className="text-primary font-bold text-sm">{userInitials}</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold truncate">{user?.name || "المستخدم"}</p>
+              <p className="text-sm font-bold truncate">{user?.name || t('nav.user')}</p>
               <p className="text-[11px] text-muted-foreground truncate">{user?.email || ""}</p>
             </div>
             <ChevronUp className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors duration-200 shrink-0" />
@@ -187,16 +189,16 @@ export function AppSidebar() {
           <DropdownMenuContent side="top" align="end" sideOffset={8} className="w-[220px] rounded-xl p-1">
             <DropdownMenuItem onClick={() => router.push('/dashboard')} className="gap-2 cursor-pointer rounded-lg">
               <LayoutDashboard className="w-4 h-4" />
-              <span>لوحة التحكم</span>
+              <span>{t('nav.dashboard')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push('/dashboard/settings')} className="gap-2 cursor-pointer rounded-lg">
               <Settings className="w-4 h-4" />
-              <span>الإعدادات</span>
+              <span>{t('nav.settings')}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive gap-2 cursor-pointer rounded-lg">
               <LogOut className="w-4 h-4" />
-              <span>تسجيل الخروج</span>
+              <span>{t('nav.logout')}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -6,8 +6,11 @@ import { useEffect, useState } from "react"
 import api from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { useLanguage } from "@/lib/i18n/language-context"
 
 export default function DashboardPage() {
+  const { t, locale } = useLanguage()
+  const localeCode = locale === "ar" ? "ar-EG" : "en-US"
   const [mounted, setMounted] = useState(false)
   const { user } = useAuth()
   const [stats, setStats] = useState<any>(null)
@@ -40,11 +43,11 @@ export default function DashboardPage() {
   const getPlatformDetails = (platform: string) => {
     switch (platform) {
       case 'WHATSAPP':
-        return { name: 'واتساب', icon: MessageCircle, color: 'text-[#25D366]', bgColor: 'bg-[#25D366]/10' };
+        return { name: t('dashboardHome.platformWhatsApp'), icon: MessageCircle, color: 'text-[#25D366]', bgColor: 'bg-[#25D366]/10' };
       case 'FACEBOOK_PAGE':
-        return { name: 'فيسبوك', icon: Globe, color: 'text-secondary', bgColor: 'bg-secondary/10' };
+        return { name: t('dashboardHome.platformFacebook'), icon: Globe, color: 'text-secondary', bgColor: 'bg-secondary/10' };
       case 'INSTAGRAM':
-        return { name: 'انستغرام', icon: Camera, color: 'text-primary', bgColor: 'bg-primary/10' };
+        return { name: t('dashboardHome.platformInstagram'), icon: Camera, color: 'text-primary', bgColor: 'bg-primary/10' };
       default:
         return { name: platform, icon: MessageSquareText, color: 'text-primary', bgColor: 'bg-primary/10' };
     }
@@ -53,11 +56,11 @@ export default function DashboardPage() {
   const formatTime = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime();
     const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return 'الآن';
-    if (minutes < 60) return `قبل ${minutes} دقيقة`;
+    if (minutes < 1) return t('dashboardHome.timeNow');
+    if (minutes < 60) return t('dashboardHome.timeMinutesAgo', { n: minutes });
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `قبل ${hours} ساعة`;
-    return new Date(dateStr).toLocaleDateString('ar-EG');
+    if (hours < 24) return t('dashboardHome.timeHoursAgo', { n: hours });
+    return new Date(dateStr).toLocaleDateString(localeCode);
   }
 
   const totalSubscribersVal = stats?.totalSubscribers ?? 0;
@@ -67,48 +70,48 @@ export default function DashboardPage() {
 
   const kpiCards = [
     {
-      title: "إجمالي المشتركين",
-      value: totalSubscribersVal.toLocaleString('ar-EG'),
-      change: stats?.subscribersTrend !== undefined 
-        ? `${stats.subscribersTrend > 0 ? '+' : ''}${stats.subscribersTrend}%` 
-        : "مشترك مسجل",
-      changeLabel: stats?.subscribersTrend !== undefined ? "مقارنة بالفترة السابقة" : "",
+      title: t('dashboardHome.kpiSubscribers'),
+      value: totalSubscribersVal.toLocaleString(localeCode),
+      change: stats?.subscribersTrend !== undefined
+        ? `${stats.subscribersTrend > 0 ? '+' : ''}${stats.subscribersTrend}%`
+        : t('dashboardHome.kpiSubscribersFallback'),
+      changeLabel: stats?.subscribersTrend !== undefined ? t('dashboardHome.kpiComparedToPrevious') : "",
       trend: stats?.subscribersTrend > 0 ? "up" : stats?.subscribersTrend < 0 ? "down" : "neutral",
       icon: Users,
       gradient: "from-[#4d9fff] to-[#22d3ee]",
       bgGlow: "from-[#4d9fff]/15 to-transparent",
     },
     {
-      title: "الردود الآلية",
-      value: totalAutoRepliesVal.toLocaleString('ar-EG'),
-      change: stats?.autoRepliesTrend !== undefined 
-        ? `${stats.autoRepliesTrend > 0 ? '+' : ''}${stats.autoRepliesTrend}%` 
-        : "رد مرسل",
-      changeLabel: stats?.autoRepliesTrend !== undefined ? "مقارنة بالفترة السابقة" : "",
+      title: t('dashboardHome.kpiAutoReplies'),
+      value: totalAutoRepliesVal.toLocaleString(localeCode),
+      change: stats?.autoRepliesTrend !== undefined
+        ? `${stats.autoRepliesTrend > 0 ? '+' : ''}${stats.autoRepliesTrend}%`
+        : t('dashboardHome.kpiAutoRepliesFallback'),
+      changeLabel: stats?.autoRepliesTrend !== undefined ? t('dashboardHome.kpiComparedToPrevious') : "",
       trend: stats?.autoRepliesTrend > 0 ? "up" : stats?.autoRepliesTrend < 0 ? "down" : "neutral",
       icon: Reply,
       gradient: "from-[#22d3ee] to-[#4d9fff]",
       bgGlow: "from-[#22d3ee]/15 to-transparent",
     },
     {
-      title: "المحادثات النشطة",
-      value: activeConversationsVal.toLocaleString('ar-EG'),
-      change: stats?.conversationsTrend !== undefined 
-        ? `${stats.conversationsTrend > 0 ? '+' : ''}${stats.conversationsTrend}%` 
-        : "نشطة حالياً",
-      changeLabel: stats?.conversationsTrend !== undefined ? "مقارنة بالفترة السابقة" : "",
+      title: t('dashboardHome.kpiActiveConversations'),
+      value: activeConversationsVal.toLocaleString(localeCode),
+      change: stats?.conversationsTrend !== undefined
+        ? `${stats.conversationsTrend > 0 ? '+' : ''}${stats.conversationsTrend}%`
+        : t('dashboardHome.kpiActiveConversationsFallback'),
+      changeLabel: stats?.conversationsTrend !== undefined ? t('dashboardHome.kpiComparedToPrevious') : "",
       trend: stats?.conversationsTrend > 0 ? "up" : stats?.conversationsTrend < 0 ? "down" : "neutral",
       icon: MessageSquareText,
       gradient: "from-[#4d9fff] to-[#22d3ee]",
       bgGlow: "from-[#4d9fff]/15 to-transparent",
     },
     {
-      title: "القواعد النشطة",
-      value: totalRulesVal.toLocaleString('ar-EG'),
-      change: stats?.rulesTrend !== undefined 
-        ? `${stats.rulesTrend > 0 ? '+' : ''}${stats.rulesTrend}%` 
-        : "مفعلة",
-      changeLabel: stats?.rulesTrend !== undefined ? "مقارنة بالفترة السابقة" : "",
+      title: t('dashboardHome.kpiActiveRules'),
+      value: totalRulesVal.toLocaleString(localeCode),
+      change: stats?.rulesTrend !== undefined
+        ? `${stats.rulesTrend > 0 ? '+' : ''}${stats.rulesTrend}%`
+        : t('dashboardHome.kpiActiveRulesFallback'),
+      changeLabel: stats?.rulesTrend !== undefined ? t('dashboardHome.kpiComparedToPrevious') : "",
       trend: stats?.rulesTrend > 0 ? "up" : stats?.rulesTrend < 0 ? "down" : "neutral",
       icon: Zap,
       gradient: "from-[#22d3ee] to-[#4d9fff]",
@@ -118,31 +121,31 @@ export default function DashboardPage() {
 
   const totalConns = (stats?.platformStats?.WHATSAPP ?? 0) + (stats?.platformStats?.FACEBOOK_PAGE ?? 0) + (stats?.platformStats?.INSTAGRAM ?? 0) || 1;
   const platformData = [
-    { 
-      name: "واتساب", 
-      count: (stats?.platformStats?.WHATSAPP ?? 0).toLocaleString('ar-EG'), 
-      label: "قناة", 
-      percent: Math.round(((stats?.platformStats?.WHATSAPP ?? 0) / totalConns) * 100) || 0, 
+    {
+      name: t('dashboardHome.platformWhatsApp'),
+      count: (stats?.platformStats?.WHATSAPP ?? 0).toLocaleString(localeCode),
+      label: t('dashboardHome.unitChannel'),
+      percent: Math.round(((stats?.platformStats?.WHATSAPP ?? 0) / totalConns) * 100) || 0,
       color: "bg-[#25D366]",
       icon: MessageCircle,
       iconColor: "text-[#25D366]",
       bgColor: "bg-[#25D366]/10",
     },
-    { 
-      name: "فيسبوك", 
-      count: (stats?.platformStats?.FACEBOOK_PAGE ?? 0).toLocaleString('ar-EG'), 
-      label: "صفحة", 
-      percent: Math.round(((stats?.platformStats?.FACEBOOK_PAGE ?? 0) / totalConns) * 100) || 0, 
+    {
+      name: t('dashboardHome.platformFacebook'),
+      count: (stats?.platformStats?.FACEBOOK_PAGE ?? 0).toLocaleString(localeCode),
+      label: t('dashboardHome.unitPage'),
+      percent: Math.round(((stats?.platformStats?.FACEBOOK_PAGE ?? 0) / totalConns) * 100) || 0,
       color: "bg-secondary",
       icon: Globe,
       iconColor: "text-secondary",
       bgColor: "bg-secondary/10",
     },
-    { 
-      name: "انستغرام", 
-      count: (stats?.platformStats?.INSTAGRAM ?? 0).toLocaleString('ar-EG'), 
-      label: "حساب", 
-      percent: Math.round(((stats?.platformStats?.INSTAGRAM ?? 0) / totalConns) * 100) || 0, 
+    {
+      name: t('dashboardHome.platformInstagram'),
+      count: (stats?.platformStats?.INSTAGRAM ?? 0).toLocaleString(localeCode),
+      label: t('dashboardHome.unitAccount'),
+      percent: Math.round(((stats?.platformStats?.INSTAGRAM ?? 0) / totalConns) * 100) || 0,
       color: "bg-gradient-to-r from-primary to-secondary",
       icon: Camera,
       iconColor: "text-primary",
@@ -158,48 +161,48 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className={`${mounted ? 'animate-fade-in-up' : 'opacity-0'}`}>
           <h1 className="text-3xl font-black tracking-tight">
-            مرحباً، <span className="gradient-text">{user?.name || "المستخدم"}</span> 👋
+            {t('dashboardHome.greeting', { name: user?.name || t('dashboardHome.defaultUser') })} 👋
           </h1>
-          <p className="text-muted-foreground mt-1 text-base">إليك ملخص أداء حبقة للتحليلات وبث الرسائل</p>
+          <p className="text-muted-foreground mt-1 text-base">{t('dashboardHome.subtitle')}</p>
         </div>
 
         {/* Date Selector */}
         <div className="flex flex-wrap items-center gap-2 bg-card/30 p-1.5 rounded-2xl border border-border/50">
-          <button 
+          <button
             onClick={() => setRange('today')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${range === 'today' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'text-muted-foreground hover:text-foreground'}`}
           >
-            اليوم
+            {t('dashboardHome.rangeToday')}
           </button>
-          <button 
+          <button
             onClick={() => setRange('7days')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${range === '7days' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'text-muted-foreground hover:text-foreground'}`}
           >
-            آخر 7 أيام
+            {t('dashboardHome.range7Days')}
           </button>
-          <button 
+          <button
             onClick={() => setRange('30days')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${range === '30days' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'text-muted-foreground hover:text-foreground'}`}
           >
-            آخر 30 يوم
+            {t('dashboardHome.range30Days')}
           </button>
-          <button 
+          <button
             onClick={() => setRange('custom')}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${range === 'custom' ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20' : 'text-muted-foreground hover:text-foreground'}`}
           >
-            مخصص
+            {t('dashboardHome.rangeCustom')}
           </button>
 
           {range === 'custom' && (
             <div className="flex items-center gap-2 border-r border-border/50 pr-3 mr-1 animate-fade-in">
-              <input 
+              <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 className="bg-accent/50 border border-border/50 rounded-lg text-xs px-2.5 py-1 text-foreground focus:outline-none focus:border-primary"
               />
-              <span className="text-muted-foreground text-xs font-bold">إلى</span>
-              <input 
+              <span className="text-muted-foreground text-xs font-bold">{t('dashboardHome.rangeTo')}</span>
+              <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
@@ -255,18 +258,18 @@ export default function DashboardPage() {
             <div>
               <CardTitle className="text-xl font-black flex items-center gap-2">
                 <Activity className="w-5 h-5 text-primary" />
-                نشاط تفاعلات الحملات والرسائل
+                {t('dashboardHome.activityTitle')}
               </CardTitle>
-              <CardDescription className="mt-1">الرسائل الواردة والردود المرسلة خلال الفترة المحددة.</CardDescription>
+              <CardDescription className="mt-1">{t('dashboardHome.activitySubtitle')}</CardDescription>
             </div>
             <div className="flex items-center gap-4 text-xs font-bold">
               <span className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-sm bg-primary inline-block" />
-                ردود مرسلة
+                {t('dashboardHome.activityRepliesSent')}
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-sm bg-secondary inline-block" />
-                رسائل واردة
+                {t('dashboardHome.activityMessagesReceived')}
               </span>
             </div>
           </div>
@@ -278,7 +281,7 @@ export default function DashboardPage() {
             if (!isLoading && totalActivity === 0) {
               return (
                 <div className="text-center py-10 text-muted-foreground text-sm font-medium">
-                  لا يوجد نشاط مسجل في هذه الفترة.
+                  {t('dashboardHome.activityEmpty')}
                 </div>
               )
             }
@@ -297,22 +300,22 @@ export default function DashboardPage() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="#71717a" 
+                    <XAxis
+                      dataKey="date"
+                      stroke="#71717a"
                       fontSize={10}
                       tickFormatter={(tick) => {
                         const d = new Date(tick);
-                        return d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'numeric' });
+                        return d.toLocaleDateString(localeCode, { day: 'numeric', month: 'numeric' });
                       }}
                     />
                     <YAxis stroke="#71717a" fontSize={10} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#0c0c12', border: '1px solid #333', borderRadius: '8px', direction: 'rtl' }}
-                      labelFormatter={(label) => new Date(label).toLocaleDateString('ar-EG', { dateStyle: 'medium' })}
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0c0c12', border: '1px solid #333', borderRadius: '8px', direction: locale === 'ar' ? 'rtl' : 'ltr' }}
+                      labelFormatter={(label) => new Date(label).toLocaleDateString(localeCode, { dateStyle: 'medium' })}
                     />
-                    <Area type="monotone" dataKey="sent" name="ردود مرسلة" stroke="#4d9fff" fillOpacity={1} fill="url(#colorSent)" strokeWidth={2} />
-                    <Area type="monotone" dataKey="received" name="رسائل واردة" stroke="#22d3ee" fillOpacity={1} fill="url(#colorReceived)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="sent" name={t('dashboardHome.activityRepliesSent')} stroke="#4d9fff" fillOpacity={1} fill="url(#colorSent)" strokeWidth={2} />
+                    <Area type="monotone" dataKey="received" name={t('dashboardHome.activityMessagesReceived')} stroke="#22d3ee" fillOpacity={1} fill="url(#colorReceived)" strokeWidth={2} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -330,9 +333,9 @@ export default function DashboardPage() {
               <div>
                 <CardTitle className="text-xl font-black flex items-center gap-2">
                   <BarChart3 className="w-5 h-5 text-primary" />
-                  نشاط المنصات
+                  {t('dashboardHome.platformsTitle')}
                 </CardTitle>
-                <CardDescription className="mt-1">إحصائيات تفاعل البوت عبر فيسبوك وانستغرام وواتساب.</CardDescription>
+                <CardDescription className="mt-1">{t('dashboardHome.platformsSubtitle')}</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -370,12 +373,12 @@ export default function DashboardPage() {
               <div>
                 <CardTitle className="text-xl font-black flex items-center gap-2">
                   <MessageCircle className="w-5 h-5 text-primary" />
-                  أحدث المحادثات
+                  {t('dashboardHome.recentChatsTitle')}
                 </CardTitle>
-                <CardDescription className="mt-1">آخر الرسائل الواردة والردود الآلية.</CardDescription>
+                <CardDescription className="mt-1">{t('dashboardHome.recentChatsSubtitle')}</CardDescription>
               </div>
               <a href="/dashboard/inbox" className="text-xs font-bold text-primary hover:text-primary/80 transition-colors flex items-center gap-1">
-                عرض الكل
+                {t('dashboardHome.viewAll')}
                 <ArrowUpLeft className="w-3 h-3" />
               </a>
             </div>
@@ -384,12 +387,12 @@ export default function DashboardPage() {
             <div className="space-y-1">
               {recentChats.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground text-sm font-medium">
-                  لا توجد محادثات أخيرة حالياً
+                  {t('dashboardHome.noRecentChats')}
                 </div>
               ) : (
                 recentChats.map((chat: any, i: number) => {
                   const platDetails = getPlatformDetails(chat.connection?.platform)
-                  const lastMsg = chat.messages?.[0]?.content || "لا توجد رسائل"
+                  const lastMsg = chat.messages?.[0]?.content || t('dashboardHome.noMessages')
                   return (
                     <div 
                       key={chat.id || i} 
@@ -397,7 +400,7 @@ export default function DashboardPage() {
                     >
                       <div className="relative">
                         <div className="h-11 w-11 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0 border border-primary/10 group-hover:scale-105 transition-transform duration-300">
-                          <span className="text-primary font-bold text-sm">{(chat.customerName || "م").substring(0, 2)}</span>
+                          <span className="text-primary font-bold text-sm">{(chat.customerName || t('dashboardHome.defaultUser')).substring(0, 2)}</span>
                         </div>
                       </div>
                       <div className="flex-1 min-w-0 space-y-1">

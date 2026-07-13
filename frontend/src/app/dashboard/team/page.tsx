@@ -13,6 +13,7 @@ import { Users, UserPlus, Trash2, Mail, Clock, RefreshCw, Crown, ShieldCheck, He
 import { useAuth } from "@/lib/auth-context"
 import { useConfirm } from "@/components/ui/confirm-dialog"
 import api from "@/lib/api"
+import { useLanguage } from "@/lib/i18n/language-context"
 
 interface Member {
   id: string
@@ -28,15 +29,18 @@ interface Invitation {
   expiresAt: string
 }
 
-const roleConfig: Record<string, { label: string; icon: React.ElementType; className: string }> = {
-  OWNER: { label: "المالك", icon: Crown, className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30" },
-  ADMIN: { label: "مدير", icon: ShieldCheck, className: "bg-primary/10 text-primary border-primary/30" },
-  MEMBER: { label: "عضو", icon: Users, className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30" },
-  AGENT: { label: "موظف دعم", icon: Headset, className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
-  VIEWER: { label: "مشاهد", icon: Eye, className: "bg-muted text-muted-foreground border-border" },
-}
-
 export default function TeamPage() {
+  const { t, locale } = useLanguage()
+  const localeCode = locale === "ar" ? "ar" : "en-US"
+
+  const roleConfig: Record<string, { label: string; icon: React.ElementType; className: string }> = {
+    OWNER: { label: t('teamPage.roleOwner'), icon: Crown, className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30" },
+    ADMIN: { label: t('teamPage.roleAdmin'), icon: ShieldCheck, className: "bg-primary/10 text-primary border-primary/30" },
+    MEMBER: { label: t('teamPage.roleMember'), icon: Users, className: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30" },
+    AGENT: { label: t('teamPage.roleAgent'), icon: Headset, className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30" },
+    VIEWER: { label: t('teamPage.roleViewer'), icon: Eye, className: "bg-muted text-muted-foreground border-border" },
+  }
+
   const { user } = useAuth()
   const confirm = useConfirm()
   const [members, setMembers] = useState<Member[]>([])
@@ -76,12 +80,12 @@ export default function TeamPage() {
       const res = await api.post("/team/invitations", { email: inviteEmail.trim(), role: inviteRole })
       const link = `${window.location.origin}/accept-invite?token=${res.data.token}`
       setInviteLink(link)
-      setBanner({ type: "success", text: `تم إنشاء دعوة لـ ${inviteEmail}. أُرسل بريد بالدعوة (إذا كانت خدمة البريد مفعّلة) ويمكنك أيضاً نسخ الرابط ومشاركته مباشرة.` })
+      setBanner({ type: "success", text: t('teamPage.inviteSuccess', { email: inviteEmail }) })
       setInviteEmail("")
       fetchData()
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } }
-      setBanner({ type: "error", text: axiosErr.response?.data?.message || "فشل إرسال الدعوة." })
+      setBanner({ type: "error", text: axiosErr.response?.data?.message || t('teamPage.inviteFailed') })
       setIsDialogOpen(false)
     } finally {
       setIsSubmitting(false)
@@ -92,10 +96,10 @@ export default function TeamPage() {
     try {
       setMembers(prev => prev.map(m => m.id === member.id ? { ...m, role } : m))
       await api.patch(`/team/members/${member.id}`, { role })
-      setBanner({ type: "success", text: `تم تغيير دور ${member.user.name || member.user.email} إلى ${roleConfig[role]?.label || role}.` })
+      setBanner({ type: "success", text: t('teamPage.roleChangedSuccess', { name: member.user.name || member.user.email, role: roleConfig[role]?.label || role }) })
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } }
-      setBanner({ type: "error", text: axiosErr.response?.data?.message || "فشل تغيير الدور." })
+      setBanner({ type: "error", text: axiosErr.response?.data?.message || t('teamPage.roleChangeFailed') })
       fetchData()
     }
   }
@@ -106,16 +110,16 @@ export default function TeamPage() {
     try {
       await api.delete(`/team/invitations/${inv.id}`)
       setInvitations(prev => prev.filter(i => i.id !== inv.id))
-      setBanner({ type: "success", text: `تم إلغاء دعوة ${inv.email}.` })
+      setBanner({ type: "success", text: t('teamPage.inviteCancelledSuccess', { email: inv.email }) })
     } catch {
-      setBanner({ type: "error", text: "فشل إلغاء الدعوة." })
+      setBanner({ type: "error", text: t('teamPage.inviteCancelFailed') })
     }
   }
 
   const copyInviteLink = () => {
     if (inviteLink) {
       navigator.clipboard.writeText(inviteLink)
-      setBanner({ type: "success", text: "تم نسخ رابط الدعوة." })
+      setBanner({ type: "success", text: t('teamPage.linkCopied') })
     }
   }
 
@@ -128,9 +132,9 @@ export default function TeamPage() {
             <div className="bg-gradient-to-br from-primary to-[oklch(0.62_0.15_230)] p-2.5 rounded-xl shadow-lg shadow-primary/25">
               <Users className="w-6 h-6 text-white" />
             </div>
-            إدارة الفريق
+            {t('teamPage.title')}
           </h1>
-          <p className="text-muted-foreground mt-2">أضف أعضاء لإدارة الردود والرسائل — كل رد يظهر باسم من أرسله.</p>
+          <p className="text-muted-foreground mt-2">{t('teamPage.subtitle')}</p>
         </div>
 
         {canManage && (
@@ -140,18 +144,18 @@ export default function TeamPage() {
           }}>
             <DialogTrigger render={<Button className="gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all rounded-xl px-6 h-11 font-bold" />}>
               <UserPlus className="w-4 h-4" />
-              دعوة عضو جديد
+              {t('teamPage.inviteMember')}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[440px]" dir="rtl">
+            <DialogContent className="sm:max-w-[440px]">
               <DialogHeader>
-                <DialogTitle className="text-xl font-black">دعوة عضو للفريق</DialogTitle>
+                <DialogTitle className="text-xl font-black">{t('teamPage.inviteDialogTitle')}</DialogTitle>
                 <DialogDescription>
-                  أدخل البريد الإلكتروني واختر الدور. تصل الدعوة بالبريد وتنتهي صلاحيتها خلال 24 ساعة.
+                  {t('teamPage.inviteDialogDesc')}
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-2">
                 <div className="grid gap-2">
-                  <Label htmlFor="inviteEmail" className="font-bold">البريد الإلكتروني</Label>
+                  <Label htmlFor="inviteEmail" className="font-bold">{t('teamPage.emailLabel')}</Label>
                   <Input
                     id="inviteEmail"
                     type="email"
@@ -163,16 +167,25 @@ export default function TeamPage() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label className="font-bold">الدور</Label>
-                  <Select value={inviteRole} onValueChange={(val) => val && setInviteRole(val)}>
+                  <Label className="font-bold">{t('teamPage.roleLabel')}</Label>
+                  <Select
+                    items={{
+                      ADMIN: t('teamPage.roleAdminDesc'),
+                      MEMBER: t('teamPage.roleMemberDesc'),
+                      AGENT: t('teamPage.roleAgentDesc'),
+                      VIEWER: t('teamPage.roleViewerDesc'),
+                    }}
+                    value={inviteRole}
+                    onValueChange={(val) => val && setInviteRole(val)}
+                  >
                     <SelectTrigger className="rounded-xl h-11">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ADMIN">مدير — صلاحيات كاملة عدا حذف مساحة العمل</SelectItem>
-                      <SelectItem value="MEMBER">عضو — إدارة القواعد والرسائل</SelectItem>
-                      <SelectItem value="AGENT">موظف دعم — الرد على الرسائل</SelectItem>
-                      <SelectItem value="VIEWER">مشاهد — عرض فقط</SelectItem>
+                      <SelectItem value="ADMIN">{t('teamPage.roleAdminDesc')}</SelectItem>
+                      <SelectItem value="MEMBER">{t('teamPage.roleMemberDesc')}</SelectItem>
+                      <SelectItem value="AGENT">{t('teamPage.roleAgentDesc')}</SelectItem>
+                      <SelectItem value="VIEWER">{t('teamPage.roleViewerDesc')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -181,20 +194,20 @@ export default function TeamPage() {
                   <div className="grid gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                     <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      تم إنشاء الدعوة — شارك الرابط مباشرة:
+                      {t('teamPage.inviteCreatedTitle')}
                     </p>
                     <div className="flex gap-2">
                       <Input value={inviteLink} readOnly className="rounded-lg h-9 text-xs" dir="ltr" />
-                      <Button type="button" variant="outline" size="sm" className="rounded-lg shrink-0 h-9" onClick={copyInviteLink}>نسخ</Button>
+                      <Button type="button" variant="outline" size="sm" className="rounded-lg shrink-0 h-9" onClick={copyInviteLink}>{t('teamPage.copy')}</Button>
                     </div>
                   </div>
                 )}
               </div>
               <DialogFooter className="gap-2">
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-xl">إغلاق</Button>
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-xl">{t('teamPage.close')}</Button>
                 <Button onClick={handleInvite} disabled={isSubmitting || !inviteEmail.includes("@")} className="rounded-xl gap-2 shadow-lg shadow-primary/20 font-bold">
                   {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                  إرسال الدعوة
+                  {t('teamPage.sendInvite')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -217,8 +230,8 @@ export default function TeamPage() {
       {/* Members */}
       <Card className="border-none shadow-lg">
         <CardHeader>
-          <CardTitle className="text-lg font-black">أعضاء الفريق ({members.length})</CardTitle>
-          <CardDescription>الأعضاء النشطون في مساحة العمل وأدوارهم.</CardDescription>
+          <CardTitle className="text-lg font-black">{t('teamPage.membersTitle', { count: members.length })}</CardTitle>
+          <CardDescription>{t('teamPage.membersSubtitle')}</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -237,22 +250,31 @@ export default function TeamPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-black truncate">
-                        {member.user.name || "بدون اسم"}
-                        {isSelf && <span className="text-xs text-muted-foreground font-medium mr-2">(أنت)</span>}
+                        {member.user.name || t('teamPage.noName')}
+                        {isSelf && <span className="text-xs text-muted-foreground font-medium mr-2">{t('teamPage.you')}</span>}
                       </p>
                       <p className="text-xs text-muted-foreground truncate" dir="ltr">{member.user.email}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       {canManage && !isOwnerRow && !isSelf ? (
-                        <Select value={member.role} onValueChange={(val) => val && handleRoleChange(member, val)}>
+                        <Select
+                          items={{
+                            ADMIN: t('teamPage.roleAdmin'),
+                            MEMBER: t('teamPage.roleMember'),
+                            AGENT: t('teamPage.roleAgent'),
+                            VIEWER: t('teamPage.roleViewer'),
+                          }}
+                          value={member.role}
+                          onValueChange={(val) => val && handleRoleChange(member, val)}
+                        >
                           <SelectTrigger className="rounded-lg h-9 w-[130px] text-xs font-bold">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="ADMIN">مدير</SelectItem>
-                            <SelectItem value="MEMBER">عضو</SelectItem>
-                            <SelectItem value="AGENT">موظف دعم</SelectItem>
-                            <SelectItem value="VIEWER">مشاهد</SelectItem>
+                            <SelectItem value="ADMIN">{t('teamPage.roleAdmin')}</SelectItem>
+                            <SelectItem value="MEMBER">{t('teamPage.roleMember')}</SelectItem>
+                            <SelectItem value="AGENT">{t('teamPage.roleAgent')}</SelectItem>
+                            <SelectItem value="VIEWER">{t('teamPage.roleViewer')}</SelectItem>
                           </SelectContent>
                         </Select>
                       ) : (
@@ -268,20 +290,20 @@ export default function TeamPage() {
                           className="h-9 w-9 text-destructive hover:bg-destructive/10 rounded-xl cursor-pointer"
                           onClick={async () => {
                             const confirmed = await confirm({
-                              title: "تأكيد إزالة العضو",
-                              message: `هل أنت متأكد من إزالة ${member.user.name || member.user.email} من الفريق؟ لن يتمكن من الوصول لمساحة العمل بعد الإزالة.`,
+                              title: t('teamPage.removeMemberTitle'),
+                              message: t('teamPage.removeMemberMessage', { name: member.user.name || member.user.email }),
                               variant: "destructive",
-                              confirmText: "تأكيد الإزالة",
-                              cancelText: "إلغاء"
+                              confirmText: t('teamPage.confirmRemove'),
+                              cancelText: t('teamPage.cancel')
                             })
                             if (confirmed) {
                               try {
                                 await api.delete(`/team/members/${member.id}`)
-                                setBanner({ type: "success", text: "تمت إزالة العضو من الفريق." })
+                                setBanner({ type: "success", text: t('teamPage.memberRemovedSuccess') })
                                 fetchData()
                               } catch (err: unknown) {
                                 const axiosErr = err as { response?: { data?: { message?: string } } }
-                                setBanner({ type: "error", text: axiosErr.response?.data?.message || "فشل إزالة العضو." })
+                                setBanner({ type: "error", text: axiosErr.response?.data?.message || t('teamPage.memberRemoveFailed') })
                               }
                             }
                           }}
@@ -304,9 +326,9 @@ export default function TeamPage() {
           <CardHeader>
             <CardTitle className="text-lg font-black flex items-center gap-2">
               <Clock className="w-5 h-5 text-amber-500" />
-              دعوات معلقة ({invitations.length})
+              {t('teamPage.pendingInvitesTitle', { count: invitations.length })}
             </CardTitle>
-            <CardDescription>دعوات أُرسلت ولم تُقبل بعد.</CardDescription>
+            <CardDescription>{t('teamPage.pendingInvitesSubtitle')}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
             {invitations.map(inv => (
@@ -315,12 +337,12 @@ export default function TeamPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-sm truncate" dir="ltr">{inv.email}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    الدور: {roleConfig[inv.role]?.label || inv.role} · تنتهي {new Date(inv.expiresAt).toLocaleString("ar")}
+                    {t('teamPage.roleColumnLabel')}: {roleConfig[inv.role]?.label || inv.role} · {t('teamPage.expiresLabel')} {new Date(inv.expiresAt).toLocaleString(localeCode)}
                   </p>
                 </div>
                 {canManage && (
                   <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 rounded-lg text-xs font-bold" onClick={() => handleCancelInvite(inv)}>
-                    إلغاء
+                    {t('teamPage.cancelInvite')}
                   </Button>
                 )}
               </div>
