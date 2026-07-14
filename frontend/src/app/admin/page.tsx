@@ -25,6 +25,7 @@ import {
 import api from "@/lib/api"
 import { AdminSettings } from "@/components/admin-settings"
 import { useConfirm } from "@/components/ui/confirm-dialog"
+import { useLanguage } from "@/lib/i18n/language-context"
 
 interface AdminStats {
   tenants: { total: number; suspended: number; byPlan: { plan: string; count: number }[] }
@@ -71,12 +72,6 @@ interface AuditLogEntry {
   user: { email: string; name: string | null } | null
 }
 
-const planLabels: Record<string, string> = {
-  STARTER: "مجانية",
-  PRO: "احترافية",
-  ENTERPRISE: "أعمال",
-}
-
 const planColors: Record<string, { badge: string; dot: string; bg: string }> = {
   STARTER: {
     badge: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-200 dark:border-slate-700",
@@ -100,8 +95,8 @@ const CHART_TEAL_DIM = "#2f7fe0"
 const CHART_COLORS = ["#4d9fff", "#22d3ee", "#10b981", "#fbbf24", "#a78bfa"]
 const PIE_COLORS: Record<string, string> = { STARTER: "#64748b", PRO: "#4d9fff", ENTERPRISE: "#22d3ee" }
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("ar", { year: "numeric", month: "short", day: "numeric" })
+const formatDateRaw = (iso: string, localeCode: string) =>
+  new Date(iso).toLocaleDateString(localeCode, { year: "numeric", month: "short", day: "numeric" })
 
 // generateDailyRepliesData removed, using API
 
@@ -119,13 +114,13 @@ function downloadCSV(filename: string, headers: string[], rows: string[][]) {
 }
 
 /* ─── Custom recharts tooltip ─── */
-function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: { value: number; name: string }[]; label?: string }) {
+function ChartTooltip({ active, payload, label, localeCode, dir }: { active?: boolean; payload?: { value: number; name: string }[]; label?: string; localeCode?: string; dir?: "rtl" | "ltr" }) {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-[#0d1117] border border-[#4d9fff]/30 rounded-xl px-4 py-2.5 shadow-xl shadow-[#4d9fff]/10" dir="rtl">
+    <div className="bg-[#0d1117] border border-[#4d9fff]/30 rounded-xl px-4 py-2.5 shadow-xl shadow-[#4d9fff]/10" dir={dir || "rtl"}>
       <p className="text-xs text-[#9ca3af] mb-1">{label}</p>
       {payload.map((p, i) => (
-        <p key={i} className="text-sm font-bold text-[#4d9fff]">{p.value.toLocaleString("ar")} {p.name}</p>
+        <p key={i} className="text-sm font-bold text-[#4d9fff]">{p.value.toLocaleString(localeCode || "ar-EG")} {p.name}</p>
       ))}
     </div>
   )
@@ -154,14 +149,14 @@ function useAnimatedCounter(target: number, duration = 1200) {
 }
 
 /* ─── Single animated stat value ─── */
-function AnimatedNumber({ value }: { value: number }) {
+function AnimatedNumber({ value, localeCode }: { value: number; localeCode?: string }) {
   const display = useAnimatedCounter(value)
-  return <>{display.toLocaleString("ar")}</>
+  return <>{display.toLocaleString(localeCode || "ar-EG")}</>
 }
 
 /* ─── Live monitoring indicator with tooltip ─── */
-function LiveIndicator({ lastUpdate }: { lastUpdate: Date }) {
-  const timeStr = lastUpdate.toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+function LiveIndicator({ lastUpdate, localeCode, t }: { lastUpdate: Date; localeCode?: string; t: (path: string, vars?: Record<string, string | number>) => string }) {
+  const timeStr = lastUpdate.toLocaleTimeString(localeCode || "ar-EG", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
   return (
     <TooltipProvider>
       <Tooltip>
@@ -172,7 +167,7 @@ function LiveIndicator({ lastUpdate }: { lastUpdate: Date }) {
           </span>
         </TooltipTrigger>
         <TooltipContent side="bottom" className="text-xs font-bold">
-          آخر تحديث: {timeStr}
+          {t("adminPage.liveIndicatorLastUpdate", { time: timeStr })}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -183,6 +178,14 @@ function LiveIndicator({ lastUpdate }: { lastUpdate: Date }) {
 type DateRange = "today" | "7days" | "30days" | "month"
 
 export default function AdminPage() {
+  const { t, tList, locale, dir } = useLanguage()
+  const localeCode = locale === "ar" ? "ar-EG" : "en-US"
+  const planLabels: Record<string, string> = {
+    STARTER: t("adminPage.planFree"),
+    PRO: t("adminPage.planPro"),
+    ENTERPRISE: t("adminPage.planEnterprise"),
+  }
+  const formatDate = (iso: string) => formatDateRaw(iso, localeCode)
   const [mounted, setMounted] = useState(false)
   const confirm = useConfirm()
   const [stats, setStats] = useState<AdminStats | null>(null)
@@ -376,11 +379,11 @@ export default function AdminPage() {
 
   const handleTenantDelete = async (tenant: AdminTenant) => {
     const confirmed = await confirm({
-      title: "حذف مساحة العمل نهائياً",
-      message: `هل أنت متأكد من حذف "${tenant.name}" نهائياً؟ سيتم حذف جميع بياناته (قنوات، قواعد، محادثات) ولا يمكن التراجع.`,
+      title: t("adminPage.deleteWorkspaceTitle"),
+      message: t("adminPage.deleteWorkspaceMessage", { name: tenant.name }),
       variant: "destructive",
-      confirmText: "تأكيد الحذف",
-      cancelText: "إلغاء"
+      confirmText: t("adminPage.confirmDelete"),
+      cancelText: t("adminPage.cancel")
     })
     if (!confirmed) return
     try {
@@ -413,47 +416,47 @@ export default function AdminPage() {
     try {
       await api.post(`/admin/users/${u.id}/verify-email`)
       setUsers(prev => prev.map(x => x.id === u.id ? { ...x, emailVerified: true } : x))
-      setUserActionMsg({ type: "success", text: `تم تفعيل بريد ${u.email} يدوياً` })
+      setUserActionMsg({ type: "success", text: t("adminPage.userEmailVerifiedManually", { email: u.email }) })
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } }
-      setUserActionMsg({ type: "error", text: e.response?.data?.message || "فشل التفعيل" })
+      setUserActionMsg({ type: "error", text: e.response?.data?.message || t("adminPage.userVerifyFailed") })
     }
   }
 
   const handleResetUserPassword = async (u: AdminUser) => {
     const confirmed = await confirm({
-      title: "إرسال رابط إعادة تعيين كلمة المرور",
-      message: `سيصل ${u.email} رابط آمن لاختيار كلمة مرور جديدة (صالح لساعة). أنت لن ترى كلمة المرور. متابعة؟`,
-      confirmText: "إرسال الرابط",
-      cancelText: "إلغاء",
+      title: t("adminPage.resetPasswordConfirmTitle"),
+      message: t("adminPage.resetPasswordConfirmMessage", { email: u.email }),
+      confirmText: t("adminPage.sendLink"),
+      cancelText: t("adminPage.cancel"),
     })
     if (!confirmed) return
     try {
       const res = await api.post(`/admin/users/${u.id}/reset-password`)
-      setUserActionMsg({ type: "success", text: res.data.message || "تم إرسال الرابط" })
+      setUserActionMsg({ type: "success", text: res.data.message || t("adminPage.linkSent") })
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } }
-      setUserActionMsg({ type: "error", text: e.response?.data?.message || "فشل الإرسال" })
+      setUserActionMsg({ type: "error", text: e.response?.data?.message || t("adminPage.linkSendFailed") })
     }
   }
 
   const handleDeleteUser = async (u: AdminUser) => {
     const confirmed = await confirm({
-      title: "حذف المستخدم نهائياً",
-      message: `سيتم حذف "${u.name || u.email}" نهائياً، وأي مساحة عمل يملكها بالكامل. لا يمكن التراجع. متابعة؟`,
+      title: t("adminPage.deleteUserTitle"),
+      message: t("adminPage.deleteUserMessage", { name: u.name || u.email }),
       variant: "destructive",
-      confirmText: "تأكيد الحذف",
-      cancelText: "إلغاء",
+      confirmText: t("adminPage.confirmDelete"),
+      cancelText: t("adminPage.cancel"),
     })
     if (!confirmed) return
     try {
       await api.delete(`/admin/users/${u.id}`)
-      setUserActionMsg({ type: "success", text: `تم حذف ${u.email}` })
+      setUserActionMsg({ type: "success", text: t("adminPage.userDeleted", { email: u.email }) })
       fetchUsers(usersPage, userSearch)
       fetchStats()
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } }
-      setUserActionMsg({ type: "error", text: e.response?.data?.message || "فشل الحذف" })
+      setUserActionMsg({ type: "error", text: e.response?.data?.message || t("adminPage.userDeleteFailed") })
     }
   }
 
@@ -473,12 +476,12 @@ export default function AdminPage() {
         subject: tenantEmailSubject,
         body: tenantEmailBody,
       })
-      setTenantEmailResult({ type: "success", text: res.data.message || "تم الإرسال" })
+      setTenantEmailResult({ type: "success", text: res.data.message || t("adminPage.emailSent") })
       setTenantEmailSubject("")
       setTenantEmailBody("")
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string } } }
-      setTenantEmailResult({ type: "error", text: e.response?.data?.message || "فشل الإرسال" })
+      setTenantEmailResult({ type: "error", text: e.response?.data?.message || t("adminPage.emailSendFailed") })
     } finally {
       setTenantEmailSending(false)
     }
@@ -519,12 +522,12 @@ export default function AdminPage() {
         title: tenantNotifTitle,
         message: tenantNotifMessage,
       })
-      setTenantNotifResult({ type: "success", text: "تم إرسال الإشعار بنجاح." })
+      setTenantNotifResult({ type: "success", text: t("adminPage.notificationSentSuccess") })
       setTenantNotifTitle("")
       setTenantNotifMessage("")
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } }
-      setTenantNotifResult({ type: "error", text: axiosErr.response?.data?.message || "فشل إرسال الإشعار." })
+      setTenantNotifResult({ type: "error", text: axiosErr.response?.data?.message || t("adminPage.notificationSendFailed") })
     } finally {
       setTenantNotifSending(false)
     }
@@ -546,30 +549,30 @@ export default function AdminPage() {
 
   /* ─── CSV Export handlers ─── */
   const exportTenantsCSV = () => {
-    const headers = ["الاسم", "الخطة", "الحالة", "المالك", "تاريخ الإنشاء", "الأعضاء", "القنوات", "القواعد", "المحادثات", "الردود هذا الشهر"]
-    const rows = tenants.map(t => [
-      t.name, planLabels[t.plan] || t.plan, t.isSuspended ? "موقوفة" : "نشطة",
-      t.owner?.email || "—", formatDate(t.createdAt), String(t.counts.members),
-      String(t.counts.connections), String(t.counts.rules), String(t.counts.conversations),
-      String(t.usage?.repliesThisMonth ?? 0)
+    const headers = tList("adminPage.csvTenantHeaders")
+    const rows = tenants.map(tn => [
+      tn.name, planLabels[tn.plan] || tn.plan, tn.isSuspended ? t("adminPage.suspended") : t("adminPage.active"),
+      tn.owner?.email || "—", formatDate(tn.createdAt), String(tn.counts.members),
+      String(tn.counts.connections), String(tn.counts.rules), String(tn.counts.conversations),
+      String(tn.usage?.repliesThisMonth ?? 0)
     ])
     downloadCSV("tenants.csv", headers, rows)
   }
 
   const exportUsersCSV = () => {
-    const headers = ["الاسم", "البريد الإلكتروني", "أدمن المنصة", "تاريخ الإنشاء", "مساحات العمل"]
+    const headers = tList("adminPage.csvUserHeaders")
     const rows = users.map(u => [
-      u.name || "بدون اسم", u.email, u.isSuperAdmin ? "نعم" : "لا",
-      formatDate(u.createdAt), u.tenants.map(t => t.name).join(" | ")
+      u.name || t("adminPage.noName"), u.email, u.isSuperAdmin ? t("adminPage.csvYes") : t("adminPage.csvNo"),
+      formatDate(u.createdAt), u.tenants.map(tn => tn.name).join(" | ")
     ])
     downloadCSV("users.csv", headers, rows)
   }
 
   const exportLogsCSV = () => {
-    const headers = ["الإجراء", "نوع الكيان", "المستخدم", "مساحة العمل", "التاريخ"]
+    const headers = tList("adminPage.csvLogHeaders")
     const rows = filteredLogs.map(l => [
       l.action, l.entityType, l.user?.email || "—",
-      l.tenant?.name || "—", new Date(l.createdAt).toLocaleString("ar")
+      l.tenant?.name || "—", new Date(l.createdAt).toLocaleString(localeCode)
     ])
     downloadCSV("audit-logs.csv", headers, rows)
   }
@@ -628,43 +631,43 @@ export default function AdminPage() {
 
   const statCards = stats ? [
     {
-      title: "مساحات العمل", value: stats.tenants.total,
-      sub: `${stats.tenants.suspended} موقوفة`, icon: Building2,
+      title: t("adminPage.statTenants"), value: stats.tenants.total,
+      sub: t("adminPage.statTenantsSub", { count: stats.tenants.suspended }), icon: Building2,
       gradient: "from-blue-500 to-cyan-500",
       bgGlow: "from-blue-500/20 to-cyan-500/5",
       iconBg: "bg-gradient-to-br from-blue-500 to-cyan-500",
     },
     {
-      title: "المستخدمون", value: stats.users.total,
-      sub: `+${stats.users.newLast30Days} آخر 30 يوم`, icon: Users,
+      title: t("adminPage.statUsers"), value: stats.users.total,
+      sub: t("adminPage.statUsersSub", { count: stats.users.newLast30Days }), icon: Users,
       gradient: "from-blue-500 to-cyan-600",
       bgGlow: "from-blue-500/20 to-cyan-500/5",
       iconBg: "bg-gradient-to-br from-blue-500 to-cyan-600",
     },
     {
-      title: "القنوات المرتبطة", value: stats.connections.total,
-      sub: `${stats.connections.active} نشطة`, icon: Share2,
+      title: t("adminPage.statConnections"), value: stats.connections.total,
+      sub: t("adminPage.statConnectionsSub", { count: stats.connections.active }), icon: Share2,
       gradient: "from-emerald-500 to-green-600",
       bgGlow: "from-emerald-500/20 to-green-500/5",
       iconBg: "bg-gradient-to-br from-emerald-500 to-green-600",
     },
     {
-      title: "قواعد الرد الآلي", value: stats.rules.total,
-      sub: `${stats.rules.triggeredLast7Days} تنفيذ آخر 7 أيام`, icon: Zap,
+      title: t("adminPage.statRules"), value: stats.rules.total,
+      sub: t("adminPage.statRulesSub", { count: stats.rules.triggeredLast7Days }), icon: Zap,
       gradient: "from-amber-500 to-yellow-500",
       bgGlow: "from-amber-500/20 to-yellow-500/5",
       iconBg: "bg-gradient-to-br from-amber-500 to-yellow-500",
     },
     {
-      title: "ردود هذا الشهر", value: stats.usage?.repliesThisMonth ?? 0,
-      sub: `${stats.usage?.quotaSkippedThisMonth ?? 0} متخطاة بسبب حد الخطة`, icon: MessageSquareText,
+      title: t("adminPage.statRepliesMonth"), value: stats.usage?.repliesThisMonth ?? 0,
+      sub: t("adminPage.statRepliesMonthSub", { count: stats.usage?.quotaSkippedThisMonth ?? 0 }), icon: MessageSquareText,
       gradient: "from-orange-500 to-amber-600",
       bgGlow: "from-orange-500/20 to-amber-500/5",
       iconBg: "bg-gradient-to-br from-orange-500 to-amber-600",
     },
     {
-      title: "الرسائل", value: stats.inbox.messages,
-      sub: `${stats.inbox.messagesLast7Days} آخر 7 أيام`, icon: Inbox,
+      title: t("adminPage.statMessages"), value: stats.inbox.messages,
+      sub: t("adminPage.statMessagesSub", { count: stats.inbox.messagesLast7Days }), icon: Inbox,
       gradient: "from-sky-500 to-blue-600",
       bgGlow: "from-sky-500/20 to-blue-500/5",
       iconBg: "bg-gradient-to-br from-sky-500 to-blue-600",
@@ -699,10 +702,10 @@ export default function AdminPage() {
 
   /* ─── Date range buttons ─── */
   const dateRangeButtons: { label: string; value: DateRange }[] = [
-    { label: "اليوم", value: "today" },
-    { label: "٧ أيام", value: "7days" },
-    { label: "٣٠ يوم", value: "30days" },
-    { label: "هذا الشهر", value: "month" },
+    { label: t("adminPage.rangeToday"), value: "today" },
+    { label: t("adminPage.range7Days"), value: "7days" },
+    { label: t("adminPage.range30Days"), value: "30days" },
+    { label: t("adminPage.rangeMonth"), value: "month" },
   ]
 
   /* ─── Usage percent helper for drawer ─── */
@@ -725,20 +728,20 @@ export default function AdminPage() {
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="text-3xl font-black tracking-tight">
-                  مركز <span className="gradient-text">التحكم</span>
+                  {t("adminPage.heroTitle1")} <span className="gradient-text">{t("adminPage.heroTitle2")}</span>
                 </h1>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                   </span>
-                  <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400">مباشر</span>
+                  <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400">{t("adminPage.live")}</span>
                 </span>
               </div>
-              <p className="text-muted-foreground mt-1 text-sm lg:text-base">تحكّم كامل بمساحات العمل، المستخدمين، الاشتراكات، وإعدادات المنصة.</p>
+              <p className="text-muted-foreground mt-1 text-sm lg:text-base">{t("adminPage.heroSubtitle")}</p>
               <p className="text-[11px] text-muted-foreground/70 mt-1.5 flex items-center gap-1.5">
                 <Clock className="w-3 h-3" />
-                آخر تحديث: {lastStatsRefresh.toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                {t("adminPage.lastUpdate")}: {lastStatsRefresh.toLocaleTimeString(localeCode, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
               </p>
             </div>
           </div>
@@ -750,14 +753,14 @@ export default function AdminPage() {
               className="rounded-xl gap-2 h-10 font-bold border-border/50 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all cursor-pointer"
             >
               <RefreshCw className="w-4 h-4" />
-              تحديث الآن
+              {t("adminPage.refreshNow")}
             </Button>
             <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-card/60 backdrop-blur-sm border border-border/50">
               <Timer className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs font-bold text-muted-foreground">تلقائي</span>
+              <span className="text-xs font-bold text-muted-foreground">{t("adminPage.auto")}</span>
               <Switch checked={autoRefresh} onCheckedChange={setAutoRefresh} />
               {autoRefresh && (
-                <span className="text-[10px] text-primary font-bold">٣٠ث</span>
+                <span className="text-[10px] text-primary font-bold">{t("adminPage.autoRefreshInterval")}</span>
               )}
             </div>
           </div>
@@ -768,22 +771,22 @@ export default function AdminPage() {
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="flex overflow-x-auto no-scrollbar md:grid md:grid-cols-6 w-full max-w-4xl mx-auto rounded-2xl h-auto md:h-13 p-1.5 bg-muted/70 backdrop-blur-sm gap-1 border border-border/40">
           <TabsTrigger value="overview" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
-            <BarChart3 className="w-4 h-4" /> نظرة عامة
+            <BarChart3 className="w-4 h-4" /> {t("adminPage.tabOverview")}
           </TabsTrigger>
           <TabsTrigger value="tenants" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
-            <Building2 className="w-4 h-4" /> مساحات العمل
+            <Building2 className="w-4 h-4" /> {t("adminPage.tabTenants")}
           </TabsTrigger>
           <TabsTrigger value="users" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
-            <Users className="w-4 h-4" /> المستخدمون
+            <Users className="w-4 h-4" /> {t("adminPage.tabUsers")}
           </TabsTrigger>
           <TabsTrigger value="announcements" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
-            <Megaphone className="w-4 h-4" /> النشرة
+            <Megaphone className="w-4 h-4" /> {t("adminPage.tabAnnouncements")}
           </TabsTrigger>
           <TabsTrigger value="settings" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
-            <ShieldCheck className="w-4 h-4" /> الإعدادات
+            <ShieldCheck className="w-4 h-4" /> {t("adminPage.tabSettings")}
           </TabsTrigger>
           <TabsTrigger value="logs" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
-            <ScrollText className="w-4 h-4" /> السجلات
+            <ScrollText className="w-4 h-4" /> {t("adminPage.tabLogs")}
           </TabsTrigger>
         </TabsList>
 
@@ -820,24 +823,24 @@ export default function AdminPage() {
                   <CardContent className="py-3 px-4 flex items-center gap-4">
                     <div className="flex items-center gap-2">
                       <Wifi className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-xs font-bold text-muted-foreground">حالة API</span>
+                      <span className="text-xs font-bold text-muted-foreground">{t("adminPage.apiStatus")}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span className={`w-2.5 h-2.5 rounded-full ${apiHealthy ? "bg-emerald-500 animate-pulse" : "bg-red-500"}`} />
                       <span className={`text-xs font-bold ${apiHealthy ? "text-emerald-500" : "text-red-500"}`}>
-                        {apiHealthy ? "يعمل بشكل طبيعي" : "يوجد خلل"}
+                        {apiHealthy ? t("adminPage.apiHealthy") : t("adminPage.apiUnhealthy")}
                       </span>
                     </div>
                     <div className="h-4 w-px bg-border/50" />
                     <div className="flex items-center gap-1.5">
                       <TrendingUp className="w-3.5 h-3.5 text-[#4d9fff]" />
                       <span className="text-xs font-bold text-[#4d9fff]">{uptimePercent}%</span>
-                      <span className="text-[10px] text-muted-foreground">وقت التشغيل</span>
+                      <span className="text-[10px] text-muted-foreground">{t("adminPage.uptime")}</span>
                     </div>
                     <div className="h-4 w-px bg-border/50" />
                     <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {lastHealthCheck.toLocaleTimeString("ar")}
+                      {lastHealthCheck.toLocaleTimeString(localeCode)}
                     </span>
                   </CardContent>
                 </Card>
@@ -857,7 +860,7 @@ export default function AdminPage() {
                     <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0 relative z-10">
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-sm font-bold text-muted-foreground">{card.title}</CardTitle>
-                        {autoRefresh && <LiveIndicator lastUpdate={lastStatsRefresh} />}
+                        {autoRefresh && <LiveIndicator lastUpdate={lastStatsRefresh} localeCode={localeCode} t={t} />}
                       </div>
                       <div className={`${card.iconBg} p-3 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300`}>
                         <card.icon className="w-5 h-5 text-white" />
@@ -865,7 +868,7 @@ export default function AdminPage() {
                     </CardHeader>
                     <CardContent className="relative z-10">
                       <div className="text-4xl font-black tracking-tight">
-                        <AnimatedNumber value={card.value} />
+                        <AnimatedNumber value={card.value} localeCode={localeCode} />
                       </div>
                       <div className="flex items-center gap-1.5 mt-2">
                         <Activity className="w-3.5 h-3.5 text-muted-foreground" />
@@ -882,10 +885,10 @@ export default function AdminPage() {
                   <div className="flex items-center gap-2">
                     <div className="w-1 h-6 rounded-full bg-gradient-to-b from-[#4d9fff] to-[#0cc4a8]" />
                     <div className="flex-1">
-                      <CardTitle className="text-lg font-black">الردود اليومية</CardTitle>
-                      <CardDescription className="text-xs mt-0.5">عدد الردود الآلية المرسلة خلال آخر ٣٠ يوم</CardDescription>
+                      <CardTitle className="text-lg font-black">{t("adminPage.dailyRepliesTitle")}</CardTitle>
+                      <CardDescription className="text-xs mt-0.5">{t("adminPage.dailyRepliesSubtitle")}</CardDescription>
                     </div>
-                    {autoRefresh && <LiveIndicator lastUpdate={lastStatsRefresh} />}
+                    {autoRefresh && <LiveIndicator lastUpdate={lastStatsRefresh} localeCode={localeCode} t={t} />}
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -912,11 +915,11 @@ export default function AdminPage() {
                           axisLine={{ stroke: "rgba(255,255,255,0.08)" }}
                           width={40}
                         />
-                        <RechartsTooltip content={<ChartTooltip />} />
+                        <RechartsTooltip content={<ChartTooltip localeCode={localeCode} dir={dir} />} />
                         <Line
                           type="monotone"
                           dataKey="replies"
-                          name="رد"
+                          name={t("adminPage.replyUnit")}
                           stroke={CHART_TEAL}
                           strokeWidth={2.5}
                           dot={false}
@@ -937,8 +940,8 @@ export default function AdminPage() {
                     <div className="flex items-center gap-2">
                       <div className="w-1 h-6 rounded-full bg-gradient-to-b from-blue-500 to-cyan-500" />
                       <div>
-                        <CardTitle className="text-lg font-black">توزيع الخطط</CardTitle>
-                        <CardDescription className="text-xs mt-0.5">عدد مساحات العمل حسب خطة الاشتراك</CardDescription>
+                        <CardTitle className="text-lg font-black">{t("adminPage.planDistributionTitle")}</CardTitle>
+                        <CardDescription className="text-xs mt-0.5">{t("adminPage.planDistributionSubtitle")}</CardDescription>
                       </div>
                     </div>
                   </CardHeader>
@@ -969,9 +972,9 @@ export default function AdminPage() {
                               if (!active || !payload?.length) return null
                               const d = payload[0]
                               return (
-                                <div className="bg-[#0d1117] border border-[#4d9fff]/30 rounded-xl px-4 py-2.5 shadow-xl" dir="rtl">
+                                <div className="bg-[#0d1117] border border-[#4d9fff]/30 rounded-xl px-4 py-2.5 shadow-xl" dir={dir}>
                                   <p className="text-xs text-[#9ca3af] mb-0.5">{String(d.name)}</p>
-                                  <p className="text-sm font-bold text-[#4d9fff]">{Number(d.value).toLocaleString("ar")} مساحة عمل</p>
+                                  <p className="text-sm font-bold text-[#4d9fff]">{Number(d.value).toLocaleString(localeCode)} {t("adminPage.workspaceUnit")}</p>
                                 </div>
                               )
                             }}
@@ -998,14 +1001,14 @@ export default function AdminPage() {
                     <div className="flex items-center gap-2">
                       <div className="w-1 h-6 rounded-full bg-gradient-to-b from-amber-500 to-orange-500" />
                       <div>
-                        <CardTitle className="text-lg font-black">الأكثر نشاطاً هذا الشهر</CardTitle>
-                        <CardDescription className="text-xs mt-0.5">حسب عدد الردود الآلية المرسلة</CardDescription>
+                        <CardTitle className="text-lg font-black">{t("adminPage.topActiveTitle")}</CardTitle>
+                        <CardDescription className="text-xs mt-0.5">{t("adminPage.topActiveSubtitle")}</CardDescription>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent>
                     {(stats.usage?.topTenants?.length ?? 0) === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">لا يوجد نشاط بعد هذا الشهر.</p>
+                      <p className="text-sm text-muted-foreground text-center py-4">{t("adminPage.noActivityThisMonth")}</p>
                     ) : (
                       <div className="h-[250px] w-full" dir="ltr">
                         <ResponsiveContainer width="100%" height="100%">
@@ -1030,8 +1033,8 @@ export default function AdminPage() {
                                 if (!active || !payload?.length) return null
                                 const d = payload[0]
                                 return (
-                                  <div className="bg-[#0d1117] border border-[#4d9fff]/30 rounded-xl px-4 py-2.5 shadow-xl" dir="rtl">
-                                    <p className="text-sm font-bold text-[#4d9fff]">{Number(d.value).toLocaleString("ar")} رد</p>
+                                  <div className="bg-[#0d1117] border border-[#4d9fff]/30 rounded-xl px-4 py-2.5 shadow-xl" dir={dir}>
+                                    <p className="text-sm font-bold text-[#4d9fff]">{Number(d.value).toLocaleString(localeCode)} {t("adminPage.replyUnit")}</p>
                                   </div>
                                 )
                               }}
@@ -1055,14 +1058,14 @@ export default function AdminPage() {
                     <div className="flex items-center gap-2">
                       <div className="w-1 h-6 rounded-full bg-gradient-to-b from-blue-500 to-cyan-500" />
                       <div>
-                        <CardTitle className="text-lg font-black">آخر المسجلين</CardTitle>
-                        <CardDescription className="text-xs mt-0.5">أحدث 5 مستخدمين انضموا للمنصة</CardDescription>
+                        <CardTitle className="text-lg font-black">{t("adminPage.recentSignupsTitle")}</CardTitle>
+                        <CardDescription className="text-xs mt-0.5">{t("adminPage.recentSignupsSubtitle")}</CardDescription>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {(stats.recentUsers?.length ?? 0) === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">لا يوجد مستخدمون بعد.</p>
+                      <p className="text-sm text-muted-foreground text-center py-4">{t("adminPage.noUsersYet")}</p>
                     ) : (
                       stats.recentUsers.map((u, i) => {
                         const initials = (u.name || u.email).substring(0, 2).toUpperCase()
@@ -1110,8 +1113,8 @@ export default function AdminPage() {
                 <div className="flex items-center gap-3">
                   <div className="w-1 h-8 rounded-full bg-gradient-to-b from-primary to-[oklch(0.62_0.15_230)]" />
                   <div>
-                    <CardTitle className="text-lg font-black">مساحات العمل</CardTitle>
-                    <CardDescription className="text-xs mt-0.5">تغيير الخطط، إيقاف الحسابات، أو حذفها نهائياً</CardDescription>
+                    <CardTitle className="text-lg font-black">{t("adminPage.tenantsTitle")}</CardTitle>
+                    <CardDescription className="text-xs mt-0.5">{t("adminPage.tenantsSubtitle")}</CardDescription>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1122,14 +1125,14 @@ export default function AdminPage() {
                     onClick={exportTenantsCSV}
                   >
                     <Download className="w-3.5 h-3.5" />
-                    تصدير CSV
+                    {t("adminPage.exportCsv")}
                   </Button>
                   <div className="relative w-full sm:w-72">
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       value={tenantSearch}
                       onChange={e => { setTenantSearch(e.target.value); setTenantsPage(1) }}
-                      placeholder="بحث بالاسم..."
+                      placeholder={t("adminPage.searchByName")}
                       className="rounded-xl h-11 pr-10 bg-muted/50 border-border/50 focus:bg-background transition-colors duration-200"
                     />
                   </div>
@@ -1142,7 +1145,7 @@ export default function AdminPage() {
               ) : tenants.length === 0 ? (
                 <div className="text-center py-16">
                   <Building2 className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-muted-foreground text-sm font-medium">لا توجد نتائج.</p>
+                  <p className="text-muted-foreground text-sm font-medium">{t("adminPage.noResults")}</p>
                 </div>
               ) : (
                 <div className="grid gap-3">
@@ -1176,7 +1179,7 @@ export default function AdminPage() {
                               className="font-black text-base cursor-pointer hover:text-[#4d9fff] transition-colors duration-200 group/name inline-flex items-center gap-1.5"
                               onDoubleClick={() => handleTenantNameDoubleClick(tenant)}
                               onClick={() => openTenantDrawer(tenant)}
-                              title="انقر لعرض التفاصيل — انقر مزدوج لتعديل الاسم"
+                              title={t("adminPage.viewEditNameTitle")}
                             >
                               {tenant.name}
                               <Pencil className="w-3 h-3 opacity-0 group-hover/name:opacity-50 transition-opacity duration-200" />
@@ -1189,19 +1192,19 @@ export default function AdminPage() {
                           {tenant.isSuspended && (
                             <Badge variant="outline" className="text-destructive border-destructive/40 gap-1 h-5 text-[10px]">
                               <Ban className="w-3 h-3" />
-                              موقوفة
+                              {t("adminPage.suspended")}
                             </Badge>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1.5 truncate">
-                          المالك: {tenant.owner?.email || "—"} · انضم {formatDate(tenant.createdAt)}
+                          {t("adminPage.ownerLabel")}: {tenant.owner?.email || "—"} · {t("adminPage.joinedLabel", { date: formatDate(tenant.createdAt) })}
                         </p>
                         <div className="flex gap-3 mt-1.5 flex-wrap text-[11px] text-muted-foreground">
-                          <span className="flex items-center gap-1"><Users className="w-3 h-3" />{tenant.counts.members} عضو</span>
-                          <span className="flex items-center gap-1"><Share2 className="w-3 h-3" />{tenant.counts.connections} قناة{tenant.usage?.maxConnections !== -1 ? ` من ${tenant.usage.maxConnections}` : ""}</span>
-                          <span className="flex items-center gap-1"><Zap className="w-3 h-3" />{tenant.counts.rules} قاعدة</span>
-                          <span className="flex items-center gap-1"><MessageSquareText className="w-3 h-3" />{tenant.counts.conversations} محادثة</span>
-                          <span className="flex items-center gap-1"><Inbox className="w-3 h-3" />{tenant.counts.subscribers} مشترك</span>
+                          <span className="flex items-center gap-1"><Users className="w-3 h-3" />{tenant.counts.members} {t("adminPage.memberUnit")}</span>
+                          <span className="flex items-center gap-1"><Share2 className="w-3 h-3" />{tenant.counts.connections} {t("adminPage.channelUnit")}{tenant.usage?.maxConnections !== -1 ? ` ${t("adminPage.ofMax", { max: tenant.usage!.maxConnections })}` : ""}</span>
+                          <span className="flex items-center gap-1"><Zap className="w-3 h-3" />{tenant.counts.rules} {t("adminPage.ruleUnit")}</span>
+                          <span className="flex items-center gap-1"><MessageSquareText className="w-3 h-3" />{tenant.counts.conversations} {t("adminPage.conversationUnit")}</span>
+                          <span className="flex items-center gap-1"><Inbox className="w-3 h-3" />{tenant.counts.subscribers} {t("adminPage.subscriberUnit")}</span>
                         </div>
                         {tenant.usage && (
                           <div className="mt-3 flex items-center gap-3">
@@ -1221,7 +1224,7 @@ export default function AdminPage() {
                               />
                             </div>
                             <span className="text-[11px] font-bold text-muted-foreground shrink-0">
-                              {tenant.usage.repliesThisMonth}{tenant.usage.maxRepliesPerMonth !== -1 ? ` / ${tenant.usage.maxRepliesPerMonth}` : ""} رد هذا الشهر
+                              {t("adminPage.repliesThisMonthOf", { used: tenant.usage.repliesThisMonth, max: tenant.usage.maxRepliesPerMonth !== -1 ? ` / ${tenant.usage.maxRepliesPerMonth}` : "" })}
                             </span>
                           </div>
                         )}
@@ -1236,23 +1239,23 @@ export default function AdminPage() {
                           onClick={() => openTenantDrawer(tenant)}
                         >
                           <Eye className="w-3.5 h-3.5" />
-                          تفاصيل
+                          {t("adminPage.details")}
                         </Button>
 
-                        <Select value={tenant.plan} onValueChange={(val) => val && handleTenantPlan(tenant, val)}>
+                        <Select value={tenant.plan} onValueChange={(val) => val && handleTenantPlan(tenant, val)} items={{ STARTER: planLabels.STARTER, PRO: planLabels.PRO, ENTERPRISE: planLabels.ENTERPRISE }}>
                           <SelectTrigger className="rounded-xl h-9 w-[125px] text-xs font-bold border-border/50">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="STARTER">مجانية</SelectItem>
-                            <SelectItem value="PRO">احترافية</SelectItem>
-                            <SelectItem value="ENTERPRISE">أعمال</SelectItem>
+                            <SelectItem value="STARTER">{planLabels.STARTER}</SelectItem>
+                            <SelectItem value="PRO">{planLabels.PRO}</SelectItem>
+                            <SelectItem value="ENTERPRISE">{planLabels.ENTERPRISE}</SelectItem>
                           </SelectContent>
                         </Select>
 
                         <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted/50">
                           <Switch checked={!tenant.isSuspended} onCheckedChange={() => handleTenantSuspend(tenant)} />
-                          <span className="text-xs font-bold text-muted-foreground">{tenant.isSuspended ? 'موقوفة' : 'نشطة'}</span>
+                          <span className="text-xs font-bold text-muted-foreground">{tenant.isSuspended ? t("adminPage.suspended") : t("adminPage.active")}</span>
                         </div>
 
                         <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive hover:bg-destructive/10 rounded-xl transition-all duration-200 hover:scale-110" onClick={() => handleTenantDelete(tenant)}>
@@ -1269,7 +1272,7 @@ export default function AdminPage() {
 
           {/* ─── Tenant Detail Drawer (Sheet) ─── */}
           <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-            <SheetContent side="left" className="!w-full sm:!max-w-lg overflow-y-auto p-0 bg-[#0d1117] border-[#4d9fff]/10" dir="rtl">
+            <SheetContent side="left" className="!w-full sm:!max-w-lg overflow-y-auto p-0 bg-[#0d1117] border-[#4d9fff]/10" dir={dir}>
               {selectedTenant && (
                 <>
                   <SheetHeader className="p-6 pb-4 border-b border-[#4d9fff]/10 bg-gradient-to-b from-[#4d9fff]/5 to-transparent">
@@ -1279,7 +1282,7 @@ export default function AdminPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <SheetTitle className="text-xl font-black text-white truncate">{selectedTenant.name}</SheetTitle>
-                        <SheetDescription className="text-xs text-[#9ca3af] mt-0.5">تفاصيل مساحة العمل</SheetDescription>
+                        <SheetDescription className="text-xs text-[#9ca3af] mt-0.5">{t("adminPage.workspaceDetailsTitle")}</SheetDescription>
                       </div>
                     </div>
                   </SheetHeader>
@@ -1289,29 +1292,29 @@ export default function AdminPage() {
                     <div className="space-y-3">
                       <h3 className="text-sm font-black text-[#4d9fff] flex items-center gap-2">
                         <BarChart3 className="w-4 h-4" />
-                        المعلومات الأساسية
+                        {t("adminPage.basicInfoTitle")}
                       </h3>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="bg-[#161b22] rounded-xl p-3 border border-[#30363d]">
-                          <p className="text-[10px] text-[#9ca3af] mb-1">اسم مساحة العمل</p>
+                          <p className="text-[10px] text-[#9ca3af] mb-1">{t("adminPage.workspaceNameLabel")}</p>
                           <p className="text-sm font-bold text-white truncate">{selectedTenant.name}</p>
                         </div>
                         <div className="bg-[#161b22] rounded-xl p-3 border border-[#30363d]">
-                          <p className="text-[10px] text-[#9ca3af] mb-1">الخطة</p>
+                          <p className="text-[10px] text-[#9ca3af] mb-1">{t("adminPage.planLabel")}</p>
                           <Badge variant="secondary" className={`text-[10px] h-5 border font-bold ${planColors[selectedTenant.plan]?.badge || ''}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${planColors[selectedTenant.plan]?.dot || 'bg-slate-400'} inline-block mr-1`} />
                             {planLabels[selectedTenant.plan] || selectedTenant.plan}
                           </Badge>
                         </div>
                         <div className="bg-[#161b22] rounded-xl p-3 border border-[#30363d]">
-                          <p className="text-[10px] text-[#9ca3af] mb-1">المالك</p>
+                          <p className="text-[10px] text-[#9ca3af] mb-1">{t("adminPage.ownerLabel")}</p>
                           <p className="text-sm font-bold text-white truncate" dir="ltr">{selectedTenant.owner?.email || "—"}</p>
                           {selectedTenant.owner?.name && (
                             <p className="text-[10px] text-[#9ca3af]">{selectedTenant.owner.name}</p>
                           )}
                         </div>
                         <div className="bg-[#161b22] rounded-xl p-3 border border-[#30363d]">
-                          <p className="text-[10px] text-[#9ca3af] mb-1">تاريخ الإنشاء</p>
+                          <p className="text-[10px] text-[#9ca3af] mb-1">{t("adminPage.createdAtLabel")}</p>
                           <p className="text-sm font-bold text-white">{formatDate(selectedTenant.createdAt)}</p>
                         </div>
                       </div>
@@ -1321,37 +1324,37 @@ export default function AdminPage() {
                     <div className="space-y-3">
                       <h3 className="text-sm font-black text-[#4d9fff] flex items-center gap-2">
                         <Activity className="w-4 h-4" />
-                        إحصائيات
+                        {t("adminPage.statsTitle")}
                       </h3>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="bg-[#161b22] rounded-xl p-3 border border-[#30363d]">
                           <div className="flex items-center gap-2 mb-2">
                             <Share2 className="w-3.5 h-3.5 text-[#4d9fff]" />
-                            <p className="text-[10px] text-[#9ca3af]">القنوات</p>
+                            <p className="text-[10px] text-[#9ca3af]">{t("adminPage.channelsLabel")}</p>
                           </div>
                           <p className="text-2xl font-black text-white">{selectedTenant.counts.connections}</p>
                           {selectedTenant.usage.maxConnections !== -1 && (
-                            <p className="text-[10px] text-[#9ca3af] mt-0.5">من {selectedTenant.usage.maxConnections} الحد الأقصى</p>
+                            <p className="text-[10px] text-[#9ca3af] mt-0.5">{t("adminPage.ofMaxLimit", { max: selectedTenant.usage.maxConnections })}</p>
                           )}
                         </div>
                         <div className="bg-[#161b22] rounded-xl p-3 border border-[#30363d]">
                           <div className="flex items-center gap-2 mb-2">
                             <Zap className="w-3.5 h-3.5 text-amber-400" />
-                            <p className="text-[10px] text-[#9ca3af]">القواعد</p>
+                            <p className="text-[10px] text-[#9ca3af]">{t("adminPage.rulesLabel")}</p>
                           </div>
                           <p className="text-2xl font-black text-white">{selectedTenant.counts.rules}</p>
                         </div>
                         <div className="bg-[#161b22] rounded-xl p-3 border border-[#30363d]">
                           <div className="flex items-center gap-2 mb-2">
                             <Inbox className="w-3.5 h-3.5 text-emerald-400" />
-                            <p className="text-[10px] text-[#9ca3af]">المشتركون</p>
+                            <p className="text-[10px] text-[#9ca3af]">{t("adminPage.subscribersLabel")}</p>
                           </div>
                           <p className="text-2xl font-black text-white">{selectedTenant.counts.subscribers}</p>
                         </div>
                         <div className="bg-[#161b22] rounded-xl p-3 border border-[#30363d]">
                           <div className="flex items-center gap-2 mb-2">
                             <MessageSquareText className="w-3.5 h-3.5 text-sky-400" />
-                            <p className="text-[10px] text-[#9ca3af]">المحادثات</p>
+                            <p className="text-[10px] text-[#9ca3af]">{t("adminPage.conversationsLabel")}</p>
                           </div>
                           <p className="text-2xl font-black text-white">{selectedTenant.counts.conversations}</p>
                         </div>
@@ -1363,16 +1366,16 @@ export default function AdminPage() {
                       <div className="space-y-3">
                         <h3 className="text-sm font-black text-[#4d9fff] flex items-center gap-2">
                           <TrendingUp className="w-4 h-4" />
-                          استخدام هذا الشهر
+                          {t("adminPage.usageThisMonthTitle")}
                         </h3>
                         <div className="bg-[#161b22] rounded-xl p-4 border border-[#30363d] space-y-4">
                           {/* Replies usage */}
                           <div>
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-[#9ca3af]">الردود الآلية</span>
+                              <span className="text-xs text-[#9ca3af]">{t("adminPage.autoRepliesLabel")}</span>
                               <span className="text-xs font-bold text-white">
                                 {selectedTenant.usage.repliesThisMonth}
-                                {selectedTenant.usage.maxRepliesPerMonth !== -1 ? ` / ${selectedTenant.usage.maxRepliesPerMonth}` : " (بلا حدود)"}
+                                {selectedTenant.usage.maxRepliesPerMonth !== -1 ? ` / ${selectedTenant.usage.maxRepliesPerMonth}` : ` (${t("adminPage.unlimited")})`}
                               </span>
                             </div>
                             <div className="h-2.5 rounded-full bg-[#21262d] overflow-hidden">
@@ -1398,10 +1401,10 @@ export default function AdminPage() {
                           {/* Connections usage */}
                           <div>
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs text-[#9ca3af]">القنوات المتصلة</span>
+                              <span className="text-xs text-[#9ca3af]">{t("adminPage.connectedChannelsLabel")}</span>
                               <span className="text-xs font-bold text-white">
                                 {selectedTenant.counts.connections}
-                                {selectedTenant.usage.maxConnections !== -1 ? ` / ${selectedTenant.usage.maxConnections}` : " (بلا حدود)"}
+                                {selectedTenant.usage.maxConnections !== -1 ? ` / ${selectedTenant.usage.maxConnections}` : ` (${t("adminPage.unlimited")})`}
                               </span>
                             </div>
                             <div className="h-2.5 rounded-full bg-[#21262d] overflow-hidden">
@@ -1424,7 +1427,7 @@ export default function AdminPage() {
                           <div className="flex items-center justify-between pt-2 border-t border-[#30363d]">
                             <span className="text-xs text-[#9ca3af] flex items-center gap-1.5">
                               <Users className="w-3.5 h-3.5" />
-                              الأعضاء
+                              {t("adminPage.membersLabel")}
                             </span>
                             <span className="text-sm font-bold text-white">{selectedTenant.counts.members}</span>
                           </div>
@@ -1436,21 +1439,21 @@ export default function AdminPage() {
                     <div className="space-y-3">
                       <h3 className="text-sm font-black text-[#4d9fff] flex items-center gap-2">
                         <Zap className="w-4 h-4" />
-                        إجراءات سريعة
+                        {t("adminPage.quickActionsTitle")}
                       </h3>
                       <div className="grid grid-cols-1 gap-2">
                         {/* Change Plan */}
                         <div className="flex items-center gap-3 bg-[#161b22] rounded-xl p-3 border border-[#30363d]">
                           <Crown className="w-4 h-4 text-amber-400" />
-                          <span className="text-xs font-bold text-white flex-1">تغيير الخطة</span>
-                          <Select value={selectedTenant.plan} onValueChange={(val) => val && handleTenantPlan(selectedTenant, val)}>
+                          <span className="text-xs font-bold text-white flex-1">{t("adminPage.changePlan")}</span>
+                          <Select value={selectedTenant.plan} onValueChange={(val) => val && handleTenantPlan(selectedTenant, val)} items={{ STARTER: planLabels.STARTER, PRO: planLabels.PRO, ENTERPRISE: planLabels.ENTERPRISE }}>
                             <SelectTrigger className="rounded-lg h-8 w-[110px] text-xs font-bold border-[#30363d] bg-[#0d1117]">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="STARTER">مجانية</SelectItem>
-                              <SelectItem value="PRO">احترافية</SelectItem>
-                              <SelectItem value="ENTERPRISE">أعمال</SelectItem>
+                              <SelectItem value="STARTER">{planLabels.STARTER}</SelectItem>
+                              <SelectItem value="PRO">{planLabels.PRO}</SelectItem>
+                              <SelectItem value="ENTERPRISE">{planLabels.ENTERPRISE}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -1466,7 +1469,7 @@ export default function AdminPage() {
                         >
                           <Ban className={`w-4 h-4 ${selectedTenant.isSuspended ? "text-emerald-400" : "text-red-400"}`} />
                           <span className={`text-xs font-bold flex-1 ${selectedTenant.isSuspended ? "text-emerald-400" : "text-red-400"}`}>
-                            {selectedTenant.isSuspended ? "إلغاء الإيقاف (تفعيل)" : "إيقاف مساحة العمل"}
+                            {selectedTenant.isSuspended ? t("adminPage.reactivate") : t("adminPage.suspendWorkspace")}
                           </span>
                         </button>
 
@@ -1476,7 +1479,7 @@ export default function AdminPage() {
                           onClick={() => setShowNotifForm(!showNotifForm)}
                         >
                           <Bell className="w-4 h-4 text-[#4d9fff]" />
-                          <span className="text-xs font-bold text-white flex-1">إرسال إشعار</span>
+                          <span className="text-xs font-bold text-white flex-1">{t("adminPage.sendNotification")}</span>
                           <ChevronLeft className={`w-3.5 h-3.5 text-[#9ca3af] transition-transform duration-200 ${showNotifForm ? "-rotate-90" : ""}`} />
                         </button>
 
@@ -1484,20 +1487,20 @@ export default function AdminPage() {
                         {showNotifForm && (
                           <div className="bg-[#161b22] rounded-xl p-4 border border-[#4d9fff]/20 space-y-3 animate-fade-in">
                             <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold text-[#9ca3af]">عنوان الإشعار</label>
+                              <label className="text-[10px] font-bold text-[#9ca3af]">{t("adminPage.notificationTitleLabel")}</label>
                               <Input
                                 value={tenantNotifTitle}
                                 onChange={e => setTenantNotifTitle(e.target.value)}
-                                placeholder="عنوان الإشعار..."
+                                placeholder={t("adminPage.notificationTitlePlaceholder")}
                                 className="rounded-lg h-9 text-xs bg-[#0d1117] border-[#30363d] text-white placeholder:text-[#484f58]"
                               />
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold text-[#9ca3af]">نص الرسالة</label>
+                              <label className="text-[10px] font-bold text-[#9ca3af]">{t("adminPage.messageTextLabel")}</label>
                               <Textarea
                                 value={tenantNotifMessage}
                                 onChange={e => setTenantNotifMessage(e.target.value)}
-                                placeholder="نص الإشعار..."
+                                placeholder={t("adminPage.notificationTextPlaceholder")}
                                 className="rounded-lg min-h-[80px] text-xs bg-[#0d1117] border-[#30363d] text-white placeholder:text-[#484f58]"
                               />
                             </div>
@@ -1518,7 +1521,7 @@ export default function AdminPage() {
                               onClick={handleSendTenantNotification}
                             >
                               {tenantNotifSending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                              إرسال الإشعار
+                              {t("adminPage.sendNotificationBtn")}
                             </Button>
                           </div>
                         )}
@@ -1529,28 +1532,28 @@ export default function AdminPage() {
                           onClick={() => setShowEmailForm(!showEmailForm)}
                         >
                           <Mail className="w-4 h-4 text-[#4d9fff]" />
-                          <span className="text-xs font-bold text-white flex-1">مراسلة المالك بالبريد</span>
+                          <span className="text-xs font-bold text-white flex-1">{t("adminPage.emailOwner")}</span>
                           <ChevronLeft className={`w-3.5 h-3.5 text-[#9ca3af] transition-transform duration-200 ${showEmailForm ? "-rotate-90" : ""}`} />
                         </button>
 
                         {showEmailForm && (
                           <div className="bg-[#161b22] rounded-xl p-4 border border-[#4d9fff]/20 space-y-3 animate-fade-in">
-                            <p className="text-[10px] text-[#9ca3af]">يُرسل إلى: <span dir="ltr" className="font-bold text-white">{selectedTenant.owner?.email || "—"}</span></p>
+                            <p className="text-[10px] text-[#9ca3af]">{t("adminPage.sendsTo")} <span dir="ltr" className="font-bold text-white">{selectedTenant.owner?.email || "—"}</span></p>
                             <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold text-[#9ca3af]">الموضوع</label>
+                              <label className="text-[10px] font-bold text-[#9ca3af]">{t("adminPage.subjectLabel")}</label>
                               <Input
                                 value={tenantEmailSubject}
                                 onChange={e => setTenantEmailSubject(e.target.value)}
-                                placeholder="موضوع الرسالة..."
+                                placeholder={t("adminPage.subjectPlaceholder")}
                                 className="rounded-lg h-9 text-xs bg-[#0d1117] border-[#30363d] text-white placeholder:text-[#484f58]"
                               />
                             </div>
                             <div className="space-y-1.5">
-                              <label className="text-[10px] font-bold text-[#9ca3af]">نص الرسالة</label>
+                              <label className="text-[10px] font-bold text-[#9ca3af]">{t("adminPage.messageTextLabel")}</label>
                               <Textarea
                                 value={tenantEmailBody}
                                 onChange={e => setTenantEmailBody(e.target.value)}
-                                placeholder="اكتب رسالتك... (كل سطر يصبح فقرة)"
+                                placeholder={t("adminPage.emailBodyPlaceholder")}
                                 className="rounded-lg min-h-[80px] text-xs bg-[#0d1117] border-[#30363d] text-white placeholder:text-[#484f58]"
                               />
                             </div>
@@ -1571,7 +1574,7 @@ export default function AdminPage() {
                               onClick={handleEmailTenant}
                             >
                               {tenantEmailSending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                              إرسال البريد
+                              {t("adminPage.sendEmailBtn")}
                             </Button>
                           </div>
                         )}
@@ -1582,7 +1585,7 @@ export default function AdminPage() {
                           onClick={() => handleTenantDelete(selectedTenant)}
                         >
                           <Trash2 className="w-4 h-4 text-red-400" />
-                          <span className="text-xs font-bold text-red-400 flex-1">حذف مساحة العمل نهائياً</span>
+                          <span className="text-xs font-bold text-red-400 flex-1">{t("adminPage.deleteWorkspacePermanently")}</span>
                         </button>
                       </div>
                     </div>
@@ -1602,9 +1605,9 @@ export default function AdminPage() {
                   <Megaphone className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg font-black">إرسال نشرة بريدية</CardTitle>
+                  <CardTitle className="text-lg font-black">{t("adminPage.newsletterTitle")}</CardTitle>
                   <CardDescription className="text-xs mt-0.5">
-                    تصل إلى جميع المستخدمين المسجلين على المنصة — استخدمها للأخبار والتحديثات والعروض.
+                    {t("adminPage.newsletterSubtitle")}
                   </CardDescription>
                 </div>
               </div>
@@ -1613,21 +1616,21 @@ export default function AdminPage() {
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
                   <Mail className="w-3.5 h-3.5" />
-                  عنوان الرسالة
+                  {t("adminPage.messageSubjectLabel")}
                 </label>
                 <Input
                   value={annSubject}
                   onChange={e => setAnnSubject(e.target.value)}
-                  placeholder="مثال: ميزات جديدة في حبقة 🎉"
+                  placeholder={t("adminPage.messageSubjectPlaceholder")}
                   className="rounded-xl h-11 font-bold bg-muted/30 border-border/50 focus:bg-background transition-colors duration-200"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-muted-foreground">محتوى الرسالة</label>
+                <label className="text-xs font-bold text-muted-foreground">{t("adminPage.messageContentLabel")}</label>
                 <Textarea
                   value={annBody}
                   onChange={e => setAnnBody(e.target.value)}
-                  placeholder={"محتوى الرسالة...\nكل سطر يصبح فقرة مستقلة في البريد."}
+                  placeholder={t("adminPage.messageContentPlaceholder")}
                   className="rounded-xl min-h-[200px] leading-relaxed bg-muted/30 border-border/50 focus:bg-background transition-colors duration-200"
                 />
               </div>
@@ -1647,30 +1650,30 @@ export default function AdminPage() {
                   className="rounded-xl gap-2.5 font-bold shadow-lg shadow-primary/20 px-8 h-11 text-sm hover:scale-105 transition-all duration-200 cursor-pointer"
                   onClick={async () => {
                     const confirmed = await confirm({
-                      title: "إرسال نشرة بريدية",
-                      message: "سيتم الإرسال لجميع مستخدمي المنصة. متابعة؟",
+                      title: t("adminPage.sendNewsletterTitle"),
+                      message: t("adminPage.sendNewsletterMessage"),
                       variant: "primary",
-                      confirmText: "إرسال",
-                      cancelText: "إلغاء"
+                      confirmText: t("adminPage.send"),
+                      cancelText: t("adminPage.cancel")
                     })
                     if (!confirmed) return
                     try {
                       setAnnSending(true)
                       setAnnResult(null)
                       const res = await api.post("/admin/announcements", { subject: annSubject, body: annBody })
-                      setAnnResult({ type: "success", text: `تم الإرسال إلى ${res.data.sent} من أصل ${res.data.total} مستخدم${res.data.failed ? ` (فشل ${res.data.failed})` : ""}.` })
+                      setAnnResult({ type: "success", text: t("adminPage.sendResultSuccess", { sent: res.data.sent, total: res.data.total, failedNote: res.data.failed ? t("adminPage.sendResultFailedNote", { count: res.data.failed }) : "" }) })
                       setAnnSubject("")
                       setAnnBody("")
                     } catch (err: unknown) {
                       const axiosErr = err as { response?: { data?: { message?: string } } }
-                      setAnnResult({ type: "error", text: axiosErr.response?.data?.message || "فشل إرسال النشرة." })
+                      setAnnResult({ type: "error", text: axiosErr.response?.data?.message || t("adminPage.sendNewsletterFailed") })
                     } finally {
                       setAnnSending(false)
                     }
                   }}
                 >
                   {annSending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  إرسال للجميع
+                  {t("adminPage.sendToAll")}
                 </Button>
               </div>
             </CardContent>
@@ -1690,8 +1693,8 @@ export default function AdminPage() {
                 <div className="flex items-center gap-3">
                   <div className="w-1 h-8 rounded-full bg-gradient-to-b from-blue-500 to-cyan-500" />
                   <div>
-                    <CardTitle className="text-lg font-black">المستخدمون</CardTitle>
-                    <CardDescription className="text-xs mt-0.5">جميع المستخدمين المسجلين ومنح صلاحيات الأدمن</CardDescription>
+                    <CardTitle className="text-lg font-black">{t("adminPage.usersTitle")}</CardTitle>
+                    <CardDescription className="text-xs mt-0.5">{t("adminPage.usersSubtitle")}</CardDescription>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1702,14 +1705,14 @@ export default function AdminPage() {
                     onClick={exportUsersCSV}
                   >
                     <Download className="w-3.5 h-3.5" />
-                    تصدير CSV
+                    {t("adminPage.exportCsv")}
                   </Button>
                   <div className="relative w-full sm:w-72">
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       value={userSearch}
                       onChange={e => { setUserSearch(e.target.value); setUsersPage(1) }}
-                      placeholder="بحث بالاسم أو الإيميل..."
+                      placeholder={t("adminPage.searchByNameOrEmail")}
                       className="rounded-xl h-11 pr-10 bg-muted/50 border-border/50 focus:bg-background transition-colors duration-200"
                     />
                   </div>
@@ -1725,7 +1728,7 @@ export default function AdminPage() {
                 }`}>
                   {userActionMsg.type === "success" ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
                   {userActionMsg.text}
-                  <button onClick={() => setUserActionMsg(null)} className="mr-auto text-xs opacity-60 hover:opacity-100 cursor-pointer">إغلاق</button>
+                  <button onClick={() => setUserActionMsg(null)} className="mr-auto text-xs opacity-60 hover:opacity-100 cursor-pointer">{t("adminPage.close")}</button>
                 </div>
               )}
               {usersLoading ? (
@@ -1733,7 +1736,7 @@ export default function AdminPage() {
               ) : users.length === 0 ? (
                 <div className="text-center py-16">
                   <Users className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-muted-foreground text-sm font-medium">لا توجد نتائج.</p>
+                  <p className="text-muted-foreground text-sm font-medium">{t("adminPage.noResults")}</p>
                 </div>
               ) : (
                 <div className="grid gap-3">
@@ -1760,30 +1763,30 @@ export default function AdminPage() {
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-black">{u.name || "بدون اسم"}</span>
+                                <span className="font-black">{u.name || t("adminPage.noName")}</span>
                                 {u.isSuperAdmin && (
                                   <Badge className="gap-1 h-5 text-[10px] font-bold bg-gradient-to-r from-amber-500 to-orange-500 border-0 text-white">
                                     <ShieldCheck className="w-3 h-3" />
-                                    أدمن المنصة
+                                    {t("adminPage.platformAdmin")}
                                   </Badge>
                                 )}
                                 {u.emailVerified ? (
                                   <Badge className="gap-1 h-5 text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
                                     <CheckCircle2 className="w-3 h-3" />
-                                    بريد مفعّل
+                                    {t("adminPage.emailVerified")}
                                   </Badge>
                                 ) : (
                                   <Badge className="gap-1 h-5 text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
                                     <AlertTriangle className="w-3 h-3" />
-                                    بريد غير مفعّل
+                                    {t("adminPage.emailNotVerified")}
                                   </Badge>
                                 )}
                               </div>
                               <p className="text-xs text-muted-foreground mt-0.5 truncate" dir="ltr">{u.email}</p>
                               <div className="flex gap-1.5 mt-2 flex-wrap">
-                                {u.tenants.map(t => (
-                                  <Badge key={t.id} variant="secondary" className={`text-[10px] h-5 rounded-lg border ${planColors[t.plan]?.badge || ''}`}>
-                                    {t.name} · {t.role}
+                                {u.tenants.map(tn => (
+                                  <Badge key={tn.id} variant="secondary" className={`text-[10px] h-5 rounded-lg border ${planColors[tn.plan]?.badge || ''}`}>
+                                    {tn.name} · {tn.role}
                                   </Badge>
                                 ))}
                               </div>
@@ -1794,7 +1797,7 @@ export default function AdminPage() {
                           <div className="flex flex-wrap items-center gap-2 shrink-0">
                             <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/40 border border-border/40">
                               <UserCheck className="w-3.5 h-3.5 text-muted-foreground" />
-                              <span className="text-[11px] font-bold text-muted-foreground">أدمن</span>
+                              <span className="text-[11px] font-bold text-muted-foreground">{t("adminPage.admin")}</span>
                               <Switch checked={u.isSuperAdmin} onCheckedChange={() => handleToggleAdmin(u)} />
                             </div>
                             {!u.emailVerified && (
@@ -1804,7 +1807,7 @@ export default function AdminPage() {
                                 className="rounded-xl gap-1.5 h-9 font-bold text-xs border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
-                                تفعيل البريد
+                                {t("adminPage.verifyEmail")}
                               </Button>
                             )}
                             <Button
@@ -1813,7 +1816,7 @@ export default function AdminPage() {
                               className="rounded-xl gap-1.5 h-9 font-bold text-xs border-border/50 hover:bg-primary/10 hover:text-primary hover:border-primary/30 cursor-pointer"
                             >
                               <Mail className="w-3.5 h-3.5" />
-                              إعادة كلمة السر
+                              {t("adminPage.resetPassword")}
                             </Button>
                             <Button
                               variant="outline" size="sm"
@@ -1821,7 +1824,7 @@ export default function AdminPage() {
                               className="rounded-xl gap-1.5 h-9 font-bold text-xs border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/10 cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
-                              حذف
+                              {t("adminPage.delete")}
                             </Button>
                           </div>
                         </div>
@@ -1846,8 +1849,8 @@ export default function AdminPage() {
                       <ScrollText className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg font-black">سجل النشاطات</CardTitle>
-                      <CardDescription className="text-xs mt-0.5">آخر الأحداث على مستوى المنصة بالكامل</CardDescription>
+                      <CardTitle className="text-lg font-black">{t("adminPage.logsTitle")}</CardTitle>
+                      <CardDescription className="text-xs mt-0.5">{t("adminPage.logsSubtitle")}</CardDescription>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1858,7 +1861,7 @@ export default function AdminPage() {
                       onClick={exportLogsCSV}
                     >
                       <Download className="w-3.5 h-3.5" />
-                      تصدير CSV
+                      {t("adminPage.exportCsv")}
                     </Button>
                     <Button
                       variant="outline"
@@ -1867,7 +1870,7 @@ export default function AdminPage() {
                       onClick={() => fetchLogs(logsPage)}
                     >
                       <RefreshCw className="w-3.5 h-3.5" />
-                      تحديث
+                      {t("adminPage.refresh")}
                     </Button>
                   </div>
                 </div>
@@ -1876,11 +1879,11 @@ export default function AdminPage() {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 rounded-xl bg-[#4d9fff]/5 border border-[#4d9fff]/10">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-[#4d9fff] shrink-0">
                     <CalendarDays className="w-3.5 h-3.5" />
-                    نطاق التاريخ:
+                    {t("adminPage.dateRangeLabel")}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-muted-foreground font-bold">من</span>
+                      <span className="text-[10px] text-muted-foreground font-bold">{t("adminPage.from")}</span>
                       <Input
                         type="date"
                         value={logDateFrom}
@@ -1889,7 +1892,7 @@ export default function AdminPage() {
                       />
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-muted-foreground font-bold">إلى</span>
+                      <span className="text-[10px] text-muted-foreground font-bold">{t("adminPage.to")}</span>
                       <Input
                         type="date"
                         value={logDateTo}
@@ -1904,7 +1907,7 @@ export default function AdminPage() {
                         className="h-7 text-[10px] font-bold text-[#4d9fff] hover:bg-[#4d9fff]/10 rounded-lg cursor-pointer"
                         onClick={() => { setLogDateFrom(""); setLogDateTo("") }}
                       >
-                        مسح
+                        {t("adminPage.clear")}
                       </Button>
                     )}
                   </div>
@@ -1916,14 +1919,14 @@ export default function AdminPage() {
                   <Input
                     value={logFullTextSearch}
                     onChange={e => setLogFullTextSearch(e.target.value)}
-                    placeholder="بحث شامل في جميع حقول السجل (الإجراء، الكيان، المستخدم، مساحة العمل...)"
+                    placeholder={t("adminPage.fullTextSearchPlaceholder")}
                     className="rounded-xl h-10 pr-10 bg-muted/30 border-border/50 focus:bg-background transition-colors duration-200"
                   />
                 </div>
 
                 {/* ── Clickable Action Badges (quick filter) ── */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-bold text-muted-foreground">تصفية بالإجراء:</span>
+                  <span className="text-[10px] font-bold text-muted-foreground">{t("adminPage.filterByAction")}</span>
                   <button
                     className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all duration-200 cursor-pointer border ${
                       logActionFilter === "ALL"
@@ -1932,7 +1935,7 @@ export default function AdminPage() {
                     }`}
                     onClick={() => setLogActionFilter("ALL")}
                   >
-                    الكل
+                    {t("adminPage.all")}
                   </button>
                   {uniqueActions.map(action => {
                     const actionBadgeColors: Record<string, string> = {
@@ -1961,25 +1964,33 @@ export default function AdminPage() {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/30">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground shrink-0">
                     <Filter className="w-3.5 h-3.5" />
-                    فلترة:
+                    {t("adminPage.filter")}
                   </div>
-                  <Select value={logActionFilter} onValueChange={(v) => v && setLogActionFilter(v)}>
+                  <Select
+                    value={logActionFilter}
+                    onValueChange={(v) => v && setLogActionFilter(v)}
+                    items={{ ALL: t("adminPage.allActions"), CREATE: t("adminPage.actionCreate"), UPDATE: t("adminPage.actionUpdate"), DELETE: t("adminPage.actionDelete") }}
+                  >
                     <SelectTrigger className="rounded-xl h-9 w-[140px] text-xs font-bold border-border/50">
-                      <SelectValue placeholder="نوع الإجراء" />
+                      <SelectValue placeholder={t("adminPage.actionTypePlaceholder")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ALL">كل الإجراءات</SelectItem>
-                      <SelectItem value="CREATE">إنشاء (CREATE)</SelectItem>
-                      <SelectItem value="UPDATE">تعديل (UPDATE)</SelectItem>
-                      <SelectItem value="DELETE">حذف (DELETE)</SelectItem>
+                      <SelectItem value="ALL">{t("adminPage.allActions")}</SelectItem>
+                      <SelectItem value="CREATE">{t("adminPage.actionCreate")}</SelectItem>
+                      <SelectItem value="UPDATE">{t("adminPage.actionUpdate")}</SelectItem>
+                      <SelectItem value="DELETE">{t("adminPage.actionDelete")}</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={logEntityFilter} onValueChange={(v) => v && setLogEntityFilter(v)}>
+                  <Select
+                    value={logEntityFilter}
+                    onValueChange={(v) => v && setLogEntityFilter(v)}
+                    items={{ ALL: t("adminPage.allEntities"), ...Object.fromEntries(uniqueEntityTypes.map(et => [et, et])) }}
+                  >
                     <SelectTrigger className="rounded-xl h-9 w-[160px] text-xs font-bold border-border/50">
-                      <SelectValue placeholder="نوع الكيان" />
+                      <SelectValue placeholder={t("adminPage.entityTypePlaceholder")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ALL">كل الكيانات</SelectItem>
+                      <SelectItem value="ALL">{t("adminPage.allEntities")}</SelectItem>
                       {uniqueEntityTypes.map(et => (
                         <SelectItem key={et} value={et}>{et}</SelectItem>
                       ))}
@@ -1990,7 +2001,7 @@ export default function AdminPage() {
                     <Input
                       value={logEmailSearch}
                       onChange={e => setLogEmailSearch(e.target.value)}
-                      placeholder="بحث بالبريد الإلكتروني..."
+                      placeholder={t("adminPage.searchByEmail")}
                       className="rounded-xl h-9 pr-9 text-xs bg-background border-border/50 focus:bg-background"
                     />
                   </div>
@@ -2003,7 +2014,7 @@ export default function AdminPage() {
               ) : filteredLogs.length === 0 ? (
                 <div className="text-center py-16">
                   <ScrollText className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-muted-foreground text-sm font-medium">لا توجد سجلات بعد.</p>
+                  <p className="text-muted-foreground text-sm font-medium">{t("adminPage.noLogsYet")}</p>
                 </div>
               ) : (
                 <div className="grid gap-2">
@@ -2040,7 +2051,7 @@ export default function AdminPage() {
                         </div>
                         <span className="text-[11px] text-muted-foreground shrink-0 flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {new Date(log.createdAt).toLocaleString("ar")}
+                          {new Date(log.createdAt).toLocaleString(localeCode)}
                         </span>
                       </div>
                     )
@@ -2065,11 +2076,12 @@ interface PaginationProps {
 }
 
 function Pagination({ page, total, pageSize, onChange }: PaginationProps) {
+  const { t } = useLanguage()
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   return (
     <div className="flex items-center justify-between pt-5 border-t border-border/50 mt-2">
       <span className="text-xs text-muted-foreground font-medium">
-        صفحة {page} من {totalPages} — الإجمالي {total}
+        {t("adminPage.pageOf", { page, total: totalPages, count: total })}
       </span>
       <div className="flex gap-2">
         <Button
@@ -2080,7 +2092,7 @@ function Pagination({ page, total, pageSize, onChange }: PaginationProps) {
           onClick={() => onChange(page - 1)}
         >
           <ChevronLeft className="w-3.5 h-3.5 ml-1" />
-          السابق
+          {t("adminPage.previous")}
         </Button>
         <Button
           variant="outline"
@@ -2089,7 +2101,7 @@ function Pagination({ page, total, pageSize, onChange }: PaginationProps) {
           disabled={page >= totalPages}
           onClick={() => onChange(page + 1)}
         >
-          التالي
+          {t("adminPage.next")}
           <ChevronRight className="w-3.5 h-3.5 mr-1" />
         </Button>
       </div>

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Mail, Save, RefreshCw, CheckCircle2, AlertTriangle, X, Sparkles, Webhook, Send } from "lucide-react"
 import api from "@/lib/api"
+import { useLanguage } from "@/lib/i18n/language-context"
 
 interface PlatformSetting {
   key: string
@@ -21,27 +22,43 @@ interface PlatformSetting {
   value: string | null
 }
 
-const groupMeta: Record<string, { title: string; description: string; icon: React.ElementType }> = {
-  mail: {
-    title: "البريد الإلكتروني (SMTP)",
-    description: "تشغّل رسائل التفعيل واستعادة كلمة المرور والدعوات والنشرة. جرّب Resend أو أي مزود SMTP.",
-    icon: Mail,
-  },
-  meta: {
-    title: "تطبيق ميتا (فيسبوك)",
-    description: "بيانات تطبيقك من developers.facebook.com — تشغّل زر الربط عبر فيسبوك والويبهوك.",
-    icon: Webhook,
-  },
-  ai: {
-    title: "الذكاء الاصطناعي",
-    description: "مفتاح Anthropic لتشغيل الردود الذكية. يفعّلها كل مشترك من إعداداته الخاصة.",
-    icon: Sparkles,
-  },
+const fieldLabelKeys: Record<string, string> = {
+  SMTP_HOST: "fieldSmtpHost",
+  SMTP_PORT: "fieldSmtpPort",
+  SMTP_USER: "fieldSmtpUser",
+  SMTP_PASS: "fieldSmtpPass",
+  SMTP_FROM: "fieldSmtpFrom",
+  FACEBOOK_APP_ID: "fieldFacebookAppId",
+  FACEBOOK_APP_SECRET: "fieldFacebookAppSecret",
+  FACEBOOK_REDIRECT_URI: "fieldFacebookRedirectUri",
+  WEBHOOK_VERIFY_TOKEN: "fieldWebhookVerifyToken",
+  INSTAGRAM_APP_ID: "fieldInstagramAppId",
+  INSTAGRAM_APP_SECRET: "fieldInstagramAppSecret",
+  INSTAGRAM_REDIRECT_URI: "fieldInstagramRedirectUri",
+  ANTHROPIC_API_KEY: "fieldAnthropicApiKey",
 }
 
 // Admin panel section: edits platform-wide settings stored in the DB.
 // Changes apply immediately — no server restart needed.
 export function AdminSettings() {
+  const { t } = useLanguage()
+  const groupMeta: Record<string, { title: string; description: string; icon: React.ElementType }> = {
+    mail: {
+      title: t("platformSettingsPage.mailGroupTitle"),
+      description: t("platformSettingsPage.mailGroupDesc"),
+      icon: Mail,
+    },
+    meta: {
+      title: t("platformSettingsPage.metaGroupTitle"),
+      description: t("platformSettingsPage.metaGroupDesc"),
+      icon: Webhook,
+    },
+    ai: {
+      title: t("platformSettingsPage.aiGroupTitle"),
+      description: t("platformSettingsPage.aiGroupDesc"),
+      icon: Sparkles,
+    },
+  }
   const [settings, setSettings] = useState<PlatformSetting[]>([])
   const [values, setValues] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
@@ -83,11 +100,11 @@ export function AdminSettings() {
         }
       }
       await api.put("/admin/settings", payload)
-      setBanner({ type: "success", text: "تم حفظ الإعدادات — سارية فوراً بدون إعادة تشغيل." })
+      setBanner({ type: "success", text: t("platformSettingsPage.savedSuccess") })
       fetchSettings()
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } }
-      setBanner({ type: "error", text: axiosErr.response?.data?.message || "فشل حفظ الإعدادات." })
+      setBanner({ type: "error", text: axiosErr.response?.data?.message || t("platformSettingsPage.saveFailed") })
     } finally {
       setIsSaving(false)
     }
@@ -101,7 +118,7 @@ export function AdminSettings() {
       setBanner({ type: res.data.sent ? "success" : "error", text: res.data.message })
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } }
-      setBanner({ type: "error", text: axiosErr.response?.data?.message || "فشل إرسال رسالة الاختبار." })
+      setBanner({ type: "error", text: axiosErr.response?.data?.message || t("platformSettingsPage.testEmailFailed") })
     } finally {
       setIsTesting(false)
     }
@@ -144,11 +161,11 @@ export function AdminSettings() {
               {groupSettings.map(setting => (
                 <div key={setting.key} className="grid gap-1.5">
                   <Label htmlFor={setting.key} className="font-bold text-xs flex items-center gap-2">
-                    {setting.label}
+                    {fieldLabelKeys[setting.key] ? t(`platformSettingsPage.${fieldLabelKeys[setting.key]}`) : setting.label}
                     {setting.isSet && (
                       <Badge variant="outline" className="h-4 text-[9px] rounded gap-0.5 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
                         <CheckCircle2 className="w-2.5 h-2.5" />
-                        {setting.source === "env" ? "من ملف البيئة" : "محفوظ"}
+                        {setting.source === "env" ? t("platformSettingsPage.fromEnvBadge") : t("platformSettingsPage.savedBadge")}
                       </Badge>
                     )}
                   </Label>
@@ -157,7 +174,7 @@ export function AdminSettings() {
                     type={setting.secret ? "password" : "text"}
                     value={values[setting.key] ?? ""}
                     onChange={e => setValues(prev => ({ ...prev, [setting.key]: e.target.value }))}
-                    placeholder={setting.secret && setting.isSet ? "•••••••• (اتركه فارغاً للإبقاء عليه)" : setting.placeholder}
+                    placeholder={setting.secret && setting.isSet ? t("platformSettingsPage.secretSetPlaceholder") : setting.placeholder}
                     className="rounded-xl h-10 text-sm"
                     dir="ltr"
                     autoComplete="off"
@@ -172,11 +189,11 @@ export function AdminSettings() {
       <div className="flex items-center gap-3 justify-end">
         <Button variant="outline" className="rounded-xl gap-2 font-bold" disabled={isTesting} onClick={handleTestEmail}>
           {isTesting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          اختبار البريد
+          {t("platformSettingsPage.testEmailBtn")}
         </Button>
         <Button className="rounded-xl gap-2 font-bold shadow-lg shadow-primary/20 px-8" disabled={isSaving} onClick={handleSave}>
           {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          حفظ الإعدادات
+          {t("platformSettingsPage.saveSettingsBtn")}
         </Button>
       </div>
     </div>

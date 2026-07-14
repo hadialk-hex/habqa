@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import api from "@/lib/api"
 import { useConfirm } from "@/components/ui/confirm-dialog"
+import { useLanguage } from "@/lib/i18n/language-context"
 
 // --- TYPES & DEFINITIONS ---
 
@@ -48,27 +49,6 @@ interface Flow {
   steps?: any[];
 }
 
-const NODE_TYPES = {
-  // Triggers
-  TRIGGER_KEYWORD: { type: 'TRIGGER_KEYWORD', category: 'trigger', name: 'مطابقة كلمة مفتاحية', color: 'border-emerald-500 bg-emerald-950/40 text-emerald-200' },
-  TRIGGER_NEW_SUBSCRIBER: { type: 'TRIGGER_NEW_SUBSCRIBER', category: 'trigger', name: 'مشترك جديد', color: 'border-emerald-500 bg-emerald-950/40 text-emerald-200' },
-  TRIGGER_COMMENT: { type: 'TRIGGER_COMMENT', category: 'trigger', name: 'تعليق على منشور', color: 'border-emerald-500 bg-emerald-950/40 text-emerald-200' },
-  TRIGGER_ANY_MESSAGE: { type: 'TRIGGER_ANY_MESSAGE', category: 'trigger', name: 'أي رسالة واردة', color: 'border-emerald-500 bg-emerald-950/40 text-emerald-200' },
-
-  // Actions
-  ACTION_SEND_MESSAGE: { type: 'ACTION_SEND_MESSAGE', category: 'action', name: 'إرسال رسالة', color: 'border-cyan-500 bg-cyan-950/40 text-cyan-200' },
-  ACTION_TAG_ADD: { type: 'ACTION_TAG_ADD', category: 'action', name: 'إضافة وسم (Tag)', color: 'border-cyan-500 bg-cyan-950/40 text-cyan-200' },
-  ACTION_TAG_REMOVE: { type: 'ACTION_TAG_REMOVE', category: 'action', name: 'إزالة وسم (Tag)', color: 'border-cyan-500 bg-cyan-950/40 text-cyan-200' },
-  ACTION_NOTIFY_TEAM: { type: 'ACTION_NOTIFY_TEAM', category: 'action', name: 'إشعار الفريق', color: 'border-cyan-500 bg-cyan-950/40 text-cyan-200' },
-  ACTION_WAIT_DELAY: { type: 'ACTION_WAIT_DELAY', category: 'action', name: 'انتظار / تأخير', color: 'border-cyan-500 bg-cyan-950/40 text-cyan-200' },
-
-  // Conditions
-  CONDITION_TAG_CHECK: { type: 'CONDITION_TAG_CHECK', category: 'condition', name: 'فحص الوسوم', color: 'border-amber-500 bg-amber-950/40 text-amber-200' },
-  CONDITION_PLATFORM_CHECK: { type: 'CONDITION_PLATFORM_CHECK', category: 'condition', name: 'فحص المنصة', color: 'border-amber-500 bg-amber-950/40 text-amber-200' },
-  CONDITION_TIME_CHECK: { type: 'CONDITION_TIME_CHECK', category: 'condition', name: 'فحص الوقت', color: 'border-amber-500 bg-amber-950/40 text-amber-200' },
-  CONDITION_KEYWORD_CHECK: { type: 'CONDITION_KEYWORD_CHECK', category: 'condition', name: 'فحص الكلمات', color: 'border-amber-500 bg-amber-950/40 text-amber-200' },
-};
-
 // Simple random UUID helper
 const generateUUID = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -78,24 +58,48 @@ const generateUUID = () => {
   });
 };
 
-const getInitialConfig = (type: string) => {
-  switch (type) {
-    case 'TRIGGER_KEYWORD': return { keywords: '' };
-    case 'TRIGGER_COMMENT': return { postId: '' };
-    case 'ACTION_SEND_MESSAGE': return { text: 'مرحباً بك! ||| أهلاً بك! كيف يمكننا مساعدتك اليوم؟', mediaUrl: '' };
-    case 'ACTION_TAG_ADD':
-    case 'ACTION_TAG_REMOVE': return { tag: '' };
-    case 'ACTION_NOTIFY_TEAM': return { message: 'تدفق جديد تم تفعيله!' };
-    case 'ACTION_WAIT_DELAY': return { delayAmount: 5, delayUnit: 'minutes' };
-    case 'CONDITION_TAG_CHECK': return { conditionType: 'TAG', tag: '' };
-    case 'CONDITION_PLATFORM_CHECK': return { conditionType: 'PLATFORM', platform: 'FACEBOOK_PAGE' };
-    case 'CONDITION_TIME_CHECK': return { conditionType: 'TIME', startTime: '09:00', endTime: '17:00' };
-    case 'CONDITION_KEYWORD_CHECK': return { conditionType: 'KEYWORD', keywords: '' };
-    default: return {};
-  }
-};
-
 export default function FlowsPage() {
+  const { t, locale, dir } = useLanguage();
+  const localeCode = locale === "ar" ? "ar-EG" : "en-US";
+
+  const NODE_TYPES = {
+    // Triggers
+    TRIGGER_KEYWORD: { type: 'TRIGGER_KEYWORD', category: 'trigger', name: t("flowsPage.nodeTriggerKeyword"), color: 'border-emerald-500 bg-emerald-950/40 text-emerald-200' },
+    TRIGGER_NEW_SUBSCRIBER: { type: 'TRIGGER_NEW_SUBSCRIBER', category: 'trigger', name: t("flowsPage.nodeTriggerNewSubscriber"), color: 'border-emerald-500 bg-emerald-950/40 text-emerald-200' },
+    TRIGGER_COMMENT: { type: 'TRIGGER_COMMENT', category: 'trigger', name: t("flowsPage.nodeTriggerComment"), color: 'border-emerald-500 bg-emerald-950/40 text-emerald-200' },
+    TRIGGER_ANY_MESSAGE: { type: 'TRIGGER_ANY_MESSAGE', category: 'trigger', name: t("flowsPage.nodeTriggerAnyMessage"), color: 'border-emerald-500 bg-emerald-950/40 text-emerald-200' },
+
+    // Actions
+    ACTION_SEND_MESSAGE: { type: 'ACTION_SEND_MESSAGE', category: 'action', name: t("flowsPage.nodeActionSendMessage"), color: 'border-cyan-500 bg-cyan-950/40 text-cyan-200' },
+    ACTION_TAG_ADD: { type: 'ACTION_TAG_ADD', category: 'action', name: t("flowsPage.nodeActionTagAdd"), color: 'border-cyan-500 bg-cyan-950/40 text-cyan-200' },
+    ACTION_TAG_REMOVE: { type: 'ACTION_TAG_REMOVE', category: 'action', name: t("flowsPage.nodeActionTagRemove"), color: 'border-cyan-500 bg-cyan-950/40 text-cyan-200' },
+    ACTION_NOTIFY_TEAM: { type: 'ACTION_NOTIFY_TEAM', category: 'action', name: t("flowsPage.nodeActionNotifyTeam"), color: 'border-cyan-500 bg-cyan-950/40 text-cyan-200' },
+    ACTION_WAIT_DELAY: { type: 'ACTION_WAIT_DELAY', category: 'action', name: t("flowsPage.nodeActionWaitDelay"), color: 'border-cyan-500 bg-cyan-950/40 text-cyan-200' },
+
+    // Conditions
+    CONDITION_TAG_CHECK: { type: 'CONDITION_TAG_CHECK', category: 'condition', name: t("flowsPage.nodeConditionTagCheck"), color: 'border-amber-500 bg-amber-950/40 text-amber-200' },
+    CONDITION_PLATFORM_CHECK: { type: 'CONDITION_PLATFORM_CHECK', category: 'condition', name: t("flowsPage.nodeConditionPlatformCheck"), color: 'border-amber-500 bg-amber-950/40 text-amber-200' },
+    CONDITION_TIME_CHECK: { type: 'CONDITION_TIME_CHECK', category: 'condition', name: t("flowsPage.nodeConditionTimeCheck"), color: 'border-amber-500 bg-amber-950/40 text-amber-200' },
+    CONDITION_KEYWORD_CHECK: { type: 'CONDITION_KEYWORD_CHECK', category: 'condition', name: t("flowsPage.nodeConditionKeywordCheck"), color: 'border-amber-500 bg-amber-950/40 text-amber-200' },
+  };
+
+  const getInitialConfig = (type: string) => {
+    switch (type) {
+      case 'TRIGGER_KEYWORD': return { keywords: '' };
+      case 'TRIGGER_COMMENT': return { postId: '' };
+      case 'ACTION_SEND_MESSAGE': return { text: t("flowsPage.defaultSendMessageText"), mediaUrl: '' };
+      case 'ACTION_TAG_ADD':
+      case 'ACTION_TAG_REMOVE': return { tag: '' };
+      case 'ACTION_NOTIFY_TEAM': return { message: t("flowsPage.defaultNotifyTeamMessage") };
+      case 'ACTION_WAIT_DELAY': return { delayAmount: 5, delayUnit: 'minutes' };
+      case 'CONDITION_TAG_CHECK': return { conditionType: 'TAG', tag: '' };
+      case 'CONDITION_PLATFORM_CHECK': return { conditionType: 'PLATFORM', platform: 'FACEBOOK_PAGE' };
+      case 'CONDITION_TIME_CHECK': return { conditionType: 'TIME', startTime: '09:00', endTime: '17:00' };
+      case 'CONDITION_KEYWORD_CHECK': return { conditionType: 'KEYWORD', keywords: '' };
+      default: return {};
+    }
+  };
+
   const confirm = useConfirm();
   const canvasRef = useRef<HTMLDivElement>(null);
 
@@ -107,7 +111,7 @@ export default function FlowsPage() {
   // Editor View State
   const [isEditing, setIsEditing] = useState(false);
   const [editingFlowId, setEditingFlowId] = useState<string | null>(null);
-  const [flowName, setFlowName] = useState("مخطط تدفق جديد");
+  const [flowName, setFlowName] = useState(t("flowsPage.newFlowDefaultName"));
   const [flowDescription, setFlowDescription] = useState("");
   const [flowIsActive, setFlowIsActive] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -138,7 +142,7 @@ export default function FlowsPage() {
       setFlows(res.data);
     } catch (error) {
       console.error("Failed to fetch flows", error);
-      setBanner({ type: "error", text: "فشل تحميل مخططات التدفق" });
+      setBanner({ type: "error", text: t("flowsPage.fetchFlowsFailed") });
     } finally {
       setIsLoading(false);
     }
@@ -289,7 +293,7 @@ export default function FlowsPage() {
       setIsEditing(true);
     } catch (error) {
       console.error("Failed to load flow", error);
-      setBanner({ type: "error", text: "فشل تحميل تفاصيل المخطط" });
+      setBanner({ type: "error", text: t("flowsPage.loadFlowDetailsFailed") });
     } finally {
       setIsLoading(false);
     }
@@ -298,7 +302,7 @@ export default function FlowsPage() {
   // Create fresh new flow with templates
   const handleCreateNewFlow = () => {
     setEditingFlowId(null);
-    setFlowName("مخطط تدفق تلقائي جديد");
+    setFlowName(t("flowsPage.autoFlowDefaultName"));
     setFlowDescription("");
     setFlowIsActive(false);
 
@@ -314,7 +318,7 @@ export default function FlowsPage() {
         name: NODE_TYPES.TRIGGER_KEYWORD.name,
         x: 100,
         y: 150,
-        configuration: { keywords: "سعر, كم, تفاصيل" }
+        configuration: { keywords: t("flowsPage.demoKeywords") }
       },
       {
         id: actionId,
@@ -323,7 +327,7 @@ export default function FlowsPage() {
         name: NODE_TYPES.ACTION_SEND_MESSAGE.name,
         x: 450,
         y: 140,
-        configuration: { text: "أهلاً بك! تفاصيل الأسعار تم إرسالها لك في رسالة خاصة 💬 ||| مرحباً بك يا غالي! كيف يمكننا مساعدتك اليوم؟", mediaUrl: "" }
+        configuration: { text: t("flowsPage.demoSendMessageText"), mediaUrl: "" }
       }
     ];
 
@@ -348,7 +352,7 @@ export default function FlowsPage() {
   // Convert visual graph and save to NestJS
   const handleSaveFlow = async () => {
     if (!flowName.trim()) {
-      setBanner({ type: "error", text: "يرجى إدخال اسم مخطط التدفق" });
+      setBanner({ type: "error", text: t("flowsPage.enterFlowNamePrompt") });
       return;
     }
 
@@ -442,17 +446,17 @@ export default function FlowsPage() {
 
       if (editingFlowId) {
         await api.put(`/flows/${editingFlowId}`, payload);
-        setBanner({ type: "success", text: "✅ تم حفظ مخطط التدفق بنجاح" });
+        setBanner({ type: "success", text: t("flowsPage.flowSavedSuccess") });
       } else {
         const res = await api.post("/flows", payload);
         setEditingFlowId(res.data.id);
-        setBanner({ type: "success", text: "✅ تم إنشاء مخطط التدفق بنجاح" });
+        setBanner({ type: "success", text: t("flowsPage.flowCreatedSuccess") });
       }
 
       fetchFlows();
     } catch (error) {
       console.error("Failed to save flow", error);
-      setBanner({ type: "error", text: "فشل حفظ مخطط التدفق. حاول مرة أخرى." });
+      setBanner({ type: "error", text: t("flowsPage.saveFlowFailed") });
     } finally {
       setIsSaving(false);
     }
@@ -463,10 +467,10 @@ export default function FlowsPage() {
     try {
       setFlows(flows.map(f => f.id === flow.id ? { ...f, isActive: !f.isActive } : f));
       await api.put(`/flows/${flow.id}/toggle`, { isActive: !flow.isActive });
-      setBanner({ type: "success", text: `تم ${!flow.isActive ? 'تفعيل' : 'تعطيل'} مخطط التدفق` });
+      setBanner({ type: "success", text: !flow.isActive ? t("flowsPage.flowActivatedToast") : t("flowsPage.flowDeactivatedToast") });
     } catch (error) {
       console.error("Failed to toggle activation status", error);
-      setBanner({ type: "error", text: "فشل تعديل حالة التفعيل" });
+      setBanner({ type: "error", text: t("flowsPage.toggleActivationFailed") });
       fetchFlows();
     }
   };
@@ -474,10 +478,10 @@ export default function FlowsPage() {
   // Delete Flow
   const handleDeleteFlow = async (flow: Flow) => {
     const confirmed = await confirm({
-      title: "حذف مخطط التدفق",
-      message: `هل أنت متأكد من رغبتك في حذف "${flow.name}"؟ لا يمكن التراجع عن هذا الإجراء وسيتم مسح كافة الخطوات والربط.`,
-      confirmText: "حذف الآن",
-      cancelText: "إلغاء",
+      title: t("flowsPage.deleteFlowConfirmTitle"),
+      message: t("flowsPage.deleteFlowConfirmMessage", { name: flow.name }),
+      confirmText: t("flowsPage.deleteNow"),
+      cancelText: t("flowsPage.cancel"),
       variant: "destructive"
     });
 
@@ -485,11 +489,11 @@ export default function FlowsPage() {
 
     try {
       await api.delete(`/flows/${flow.id}`);
-      setBanner({ type: "success", text: "تم حذف مخطط التدفق بنجاح" });
+      setBanner({ type: "success", text: t("flowsPage.flowDeletedSuccess") });
       fetchFlows();
     } catch (error) {
       console.error("Failed to delete flow", error);
-      setBanner({ type: "error", text: "فشل حذف مخطط التدفق" });
+      setBanner({ type: "error", text: t("flowsPage.deleteFlowFailed") });
     }
   };
 
@@ -733,23 +737,23 @@ export default function FlowsPage() {
 
       {/* --- LIST VIEW --- */}
       {!isEditing && (
-        <div className="flex flex-col gap-6" dir="rtl">
+        <div className="flex flex-col gap-6" dir={dir}>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
                 <div className="bg-gradient-to-br from-primary to-[oklch(0.62_0.15_230)] p-2.5 rounded-xl shadow-lg shadow-primary/25">
                   <Bot className="w-6 h-6 text-white" />
                 </div>
-                مخططات التدفق التفاعلية
+                {t("flowsPage.title")}
               </h1>
-              <p className="text-muted-foreground mt-2 font-medium">قم ببناء سيناريوهات محادثة بصرية متكاملة للرد التلقائي وإرسال الوسوم وفحص البيانات.</p>
+              <p className="text-muted-foreground mt-2 font-medium">{t("flowsPage.subtitle")}</p>
             </div>
             <Button 
               onClick={handleCreateNewFlow}
               className="gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all rounded-xl px-6 h-11 font-bold cursor-pointer w-full sm:w-auto"
             >
               <Plus className="w-4 h-4" />
-              إنشاء مخطط تدفق
+              {t("flowsPage.createFlowBtn")}
             </Button>
           </div>
 
@@ -763,10 +767,10 @@ export default function FlowsPage() {
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                   <Bot className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="text-xl font-bold">لا يوجد مخططات تدفق حالية</h3>
-                <p className="text-muted-foreground max-w-sm">ابدأ بإنشاء أول مخطط تدفق تفاعلي لتتمكن من أتمتة الردود على رسائل عملائك بشكل بصري ذكي.</p>
+                <h3 className="text-xl font-bold">{t("flowsPage.noFlowsTitle")}</h3>
+                <p className="text-muted-foreground max-w-sm">{t("flowsPage.noFlowsDesc")}</p>
                 <Button onClick={handleCreateNewFlow} className="mt-2 rounded-xl font-bold">
-                  إنشاء أول مخطط الآن
+                  {t("flowsPage.createFirstFlowBtn")}
                 </Button>
               </CardContent>
             </Card>
@@ -782,7 +786,7 @@ export default function FlowsPage() {
                           ? "bg-emerald-950/60 border-emerald-500/30 text-emerald-400 hover:bg-emerald-950/60" 
                           : "bg-muted text-muted-foreground hover:bg-muted"
                       }`}>
-                        {flow.isActive ? "نشط" : "غير نشط"}
+                        {flow.isActive ? t("flowsPage.activeBadge") : t("flowsPage.inactiveBadge")}
                       </Badge>
                       <Switch 
                         checked={flow.isActive}
@@ -791,18 +795,18 @@ export default function FlowsPage() {
                     </div>
                     <CardTitle className="text-lg font-black mt-3 text-right">{flow.name}</CardTitle>
                     <CardDescription className="text-sm font-medium line-clamp-2 text-right mt-1.5 h-10">
-                      {flow.description || "لا يوجد وصف لهذا المخطط"}
+                      {flow.description || t("flowsPage.noDescriptionFallback")}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="pt-0 pb-5">
                     <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border/40 pt-4 font-bold">
                       <div className="flex items-center gap-1.5">
                         <Clock className="w-3.5 h-3.5" />
-                        <span>{new Date(flow.updatedAt).toLocaleDateString('ar-EG')}</span>
+                        <span>{new Date(flow.updatedAt).toLocaleDateString(localeCode)}</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span>الخطوات: {flow.steps?.length || 0}</span>
-                        <span>المحفزات: {flow.triggers?.length || 0}</span>
+                        <span>{t("flowsPage.stepsCountLabel", { count: flow.steps?.length || 0 })}</span>
+                        <span>{t("flowsPage.triggersCountLabel", { count: flow.triggers?.length || 0 })}</span>
                       </div>
                     </div>
                     <div className="flex gap-2 mt-5">
@@ -812,7 +816,7 @@ export default function FlowsPage() {
                         className="flex-1 rounded-xl font-bold h-10 border-primary/25 text-primary hover:bg-primary/5 cursor-pointer"
                       >
                         <Edit className="w-4 h-4 ml-1.5" />
-                        تعديل المخطط
+                        {t("flowsPage.editFlowBtn")}
                       </Button>
                       <Button 
                         variant="ghost" 
@@ -832,7 +836,7 @@ export default function FlowsPage() {
 
       {/* --- CANVAS EDITOR VIEW --- */}
       {isEditing && (
-        <div className="flex flex-col h-[calc(100vh-8.5rem)] min-h-[600px] border border-border/50 bg-[#0a0a0f] rounded-2xl overflow-hidden relative" dir="rtl">
+        <div className="flex flex-col h-[calc(100vh-8.5rem)] min-h-[600px] border border-border/50 bg-[#0a0a0f] rounded-2xl overflow-hidden relative" dir={dir}>
           
           {/* TOP CONTROL BAR */}
           <header className="flex h-16 shrink-0 items-center justify-between border-b border-border/50 px-4 bg-[#0d1117] z-20">
@@ -851,7 +855,7 @@ export default function FlowsPage() {
                 <Input 
                   value={flowName} 
                   onChange={e => setFlowName(e.target.value)} 
-                  placeholder="اسم مخطط التدفق..." 
+                  placeholder={t("flowsPage.flowNamePlaceholder")} 
                   className="rounded-xl h-9 text-base font-black bg-accent/20 border-border/40 focus:border-primary/50 w-48 sm:w-64"
                 />
                 <span className="hidden sm:inline text-muted-foreground/30">|</span>
@@ -859,7 +863,7 @@ export default function FlowsPage() {
                   type="text"
                   value={flowDescription}
                   onChange={e => setFlowDescription(e.target.value)}
-                  placeholder="أضف وصفاً بسيطاً للمخطط..."
+                  placeholder={t("flowsPage.flowDescPlaceholder")}
                   className="bg-transparent border-none text-xs text-muted-foreground outline-none w-48 font-medium sm:w-80 placeholder:text-muted-foreground/40"
                 />
               </div>
@@ -867,7 +871,7 @@ export default function FlowsPage() {
 
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <Label htmlFor="active-toggle" className="text-xs font-bold text-muted-foreground">نشط</Label>
+                <Label htmlFor="active-toggle" className="text-xs font-bold text-muted-foreground">{t("flowsPage.activeLabel")}</Label>
                 <Switch 
                   id="active-toggle" 
                   checked={flowIsActive}
@@ -880,7 +884,7 @@ export default function FlowsPage() {
                 className="gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/45 rounded-xl px-5 h-10 font-bold cursor-pointer"
               >
                 {isSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                حفظ التغييرات
+                {t("flowsPage.saveChangesBtn")}
               </Button>
             </div>
           </header>
@@ -891,7 +895,7 @@ export default function FlowsPage() {
             {/* LEFT PALETTE SIDEBAR */}
             <aside className="w-64 border-l border-border/50 bg-[#0d1117] p-4 flex flex-col gap-5 overflow-y-auto shrink-0 select-none z-10">
               <div>
-                <h4 className="text-xs font-black text-muted-foreground/70 uppercase tracking-wider mb-3">1. محفزات البدء (Triggers)</h4>
+                <h4 className="text-xs font-black text-muted-foreground/70 uppercase tracking-wider mb-3">{t("flowsPage.triggersHeader")}</h4>
                 <div className="flex flex-col gap-2">
                   {Object.entries(NODE_TYPES).filter(([_, n]) => n.category === 'trigger').map(([key, n]) => (
                     <div 
@@ -908,7 +912,7 @@ export default function FlowsPage() {
               </div>
 
               <div>
-                <h4 className="text-xs font-black text-muted-foreground/70 uppercase tracking-wider mb-3">2. إجراءات التنفيذ (Actions)</h4>
+                <h4 className="text-xs font-black text-muted-foreground/70 uppercase tracking-wider mb-3">{t("flowsPage.actionsHeader")}</h4>
                 <div className="flex flex-col gap-2">
                   {Object.entries(NODE_TYPES).filter(([_, n]) => n.category === 'action').map(([key, n]) => (
                     <div 
@@ -925,7 +929,7 @@ export default function FlowsPage() {
               </div>
 
               <div>
-                <h4 className="text-xs font-black text-muted-foreground/70 uppercase tracking-wider mb-3">3. شروط تفريعية (Conditions)</h4>
+                <h4 className="text-xs font-black text-muted-foreground/70 uppercase tracking-wider mb-3">{t("flowsPage.conditionsHeader")}</h4>
                 <div className="flex flex-col gap-2">
                   {Object.entries(NODE_TYPES).filter(([_, n]) => n.category === 'condition').map(([key, n]) => (
                     <div 
@@ -942,7 +946,7 @@ export default function FlowsPage() {
               </div>
 
               <div className="mt-auto border-t border-border/40 pt-4 text-[10px] text-muted-foreground font-medium leading-relaxed">
-                💡 اسحب العنصر من القائمة وأسقطه في مساحة العمل لتنشيطه، ثم صل بين الدوائر لتحديد تدفق العمل.
+                {t("flowsPage.canvasHint")}
               </div>
             </aside>
 
@@ -1096,34 +1100,34 @@ export default function FlowsPage() {
                       {/* Node Content Preview */}
                       <div className="p-3 text-[11px] text-muted-foreground font-semibold space-y-1.5 text-right" style={{ direction: 'rtl' }}>
                         {node.type === 'TRIGGER_KEYWORD' && (
-                          <p className="truncate">الكلمات: <span className="text-foreground">{node.configuration.keywords || "لا يوجد"}</span></p>
+                          <p className="truncate">{t("flowsPage.keywordsPreviewLabel")} <span className="text-foreground">{node.configuration.keywords || t("flowsPage.noneFallback")}</span></p>
                         )}
                         {node.type === 'TRIGGER_COMMENT' && (
-                          <p className="truncate">المنشور: <span className="text-foreground">{node.configuration.postId || "عام لجميع المنشورات"}</span></p>
+                          <p className="truncate">{t("flowsPage.postPreviewLabel")} <span className="text-foreground">{node.configuration.postId || t("flowsPage.allPostsFallback")}</span></p>
                         )}
                         {node.type === 'ACTION_SEND_MESSAGE' && (
-                          <p className="line-clamp-2">الرسالة: <span className="text-foreground">{node.configuration.text || "فارغة"}</span></p>
+                          <p className="line-clamp-2">{t("flowsPage.messagePreviewLabel")} <span className="text-foreground">{node.configuration.text || t("flowsPage.emptyFallback")}</span></p>
                         )}
                         {node.type === 'ACTION_TAG_ADD' && (
-                          <p className="truncate">الوسم: <span className="text-foreground">{node.configuration.tag || "لم يحدد"}</span></p>
+                          <p className="truncate">{t("flowsPage.tagPreviewLabel")} <span className="text-foreground">{node.configuration.tag || t("flowsPage.notSetFallback")}</span></p>
                         )}
                         {node.type === 'ACTION_TAG_REMOVE' && (
-                          <p className="truncate">إزالة وسم: <span className="text-foreground">{node.configuration.tag || "لم يحدد"}</span></p>
+                          <p className="truncate">{t("flowsPage.removeTagPreviewLabel")} <span className="text-foreground">{node.configuration.tag || t("flowsPage.notSetFallback")}</span></p>
                         )}
                         {node.type === 'ACTION_WAIT_DELAY' && (
-                          <p className="truncate">انتظار: <span className="text-foreground">{node.configuration.delayAmount} {node.configuration.delayUnit === 'seconds' ? 'ثواني' : node.configuration.delayUnit === 'minutes' ? 'دقائق' : 'ساعات'}</span></p>
+                          <p className="truncate">{t("flowsPage.waitPreviewLabel")} <span className="text-foreground">{node.configuration.delayAmount} {node.configuration.delayUnit === 'seconds' ? t("flowsPage.unitSeconds") : node.configuration.delayUnit === 'minutes' ? t("flowsPage.unitMinutes") : t("flowsPage.unitHours")}</span></p>
                         )}
                         {node.type === 'CONDITION_TAG_CHECK' && (
-                          <p className="truncate">فحص وسم: <span className="text-foreground">{node.configuration.tag || "لم يحدد"}</span></p>
+                          <p className="truncate">{t("flowsPage.tagCheckPreviewLabel")} <span className="text-foreground">{node.configuration.tag || t("flowsPage.notSetFallback")}</span></p>
                         )}
                         {node.type === 'CONDITION_PLATFORM_CHECK' && (
-                          <p className="truncate">المنصة: <span className="text-foreground">{node.configuration.platform === 'FACEBOOK_PAGE' ? 'فيسبوك' : node.configuration.platform === 'INSTAGRAM' ? 'انستغرام' : 'واتساب'}</span></p>
+                          <p className="truncate">{t("flowsPage.platformPreviewLabel")} <span className="text-foreground">{node.configuration.platform === 'FACEBOOK_PAGE' ? t("flowsPage.platformFacebook") : node.configuration.platform === 'INSTAGRAM' ? t("flowsPage.platformInstagram") : t("flowsPage.platformWhatsapp")}</span></p>
                         )}
                         {node.type === 'CONDITION_TIME_CHECK' && (
-                          <p className="truncate">الفترة: <span className="text-foreground">{node.configuration.startTime} إلى {node.configuration.endTime}</span></p>
+                          <p className="truncate">{t("flowsPage.periodPreviewLabel")} <span className="text-foreground">{node.configuration.startTime} {t("flowsPage.toLabel")} {node.configuration.endTime}</span></p>
                         )}
                         {node.type === 'CONDITION_KEYWORD_CHECK' && (
-                          <p className="truncate">الكلمات: <span className="text-foreground">{node.configuration.keywords || "لا يوجد"}</span></p>
+                          <p className="truncate">{t("flowsPage.keywordsPreviewLabel")} <span className="text-foreground">{node.configuration.keywords || t("flowsPage.noneFallback")}</span></p>
                         )}
                       </div>
 
@@ -1132,7 +1136,7 @@ export default function FlowsPage() {
                         <div 
                           onClick={(e) => handleInputHandleClick(e, node.id)}
                           className="absolute -left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 rounded-full bg-[#0a0a0f] border-2 border-primary flex items-center justify-center cursor-pointer hover:bg-primary hover:scale-125 transition-all z-20"
-                          title="مدخل"
+                          title={t("flowsPage.inputHandleTooltip")}
                         >
                           <div className="w-1.5 h-1.5 rounded-full bg-primary-foreground" />
                         </div>
@@ -1150,7 +1154,7 @@ export default function FlowsPage() {
                             >
                               <div className="w-1.5 h-1.5 rounded-full bg-[#0a0a0f]" />
                             </div>
-                            <span className="absolute right-5 text-[9px] font-bold text-amber-500 pointer-events-none select-none bg-background/80 px-1 rounded border border-border/20">نعم</span>
+                            <span className="absolute right-5 text-[9px] font-bold text-amber-500 pointer-events-none select-none bg-background/80 px-1 rounded border border-border/20">{t("flowsPage.yesBranchLabel")}</span>
                           </div>
 
                           {/* NO Outlet */}
@@ -1161,7 +1165,7 @@ export default function FlowsPage() {
                             >
                               <div className="w-1.5 h-1.5 rounded-full bg-[#0a0a0f]" />
                             </div>
-                            <span className="absolute right-5 text-[9px] font-bold text-red-400 pointer-events-none select-none bg-background/80 px-1 rounded border border-border/20">لا</span>
+                            <span className="absolute right-5 text-[9px] font-bold text-red-400 pointer-events-none select-none bg-background/80 px-1 rounded border border-border/20">{t("flowsPage.noBranchLabel")}</span>
                           </div>
                         </div>
                       ) : (
@@ -1169,7 +1173,7 @@ export default function FlowsPage() {
                         <div 
                           onClick={(e) => handleOutputHandleClick(e, node.id, "next")}
                           className="absolute -right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 rounded-full bg-[#0a0a0f] border-2 border-primary flex items-center justify-center cursor-pointer hover:bg-primary hover:scale-125 transition-all z-20"
-                          title="مخرج"
+                          title={t("flowsPage.outputHandleTooltip")}
                         >
                           <div className="w-1.5 h-1.5 rounded-full bg-[#0a0a0f]" />
                         </div>
@@ -1215,11 +1219,11 @@ export default function FlowsPage() {
 
             {/* RIGHT CONFIGURATION PANEL */}
             {selectedNode && (
-              <aside className="w-80 border-r border-border/50 bg-[#0d1117] p-5 flex flex-col gap-6 overflow-y-auto shrink-0 z-10" dir="rtl">
+              <aside className="w-80 border-r border-border/50 bg-[#0d1117] p-5 flex flex-col gap-6 overflow-y-auto shrink-0 z-10" dir={dir}>
                 <div className="flex justify-between items-center border-b border-border/50 pb-3">
                   <h3 className="font-black text-base flex items-center gap-2">
                     <Settings className="w-4 h-4 text-primary" />
-                    إعدادات الخطوة
+                    {t("flowsPage.stepSettingsTitle")}
                   </h3>
                   <Button 
                     variant="ghost" 
@@ -1233,7 +1237,7 @@ export default function FlowsPage() {
 
                 {/* Node title */}
                 <div className="grid gap-2">
-                  <Label htmlFor="node-name" className="font-bold text-xs">اسم الخطوة</Label>
+                  <Label htmlFor="node-name" className="font-bold text-xs">{t("flowsPage.stepNameLabel")}</Label>
                   <Input 
                     id="node-name"
                     value={selectedNode.name}
@@ -1246,15 +1250,15 @@ export default function FlowsPage() {
                 {selectedNode.type === 'TRIGGER_KEYWORD' && (
                   <div className="grid gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="keywords" className="font-bold text-xs">الكلمات المفتاحية (مفصولة بفاصلة)</Label>
+                      <Label htmlFor="keywords" className="font-bold text-xs">{t("flowsPage.keywordsFieldLabel")}</Label>
                       <Input 
                         id="keywords"
                         value={selectedNode.configuration.keywords || ''}
                         onChange={(e) => handleUpdateConfig('keywords', e.target.value)}
-                        placeholder="مثال: سعر, كم, تفاصيل"
+                        placeholder={t("flowsPage.keywordsFieldPlaceholder")}
                         className="rounded-xl h-10 font-medium"
                       />
-                      <p className="text-[10px] text-muted-foreground font-semibold">سيتم بدء التدفق عندما تطابق رسالة المستخدم هذه الكلمات.</p>
+                      <p className="text-[10px] text-muted-foreground font-semibold">{t("flowsPage.keywordTriggerHint")}</p>
                     </div>
                   </div>
                 )}
@@ -1262,15 +1266,15 @@ export default function FlowsPage() {
                 {selectedNode.type === 'TRIGGER_COMMENT' && (
                   <div className="grid gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="postId" className="font-bold text-xs">معرف منشور محدد (إختياري)</Label>
+                      <Label htmlFor="postId" className="font-bold text-xs">{t("flowsPage.specificPostLabel")}</Label>
                       <Input 
                         id="postId"
                         value={selectedNode.configuration.postId || ''}
                         onChange={(e) => handleUpdateConfig('postId', e.target.value)}
-                        placeholder="مثال: 1234567890"
+                        placeholder={t("flowsPage.specificPostPlaceholder")}
                         className="rounded-xl h-10 font-medium"
                       />
-                      <p className="text-[10px] text-muted-foreground font-semibold">اتركه فارغاً ليعمل التدفق على جميع المنشورات تلقائياً.</p>
+                      <p className="text-[10px] text-muted-foreground font-semibold">{t("flowsPage.specificPostHint")}</p>
                     </div>
                   </div>
                 )}
@@ -1279,21 +1283,21 @@ export default function FlowsPage() {
                 {selectedNode.type === 'ACTION_SEND_MESSAGE' && (
                   <div className="grid gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="msg-text" className="font-bold text-xs">محتوى الرسالة</Label>
+                      <Label htmlFor="msg-text" className="font-bold text-xs">{t("flowsPage.messageContentLabel")}</Label>
                       <Textarea 
                         id="msg-text"
                         value={selectedNode.configuration.text || ''}
                         onChange={(e) => handleUpdateConfig('text', e.target.value)}
-                        placeholder="اكتب رسالتك هنا..."
+                        placeholder={t("flowsPage.messageContentPlaceholder")}
                         className="rounded-xl min-h-[120px] font-medium"
                       />
                       <p className="text-[10px] text-muted-foreground font-semibold leading-relaxed">
-                        💡 يدعم spin-tax لتنويع الردود عبر الفاصل <code>|||</code> ليتجنب النظام الحظر التلقائي (مثال: أهلاً بك ||| مرحباً بك يا غالي).
+                        {t("flowsPage.spinTaxHint").split("|||").map((part, i, arr) => i < arr.length - 1 ? <span key={i}>{part}<code>|||</code></span> : <span key={i}>{part}</span>)}
                       </p>
                     </div>
 
                     <div className="grid gap-2">
-                      <Label htmlFor="media-url" className="font-bold text-xs">رابط الوسائط المرفقة (اختياري)</Label>
+                      <Label htmlFor="media-url" className="font-bold text-xs">{t("flowsPage.mediaUrlOptionalLabel")}</Label>
                       <Input 
                         id="media-url"
                         value={selectedNode.configuration.mediaUrl || ''}
@@ -1308,12 +1312,12 @@ export default function FlowsPage() {
                 {(selectedNode.type === 'ACTION_TAG_ADD' || selectedNode.type === 'ACTION_TAG_REMOVE') && (
                   <div className="grid gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="tag-name" className="font-bold text-xs">اسم الوسم (Tag)</Label>
+                      <Label htmlFor="tag-name" className="font-bold text-xs">{t("flowsPage.tagNameLabel")}</Label>
                       <Input 
                         id="tag-name"
                         value={selectedNode.configuration.tag || ''}
                         onChange={(e) => handleUpdateConfig('tag', e.target.value)}
-                        placeholder="مثال: مهتم_بالشراء"
+                        placeholder={t("flowsPage.tagNamePlaceholder")}
                         className="rounded-xl h-10 font-medium"
                       />
                     </div>
@@ -1323,12 +1327,12 @@ export default function FlowsPage() {
                 {selectedNode.type === 'ACTION_NOTIFY_TEAM' && (
                   <div className="grid gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="notify-msg" className="font-bold text-xs">نص الإشعار للفريق</Label>
+                      <Label htmlFor="notify-msg" className="font-bold text-xs">{t("flowsPage.notifyMessageLabel")}</Label>
                       <Input 
                         id="notify-msg"
                         value={selectedNode.configuration.message || ''}
                         onChange={(e) => handleUpdateConfig('message', e.target.value)}
-                        placeholder="هناك عميل ينتظر المساعدة!"
+                        placeholder={t("flowsPage.notifyMessagePlaceholder")}
                         className="rounded-xl h-10 font-medium"
                       />
                     </div>
@@ -1338,7 +1342,7 @@ export default function FlowsPage() {
                 {selectedNode.type === 'ACTION_WAIT_DELAY' && (
                   <div className="grid gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="delay-amt" className="font-bold text-xs">مدة الانتظار</Label>
+                      <Label htmlFor="delay-amt" className="font-bold text-xs">{t("flowsPage.waitDurationLabel")}</Label>
                       <Input 
                         id="delay-amt"
                         type="number"
@@ -1349,19 +1353,20 @@ export default function FlowsPage() {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="delay-unit" className="font-bold text-xs">الوحدة الزمنية</Label>
+                      <Label htmlFor="delay-unit" className="font-bold text-xs">{t("flowsPage.timeUnitLabel")}</Label>
                       <Select 
                         value={selectedNode.configuration.delayUnit || 'minutes'}
                         onValueChange={(val) => handleUpdateConfig('delayUnit', val)}
+                        items={{ seconds: t("flowsPage.unitSeconds"), minutes: t("flowsPage.unitMinutes"), hours: t("flowsPage.unitHours"), days: t("flowsPage.unitDays") }}
                       >
                         <SelectTrigger id="delay-unit" className="rounded-xl h-10 font-medium">
-                          <SelectValue placeholder="اختر الوحدة" />
+                          <SelectValue placeholder={t("flowsPage.selectUnitPlaceholder")} />
                         </SelectTrigger>
-                        <SelectContent className="rounded-xl font-bold" dir="rtl">
-                          <SelectItem value="seconds">ثواني</SelectItem>
-                          <SelectItem value="minutes">دقائق</SelectItem>
-                          <SelectItem value="hours">ساعات</SelectItem>
-                          <SelectItem value="days">أيام</SelectItem>
+                        <SelectContent className="rounded-xl font-bold" dir={dir}>
+                          <SelectItem value="seconds">{t("flowsPage.unitSeconds")}</SelectItem>
+                          <SelectItem value="minutes">{t("flowsPage.unitMinutes")}</SelectItem>
+                          <SelectItem value="hours">{t("flowsPage.unitHours")}</SelectItem>
+                          <SelectItem value="days">{t("flowsPage.unitDays")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1372,15 +1377,15 @@ export default function FlowsPage() {
                 {selectedNode.type === 'CONDITION_TAG_CHECK' && (
                   <div className="grid gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="cond-tag" className="font-bold text-xs">الوسم المراد فحصه</Label>
+                      <Label htmlFor="cond-tag" className="font-bold text-xs">{t("flowsPage.tagToCheckLabel")}</Label>
                       <Input 
                         id="cond-tag"
                         value={selectedNode.configuration.tag || ''}
                         onChange={(e) => handleUpdateConfig('tag', e.target.value)}
-                        placeholder="مثال: مهتم_بالشراء"
+                        placeholder={t("flowsPage.tagNamePlaceholder")}
                         className="rounded-xl h-10 font-medium"
                       />
-                      <p className="text-[10px] text-muted-foreground font-semibold">إذا كان لدى العميل هذا الوسم، سيسلك مخرج "نعم"، وإلا مخرج "لا".</p>
+                      <p className="text-[10px] text-muted-foreground font-semibold">{t("flowsPage.tagCheckHint")}</p>
                     </div>
                   </div>
                 )}
@@ -1388,18 +1393,19 @@ export default function FlowsPage() {
                 {selectedNode.type === 'CONDITION_PLATFORM_CHECK' && (
                   <div className="grid gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="cond-platform" className="font-bold text-xs">المنصة المراد التحقق منها</Label>
+                      <Label htmlFor="cond-platform" className="font-bold text-xs">{t("flowsPage.platformToCheckLabel")}</Label>
                       <Select 
                         value={selectedNode.configuration.platform || 'FACEBOOK_PAGE'}
                         onValueChange={(val) => handleUpdateConfig('platform', val)}
+                        items={{ FACEBOOK_PAGE: t("flowsPage.platformFacebook"), INSTAGRAM: t("flowsPage.platformInstagram"), WHATSAPP: t("flowsPage.platformWhatsapp") }}
                       >
                         <SelectTrigger id="cond-platform" className="rounded-xl h-10 font-medium">
-                          <SelectValue placeholder="اختر المنصة" />
+                          <SelectValue placeholder={t("flowsPage.selectPlatformPlaceholder")} />
                         </SelectTrigger>
-                        <SelectContent className="rounded-xl font-bold" dir="rtl">
-                          <SelectItem value="FACEBOOK_PAGE">فيسبوك</SelectItem>
-                          <SelectItem value="INSTAGRAM">انستغرام</SelectItem>
-                          <SelectItem value="WHATSAPP">واتساب</SelectItem>
+                        <SelectContent className="rounded-xl font-bold" dir={dir}>
+                          <SelectItem value="FACEBOOK_PAGE">{t("flowsPage.platformFacebook")}</SelectItem>
+                          <SelectItem value="INSTAGRAM">{t("flowsPage.platformInstagram")}</SelectItem>
+                          <SelectItem value="WHATSAPP">{t("flowsPage.platformWhatsapp")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1409,7 +1415,7 @@ export default function FlowsPage() {
                 {selectedNode.type === 'CONDITION_TIME_CHECK' && (
                   <div className="grid gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="start-time" className="font-bold text-xs">وقت البدء</Label>
+                      <Label htmlFor="start-time" className="font-bold text-xs">{t("flowsPage.startTimeLabel")}</Label>
                       <Input 
                         id="start-time"
                         type="time"
@@ -1419,7 +1425,7 @@ export default function FlowsPage() {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="end-time" className="font-bold text-xs">وقت الانتهاء</Label>
+                      <Label htmlFor="end-time" className="font-bold text-xs">{t("flowsPage.endTimeLabel")}</Label>
                       <Input 
                         id="end-time"
                         type="time"
@@ -1427,7 +1433,7 @@ export default function FlowsPage() {
                         onChange={(e) => handleUpdateConfig('endTime', e.target.value)}
                         className="rounded-xl h-10 font-medium"
                       />
-                      <p className="text-[10px] text-muted-foreground font-semibold">إذا تم استقبال الرسالة في هذه الفترة يسلك "نعم"، وإلا "لا".</p>
+                      <p className="text-[10px] text-muted-foreground font-semibold">{t("flowsPage.timeCheckHint")}</p>
                     </div>
                   </div>
                 )}
@@ -1435,12 +1441,12 @@ export default function FlowsPage() {
                 {selectedNode.type === 'CONDITION_KEYWORD_CHECK' && (
                   <div className="grid gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="cond-keywords" className="font-bold text-xs">التحقق من الكلمات (مفصولة بفاصلة)</Label>
+                      <Label htmlFor="cond-keywords" className="font-bold text-xs">{t("flowsPage.keywordCheckLabel")}</Label>
                       <Input 
                         id="cond-keywords"
                         value={selectedNode.configuration.keywords || ''}
                         onChange={(e) => handleUpdateConfig('keywords', e.target.value)}
-                        placeholder="سعر, خصم, تفاصيل"
+                        placeholder={t("flowsPage.keywordCheckPlaceholder")}
                         className="rounded-xl h-10 font-medium"
                       />
                     </div>

@@ -18,6 +18,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useToast } from "@/components/ui/toast"
 import api from "@/lib/api"
 import dynamic from "next/dynamic"
+import { useLanguage } from "@/lib/i18n/language-context"
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false })
 
@@ -42,25 +43,17 @@ const getQuickReplyText = (content: string) => {
   return content.trim().slice(10, -1)
 }
 
-const ARABIC_MONTHS = [
-  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
-]
-
-function getDateLabel(dateStr: string): string {
+function getDateLabel(dateStr: string, t: (path: string, vars?: Record<string, string | number>) => string, localeCode: string): string {
   const d = new Date(dateStr)
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate())
   const diffMs = today.getTime() - msgDay.getTime()
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
-  if (diffDays === 0) return "اليوم"
-  if (diffDays === 1) return "الأمس"
-  if (diffDays < 7) {
-    const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
-    return dayNames[d.getDay()]
-  }
-  return `${d.getDate()} ${ARABIC_MONTHS[d.getMonth()]} ${d.getFullYear()}`
+  if (diffDays === 0) return t("inboxPage.todayLabel")
+  if (diffDays === 1) return t("inboxPage.yesterdayLabel")
+  if (diffDays < 7) return d.toLocaleDateString(localeCode, { weekday: "long" })
+  return d.toLocaleDateString(localeCode, { day: "numeric", month: "long", year: "numeric" })
 }
 
 function isSameDay(d1: string, d2: string): boolean {
@@ -76,13 +69,14 @@ function isSameDay(d1: string, d2: string): boolean {
 // ─── Typing Indicator Component ─────────────────────────────────────────────
 
 function TypingIndicator() {
+  const { t, dir } = useLanguage()
   return (
-    <div className="flex items-center gap-2 px-4 py-2 animate-fade-in" dir="rtl">
+    <div className="flex items-center gap-2 px-4 py-2 animate-fade-in" dir={dir}>
       <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0 border border-primary/10">
         <span className="text-primary font-bold text-[10px]">...</span>
       </div>
       <div className="bg-[#181824] border border-border/50 rounded-2xl rounded-br-none px-4 py-3 flex items-center gap-1">
-        <span className="text-xs text-muted-foreground ml-2">جاري الكتابة</span>
+        <span className="text-xs text-muted-foreground ml-2">{t("inboxPage.typingIndicator")}</span>
         <span className="flex items-center gap-0.5">
           <span className="w-1.5 h-1.5 rounded-full bg-[#4d9fff] animate-bounce" style={{ animationDelay: "0ms" }} />
           <span className="w-1.5 h-1.5 rounded-full bg-[#4d9fff] animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -113,6 +107,8 @@ function DateSeparator({ label }: { label: string }) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 export default function InboxPage() {
+  const { t, locale, dir } = useLanguage()
+  const localeCode = locale === "ar" ? "ar-EG" : "en-US"
   const [conversations, setConversations] = useState<any[]>([])
   const [activeChat, setActiveChat] = useState<any>(null)
   const [messages, setMessages] = useState<any[]>([])
@@ -137,10 +133,10 @@ export default function InboxPage() {
 
   // ─── New state: customer profile sheet ────────────────────────────────
   const [profileSheetOpen, setProfileSheetOpen] = useState(false)
-  const [customerTags, setCustomerTags] = useState<string[]>(["عميل VIP"])
+  const [customerTags, setCustomerTags] = useState<string[]>([t("inboxPage.defaultVipTag")])
   const [newTag, setNewTag] = useState("")
   const [customerNotes, setCustomerNotes] = useState<{ text: string; date: string }[]>([
-    { text: "العميل يفضل التواصل عبر واتساب", date: new Date().toISOString() }
+    { text: t("inboxPage.defaultCustomerNote"), date: new Date().toISOString() }
   ])
   const [newNote, setNewNote] = useState("")
 
@@ -204,10 +200,10 @@ export default function InboxPage() {
         }
         return c
       }))
-      showToast("تم تحديث حالة المحادثة بنجاح", "success")
+      showToast(t("inboxPage.statusUpdatedSuccess"), "success")
     } catch (err) {
       console.error(err)
-      showToast("فشل تحديث حالة المحادثة", "error")
+      showToast(t("inboxPage.statusUpdateFailed"), "error")
     }
   }
 
@@ -226,10 +222,10 @@ export default function InboxPage() {
         }
         return c
       }))
-      showToast("تم تعيين المحادثة بنجاح", "success")
+      showToast(t("inboxPage.assignSuccess"), "success")
     } catch (err) {
       console.error(err)
-      showToast("فشل تعيين المحادثة", "error")
+      showToast(t("inboxPage.assignFailed"), "error")
     }
   }
 
@@ -239,7 +235,7 @@ export default function InboxPage() {
       setConversations(res.data)
     } catch (err) {
       console.error(err)
-      setErrorMsg("حدث خطأ أثناء تحميل المحادثات. الرجاء المحاولة مرة أخرى.")
+      setErrorMsg(t("inboxPage.loadConversationsFailed"))
     } finally {
       setIsLoadingConvs(false)
     }
@@ -307,18 +303,18 @@ export default function InboxPage() {
       }))
     } catch (err: any) {
       console.error(err)
-      showToast(err.response?.data?.message || "فشل إرسال الرسالة", "error")
+      showToast(err.response?.data?.message || t("inboxPage.sendMessageFailed"), "error")
     }
   }
 
   const getPlatformDetails = (platform: string) => {
     switch (platform) {
       case 'WHATSAPP':
-        return { name: "واتساب", icon: MessageCircle, color: "text-[#25D366]", bg: "bg-[#25D366]/10" }
+        return { name: t("inboxPage.platformWhatsapp"), icon: MessageCircle, color: "text-[#25D366]", bg: "bg-[#25D366]/10" }
       case 'FACEBOOK_PAGE':
-        return { name: "فيسبوك", icon: Globe, color: "text-[#1877F2]", bg: "bg-[#1877F2]/10" }
+        return { name: t("inboxPage.platformFacebook"), icon: Globe, color: "text-[#1877F2]", bg: "bg-[#1877F2]/10" }
       case 'INSTAGRAM':
-        return { name: "انستغرام", icon: Camera, color: "text-[#E1306C]", bg: "bg-[#E1306C]/10" }
+        return { name: t("inboxPage.platformInstagram"), icon: Camera, color: "text-[#E1306C]", bg: "bg-[#E1306C]/10" }
       default:
         return { name: platform, icon: User, color: "text-primary", bg: "bg-primary/10" }
     }
@@ -327,11 +323,11 @@ export default function InboxPage() {
   const formatTime = (dateStr: string) => {
     const diff = Date.now() - new Date(dateStr).getTime()
     const minutes = Math.floor(diff / 60000)
-    if (minutes < 1) return 'الآن'
-    if (minutes < 60) return `${minutes} د`
+    if (minutes < 1) return t("inboxPage.justNow")
+    if (minutes < 60) return t("inboxPage.minutesShort", { minutes })
     const hours = Math.floor(minutes / 60)
-    if (hours < 24) return `${hours} س`
-    return new Date(dateStr).toLocaleDateString('ar-EG')
+    if (hours < 24) return t("inboxPage.hoursShort", { hours })
+    return new Date(dateStr).toLocaleDateString(localeCode)
   }
 
   // ─── Advanced filtering ───────────────────────────────────────────────
@@ -359,7 +355,7 @@ export default function InboxPage() {
     if (!newNote.trim()) return
     setCustomerNotes(prev => [{ text: newNote.trim(), date: new Date().toISOString() }, ...prev])
     setNewNote("")
-    showToast("تم حفظ الملاحظة بنجاح", "success")
+    showToast(t("inboxPage.noteSavedSuccess"), "success")
   }
 
   const handleAddTag = () => {
@@ -403,7 +399,7 @@ export default function InboxPage() {
       }`}>
         <div className="p-4 border-b border-border/50">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xl font-black">صندوق الوارد</h2>
+            <h2 className="text-xl font-black">{t("inboxPage.title")}</h2>
             <div className="flex items-center gap-1">
               {/* Advanced Filter Dropdown */}
               <DropdownMenu>
@@ -417,14 +413,14 @@ export default function InboxPage() {
                     </span>
                   )}
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" side="bottom" sideOffset={8} className="w-64 p-3" dir="rtl">
-                  <DropdownMenuLabel className="text-xs font-black text-muted-foreground mb-1">تصفية حسب الحالة</DropdownMenuLabel>
+                <DropdownMenuContent align="end" side="bottom" sideOffset={8} className="w-64 p-3" dir={dir}>
+                  <DropdownMenuLabel className="text-xs font-black text-muted-foreground mb-1">{t("inboxPage.filterByStatus")}</DropdownMenuLabel>
                   <div className="flex flex-wrap gap-1.5 mb-3 px-1">
                     {[
-                      { label: "الكل", value: "ALL" },
-                      { label: "مفتوحة", value: "OPEN" },
-                      { label: "محلولة", value: "RESOLVED" },
-                      { label: "مؤجلة", value: "SNOOZED" }
+                      { label: t("inboxPage.statusAll"), value: "ALL" },
+                      { label: t("inboxPage.statusOpen"), value: "OPEN" },
+                      { label: t("inboxPage.statusResolved"), value: "RESOLVED" },
+                      { label: t("inboxPage.statusSnoozed"), value: "SNOOZED" }
                     ].map(st => (
                       <button
                         key={st.value}
@@ -441,13 +437,13 @@ export default function InboxPage() {
                   </div>
 
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs font-black text-muted-foreground mb-1 mt-1">تصفية حسب المنصة</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs font-black text-muted-foreground mb-1 mt-1">{t("inboxPage.filterByPlatform")}</DropdownMenuLabel>
                   <div className="flex flex-wrap gap-1.5 mb-3 px-1">
                     {[
-                      { label: "الكل", value: "ALL" },
-                      { label: "فيسبوك", value: "FACEBOOK_PAGE" },
-                      { label: "واتساب", value: "WHATSAPP" },
-                      { label: "انستغرام", value: "INSTAGRAM" }
+                      { label: t("inboxPage.statusAll"), value: "ALL" },
+                      { label: t("inboxPage.platformFacebook"), value: "FACEBOOK_PAGE" },
+                      { label: t("inboxPage.platformWhatsapp"), value: "WHATSAPP" },
+                      { label: t("inboxPage.platformInstagram"), value: "INSTAGRAM" }
                     ].map(pl => (
                       <button
                         key={pl.value}
@@ -464,12 +460,12 @@ export default function InboxPage() {
                   </div>
 
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs font-black text-muted-foreground mb-1 mt-1">تصفية حسب التعيين</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs font-black text-muted-foreground mb-1 mt-1">{t("inboxPage.filterByAssignment")}</DropdownMenuLabel>
                   <div className="flex flex-wrap gap-1.5 mb-3 px-1">
                     {[
-                      { label: "الكل", value: "ALL" },
-                      { label: "معين", value: "ASSIGNED" },
-                      { label: "غير معين", value: "UNASSIGNED" }
+                      { label: t("inboxPage.statusAll"), value: "ALL" },
+                      { label: t("inboxPage.assigned"), value: "ASSIGNED" },
+                      { label: t("inboxPage.unassigned"), value: "UNASSIGNED" }
                     ].map(a => (
                       <button
                         key={a.value}
@@ -492,7 +488,7 @@ export default function InboxPage() {
                         onClick={() => { setFilterStatus("ALL"); setFilterPlatform("ALL"); setFilterAssignment("ALL") }}
                         className="w-full text-center text-[11px] font-bold text-red-400 hover:text-red-300 py-1.5 transition-colors"
                       >
-                        مسح جميع الفلاتر
+                        {t("inboxPage.clearAllFilters")}
                       </button>
                     </>
                   )}
@@ -504,7 +500,7 @@ export default function InboxPage() {
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder="بحث في المحادثات..."
+              placeholder={t("inboxPage.searchConversationsPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full h-10 pl-4 pr-10 rounded-xl bg-muted/50 border border-border/50 focus:ring-2 focus:ring-primary/30 focus:border-primary/50 text-sm outline-none transition-all"
@@ -515,7 +511,7 @@ export default function InboxPage() {
         <div className="flex-1 overflow-y-auto">
           {isLoadingConvs ? (
             <div className="text-center py-8 text-muted-foreground text-sm font-medium">
-              جاري تحميل المحادثات...
+              {t("inboxPage.loadingConversations")}
             </div>
           ) : errorMsg ? (
             <div className="text-center py-8 text-destructive text-sm font-medium px-4">
@@ -523,7 +519,7 @@ export default function InboxPage() {
             </div>
           ) : filteredConversations.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground text-sm font-medium">
-              لا توجد محادثات مطابقة
+              {t("inboxPage.noMatchingConversations")}
             </div>
           ) : (
             filteredConversations.map((chat) => {
@@ -545,7 +541,7 @@ export default function InboxPage() {
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
                       isActive ? 'bg-gradient-to-br from-primary/30 to-primary/10 border-2 border-primary/30' : 'bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/10'
                     }`}>
-                      <span className="text-primary font-bold text-sm">{(chat.customerName || "م").substring(0, 2)}</span>
+                      <span className="text-primary font-bold text-sm">{(chat.customerName || t("inboxPage.unknownInitial")).substring(0, 2)}</span>
                     </div>
                     <div className={`absolute -bottom-0.5 -left-0.5 ${pl.bg} rounded-full p-0.5 border-2 border-card`}>
                       <pl.icon className={`w-3 h-3 ${pl.color}`} />
@@ -558,7 +554,7 @@ export default function InboxPage() {
                     </div>
                     <div className="flex items-center justify-between mt-1">
                       <p className="text-xs truncate text-muted-foreground">
-                        {chat.messages?.[0]?.content || "اضغط لعرض تفاصيل المحادثة"}
+                        {chat.messages?.[0]?.content || t("inboxPage.clickToViewConversation")}
                       </p>
                       {hasUnread && (
                         <span className="bg-[#4d9fff] text-[#0a0a0f] text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center shadow-sm shadow-[#4d9fff]/30">
@@ -598,7 +594,7 @@ export default function InboxPage() {
                   onClick={() => setProfileSheetOpen(true)}
                   className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/25 to-primary/10 flex items-center justify-center border border-primary/15 hover:border-[#4d9fff]/40 transition-all hover:shadow-md hover:shadow-[#4d9fff]/20 cursor-pointer"
                 >
-                  <span className="text-primary font-black text-sm">{(activeChat.customerName || "م").substring(0, 2)}</span>
+                  <span className="text-primary font-black text-sm">{(activeChat.customerName || t("inboxPage.unknownInitial")).substring(0, 2)}</span>
                 </button>
                 <div>
                   <h3 className="font-black text-sm">{activeChat.customerName}</h3>
@@ -608,7 +604,7 @@ export default function InboxPage() {
                       return (
                         <>
                           <pl.icon className={`w-3 h-3 ${pl.color}`} />
-                          <span>رسالة {pl.name}</span>
+                          <span>{t("inboxPage.messageFromPlatform", { platform: pl.name })}</span>
                         </>
                       )
                     })()}
@@ -619,9 +615,9 @@ export default function InboxPage() {
                 {/* Status Toggles */}
                 <div className="flex items-center bg-muted/40 p-1 rounded-xl border border-border/30 text-xs">
                   {[
-                    { label: "مفتوحة", value: "OPEN" },
-                    { label: "محلولة", value: "RESOLVED" },
-                    { label: "مؤجلة", value: "SNOOZED" }
+                    { label: t("inboxPage.statusOpen"), value: "OPEN" },
+                    { label: t("inboxPage.statusResolved"), value: "RESOLVED" },
+                    { label: t("inboxPage.statusSnoozed"), value: "SNOOZED" }
                   ].map((st) => (
                     <button
                       key={st.value}
@@ -639,16 +635,17 @@ export default function InboxPage() {
 
                 {/* Assignee Dropdown */}
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-muted-foreground">المسؤول:</span>
+                  <span className="text-muted-foreground">{t("inboxPage.assigneeLabel")}</span>
                   <Select
                     value={activeChat.assignedToId || "__none__"}
                     onValueChange={(val) => handleAssignConversation(val === "__none__" ? null : val)}
+                    items={{ __none__: t("inboxPage.unassigned"), ...Object.fromEntries(teamMembers.map((member) => [member.user.id, member.user.name || member.user.email])) }}
                   >
                     <SelectTrigger className="w-[160px] rounded-xl h-8 text-xs font-bold bg-muted/30 border-border/50">
-                      <SelectValue placeholder="غير معين" />
+                      <SelectValue placeholder={t("inboxPage.unassigned")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__none__">غير معين</SelectItem>
+                      <SelectItem value="__none__">{t("inboxPage.unassigned")}</SelectItem>
                       {teamMembers.map((member) => (
                         <SelectItem key={member.user.id} value={member.user.id}>
                           {member.user.name || member.user.email}
@@ -660,13 +657,13 @@ export default function InboxPage() {
 
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => showToast("جاري الاتصال الصوتي بالعميل... (محاكاة)", "info")}
+                    onClick={() => showToast(t("inboxPage.voiceCallSimulated"), "info")}
                     className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-all"
                   >
                     <Phone className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => showToast("جاري بدء اتصال الفيديو... (محاكاة)", "info")}
+                    onClick={() => showToast(t("inboxPage.videoCallSimulated"), "info")}
                     className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-xl transition-all"
                   >
                     <Video className="w-4 h-4" />
@@ -686,11 +683,11 @@ export default function InboxPage() {
             >
               {isLoadingMsgs ? (
                 <div className="text-center py-8 text-muted-foreground text-sm font-medium">
-                  جاري تحميل الرسائل...
+                  {t("inboxPage.loadingMessages")}
                 </div>
               ) : messages.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground text-sm font-medium">
-                  لا توجد رسائل في هذه المحادثة
+                  {t("inboxPage.noMessagesInConversation")}
                 </div>
               ) : (
                 messages.map((msg, index) => {
@@ -698,7 +695,7 @@ export default function InboxPage() {
                   const showDateSep = index === 0 || !isSameDay(messages[index - 1].createdAt, msg.createdAt)
                   return (
                     <div key={msg.id || index}>
-                      {showDateSep && <DateSeparator label={getDateLabel(msg.createdAt)} />}
+                      {showDateSep && <DateSeparator label={getDateLabel(msg.createdAt, t, localeCode)} />}
                       <div
                         className={`flex w-full ${isOutbound ? 'justify-start' : 'justify-end'} animate-fade-in-up`}
                       >
@@ -707,7 +704,7 @@ export default function InboxPage() {
                         >
                           {!isOutbound ? (
                             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0 border border-primary/10">
-                              <span className="text-primary font-bold text-[10px]">{(activeChat.customerName || "م").substring(0, 2)}</span>
+                              <span className="text-primary font-bold text-[10px]">{(activeChat.customerName || t("inboxPage.unknownInitial")).substring(0, 2)}</span>
                             </div>
                           ) : (
                             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#4d9fff] to-primary flex items-center justify-center shrink-0 shadow-md shadow-primary/30">
@@ -727,12 +724,12 @@ export default function InboxPage() {
                             )}
                             {isImage(msg.content) ? (
                               <div className="space-y-1.5">
-                                <img src={msg.content} alt="صورة مرسلة" className="max-w-[240px] max-h-[180px] object-cover rounded-xl border border-border/30 hover:scale-105 transition-transform duration-200" />
+                                <img src={msg.content} alt={t("inboxPage.sentImageAlt")} className="max-w-[240px] max-h-[180px] object-cover rounded-xl border border-border/30 hover:scale-105 transition-transform duration-200" />
                                 <p className="text-xs text-muted-foreground truncate">{msg.content}</p>
                               </div>
                             ) : isQuickReply(msg.content) ? (
                               <div className="flex flex-col gap-2">
-                                <p className="text-xs text-muted-foreground mb-1">الرد السريع المقترح:</p>
+                                <p className="text-xs text-muted-foreground mb-1">{t("inboxPage.suggestedQuickReply")}</p>
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -748,7 +745,7 @@ export default function InboxPage() {
                             )}
                             <div className="flex items-center justify-between gap-4 mt-2">
                               <span className="text-[9px] text-muted-foreground">
-                                {new Date(msg.createdAt).toLocaleTimeString('ar-EG', { hour: 'numeric', minute: '2-digit' })}
+                                {new Date(msg.createdAt).toLocaleTimeString(localeCode, { hour: 'numeric', minute: '2-digit' })}
                               </span>
                               {isOutbound && <CheckCheck className="w-3 h-3 text-[#4d9fff]/70" />}
                             </div>
@@ -799,38 +796,38 @@ export default function InboxPage() {
                   <Paperclip className="w-5 h-5" />
                 </button>
                 {showAttachmentMenu && (
-                  <div className="absolute bottom-14 right-0 bg-[#0c0c14] border border-border/50 rounded-xl p-2.5 shadow-xl flex flex-col gap-1 z-50 w-52 text-right text-xs" dir="rtl">
+                  <div className="absolute bottom-14 right-0 bg-[#0c0c14] border border-border/50 rounded-xl p-2.5 shadow-xl flex flex-col gap-1 z-50 w-52 text-right text-xs" dir={dir}>
                     <button
                       type="button"
                       onClick={() => {
                         setNewMessage("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500")
                         setShowAttachmentMenu(false)
-                        showToast("تم إدراج رابط صورة تجريبية في حقل الإدخال", "success")
+                        showToast(t("inboxPage.insertedTestImageToast"), "success")
                       }}
                       className="px-3 py-2 hover:bg-muted/50 rounded-lg transition-all text-right font-medium text-white"
                     >
-                      🖼️ إدراج رابط صورة تجريبية
+                      {t("inboxPage.insertTestImageLink")}
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         setNewMessage("[رد سريع: نعم، بكل سرور!]")
                         setShowAttachmentMenu(false)
-                        showToast("تم إدراج قالب رد سريع تجريبي", "success")
+                        showToast(t("inboxPage.insertedTestQuickReplyToast"), "success")
                       }}
                       className="px-3 py-2 hover:bg-muted/50 rounded-lg transition-all text-right font-medium text-white"
                     >
-                      💬 إدراج رد سريع تجريبي
+                      {t("inboxPage.insertTestQuickReply")}
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         setShowAttachmentMenu(false)
-                        showToast("تم إرفاق ملف تجريبي بنجاح", "success")
+                        showToast(t("inboxPage.attachedTestFileToast"), "success")
                       }}
                       className="px-3 py-2 hover:bg-muted/50 rounded-lg transition-all text-right font-medium text-white"
                     >
-                      📎 إرفاق ملف عشوائي
+                      {t("inboxPage.attachRandomFile")}
                     </button>
                   </div>
                 )}
@@ -842,19 +839,19 @@ export default function InboxPage() {
                   type="button"
                   onClick={() => { setShowCannedResponses(!showCannedResponses); setShowEmojiPicker(false); setShowAttachmentMenu(false); setCannedSearch(""); }}
                   className={`text-muted-foreground hover:text-[#4d9fff] transition-colors p-2 hover:bg-primary/10 rounded-xl ${showCannedResponses ? 'text-[#4d9fff] bg-[#4d9fff]/10' : ''}`}
-                  title="الردود الجاهزة"
+                  title={t("inboxPage.cannedResponsesTooltip")}
                 >
                   <Zap className="w-5 h-5" />
                 </button>
                 {showCannedResponses && (
-                  <div className="absolute bottom-14 right-0 bg-[#0c0c14] border border-border/50 rounded-xl shadow-xl flex flex-col z-50 w-72 text-right text-xs overflow-hidden" dir="rtl">
+                  <div className="absolute bottom-14 right-0 bg-[#0c0c14] border border-border/50 rounded-xl shadow-xl flex flex-col z-50 w-72 text-right text-xs overflow-hidden" dir={dir}>
                     <div className="p-3 border-b border-border/30">
-                      <p className="font-black text-muted-foreground text-right mb-2">الردود السريعة</p>
+                      <p className="font-black text-muted-foreground text-right mb-2">{t("inboxPage.quickRepliesTitle")}</p>
                       <div className="relative">
                         <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                         <input
                           type="text"
-                          placeholder="بحث في الردود..."
+                          placeholder={t("inboxPage.searchCannedPlaceholder")}
                           value={cannedSearch}
                           onChange={e => setCannedSearch(e.target.value)}
                           className="w-full h-8 pl-3 pr-8 rounded-lg bg-muted/50 border border-border/50 text-[11px] outline-none focus:ring-1 focus:ring-[#4d9fff]/30 transition-all"
@@ -863,7 +860,7 @@ export default function InboxPage() {
                     </div>
                     <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5">
                       {filteredCanned.length === 0 ? (
-                        <p className="text-center text-muted-foreground py-3 text-[11px]">لا توجد نتائج</p>
+                        <p className="text-center text-muted-foreground py-3 text-[11px]">{t("inboxPage.noResults")}</p>
                       ) : (
                         filteredCanned.map((response: any) => (
                           <button
@@ -888,7 +885,7 @@ export default function InboxPage() {
 
               <input
                 type="text"
-                placeholder="اكتب رسالة..."
+                placeholder={t("inboxPage.messageInputPlaceholder")}
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 className="flex-1 bg-muted/50 h-11 px-5 rounded-2xl border border-border/50 focus:ring-2 focus:ring-primary/30 focus:border-primary/50 outline-none text-sm transition-all"
@@ -901,7 +898,7 @@ export default function InboxPage() {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm font-medium p-8">
             <MessageCircle className="w-12 h-12 text-muted-foreground/30 mb-2" />
-            الرجاء اختيار محادثة من القائمة الجانبية للبدء
+            {t("inboxPage.selectConversationPrompt")}
           </div>
         )}
       </Card>
@@ -911,17 +908,17 @@ export default function InboxPage() {
           ══════════════════════════════════════════════════════════════════ */}
       {activeChat && (
         <Sheet open={profileSheetOpen} onOpenChange={setProfileSheetOpen}>
-          <SheetContent side="left" className="w-[380px] sm:max-w-[380px] bg-[#0d1117] border-l border-border/30 p-0 overflow-y-auto" dir="rtl">
+          <SheetContent side="left" className="w-[380px] sm:max-w-[380px] bg-[#0d1117] border-l border-border/30 p-0 overflow-y-auto" dir={dir}>
             <SheetHeader className="p-5 pb-0">
-              <SheetTitle className="text-right text-base font-black text-white">ملف العميل</SheetTitle>
-              <SheetDescription className="text-right text-xs text-muted-foreground">معلومات وملاحظات العميل</SheetDescription>
+              <SheetTitle className="text-right text-base font-black text-white">{t("inboxPage.customerProfileTitle")}</SheetTitle>
+              <SheetDescription className="text-right text-xs text-muted-foreground">{t("inboxPage.customerProfileSubtitle")}</SheetDescription>
             </SheetHeader>
 
             <div className="p-5 space-y-6">
               {/* ─── Avatar & Name ─────────────────────────────────── */}
               <div className="flex flex-col items-center text-center">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#4d9fff]/25 to-[#4d9fff]/5 flex items-center justify-center border-2 border-[#4d9fff]/20 mb-3 shadow-lg shadow-[#4d9fff]/10">
-                  <span className="text-[#4d9fff] font-black text-2xl">{(activeChat.customerName || "م").substring(0, 2)}</span>
+                  <span className="text-[#4d9fff] font-black text-2xl">{(activeChat.customerName || t("inboxPage.unknownInitial")).substring(0, 2)}</span>
                 </div>
                 <h3 className="font-black text-lg text-white">{activeChat.customerName}</h3>
                 {(() => {
@@ -940,12 +937,12 @@ export default function InboxPage() {
                 <div className="bg-[#0a0a0f] rounded-xl p-3 border border-border/30 text-center">
                   <MessageCircle className="w-4 h-4 text-[#4d9fff] mx-auto mb-1" />
                   <p className="text-lg font-black text-white">{messages.length}</p>
-                  <p className="text-[10px] text-muted-foreground">إجمالي الرسائل</p>
+                  <p className="text-[10px] text-muted-foreground">{t("inboxPage.totalMessages")}</p>
                 </div>
                 <div className="bg-[#0a0a0f] rounded-xl p-3 border border-border/30 text-center">
                   <Clock className="w-4 h-4 text-[#4d9fff] mx-auto mb-1" />
                   <p className="text-sm font-black text-white">{activeChat.lastMessageAt ? formatTime(activeChat.lastMessageAt) : "—"}</p>
-                  <p className="text-[10px] text-muted-foreground">آخر نشاط</p>
+                  <p className="text-[10px] text-muted-foreground">{t("inboxPage.lastActivity")}</p>
                 </div>
               </div>
 
@@ -953,21 +950,21 @@ export default function InboxPage() {
               <div className="space-y-3">
                 <h4 className="text-xs font-black text-muted-foreground flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5" />
-                  معلومات الاتصال
+                  {t("inboxPage.contactInfoTitle")}
                 </h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between bg-[#0a0a0f] rounded-lg px-3 py-2 border border-border/20">
-                    <span className="text-muted-foreground text-xs">البريد</span>
-                    <span className="text-xs text-white font-medium">{activeChat.customerEmail || "غير متوفر"}</span>
+                    <span className="text-muted-foreground text-xs">{t("inboxPage.emailLabel")}</span>
+                    <span className="text-xs text-white font-medium">{activeChat.customerEmail || t("inboxPage.notAvailable")}</span>
                   </div>
                   <div className="flex items-center justify-between bg-[#0a0a0f] rounded-lg px-3 py-2 border border-border/20">
-                    <span className="text-muted-foreground text-xs">الهاتف</span>
-                    <span className="text-xs text-white font-medium">{activeChat.customerPhone || "غير متوفر"}</span>
+                    <span className="text-muted-foreground text-xs">{t("inboxPage.phoneLabel")}</span>
+                    <span className="text-xs text-white font-medium">{activeChat.customerPhone || t("inboxPage.notAvailable")}</span>
                   </div>
                   <div className="flex items-center justify-between bg-[#0a0a0f] rounded-lg px-3 py-2 border border-border/20">
-                    <span className="text-muted-foreground text-xs">تاريخ الانضمام</span>
+                    <span className="text-muted-foreground text-xs">{t("inboxPage.joinedDateLabel")}</span>
                     <span className="text-xs text-white font-medium">
-                      {activeChat.createdAt ? new Date(activeChat.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' }) : "غير متوفر"}
+                      {activeChat.createdAt ? new Date(activeChat.createdAt).toLocaleDateString(localeCode, { year: 'numeric', month: 'long', day: 'numeric' }) : t("inboxPage.notAvailable")}
                     </span>
                   </div>
                 </div>
@@ -977,7 +974,7 @@ export default function InboxPage() {
               <div className="space-y-3">
                 <h4 className="text-xs font-black text-muted-foreground flex items-center gap-1.5">
                   <Tag className="w-3.5 h-3.5" />
-                  العلامات
+                  {t("inboxPage.tagsTitle")}
                 </h4>
                 <div className="flex flex-wrap gap-1.5">
                   {customerTags.map(tag => (
@@ -995,7 +992,7 @@ export default function InboxPage() {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="إضافة علامة..."
+                    placeholder={t("inboxPage.addTagPlaceholder")}
                     value={newTag}
                     onChange={e => setNewTag(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag() } }}
@@ -1014,11 +1011,11 @@ export default function InboxPage() {
               <div className="space-y-3">
                 <h4 className="text-xs font-black text-muted-foreground flex items-center gap-1.5">
                   <StickyNote className="w-3.5 h-3.5" />
-                  الملاحظات الداخلية
+                  {t("inboxPage.internalNotesTitle")}
                 </h4>
                 <div className="space-y-2">
                   <textarea
-                    placeholder="اكتب ملاحظة داخلية..."
+                    placeholder={t("inboxPage.internalNotePlaceholder")}
                     value={newNote}
                     onChange={e => setNewNote(e.target.value)}
                     rows={3}
@@ -1029,7 +1026,7 @@ export default function InboxPage() {
                     disabled={!newNote.trim()}
                     className="w-full h-8 rounded-lg bg-[#4d9fff]/10 text-[#4d9fff] text-xs font-bold hover:bg-[#4d9fff]/20 transition-all border border-[#4d9fff]/20 disabled:opacity-30 disabled:cursor-not-allowed"
                   >
-                    حفظ الملاحظة
+                    {t("inboxPage.saveNote")}
                   </button>
                 </div>
                 {customerNotes.length > 0 && (
@@ -1038,7 +1035,7 @@ export default function InboxPage() {
                       <div key={i} className="bg-[#0a0a0f] rounded-lg p-3 border border-border/20 text-right">
                         <p className="text-xs text-white leading-relaxed">{note.text}</p>
                         <p className="text-[9px] text-muted-foreground mt-1.5">
-                          {new Date(note.date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          {new Date(note.date).toLocaleDateString(localeCode, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
                     ))}

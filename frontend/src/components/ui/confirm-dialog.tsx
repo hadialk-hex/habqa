@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useCallback } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle } from 'lucide-react'
+import { useLanguage } from '@/lib/i18n/language-context'
 
 interface ConfirmOptions {
   title?: string
@@ -18,6 +19,7 @@ type ConfirmContextType = (options: ConfirmOptions) => Promise<boolean>
 const ConfirmContext = createContext<ConfirmContextType | undefined>(undefined)
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
+  const { t, dir } = useLanguage()
   const [state, setState] = useState<{
     isOpen: boolean
     options: ConfirmOptions
@@ -51,7 +53,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         <Dialog open={state.isOpen} onOpenChange={(open) => {
           if (!open) handleCancel()
         }}>
-          <DialogContent className="sm:max-w-[440px]" showCloseButton={false} dir="rtl">
+          <DialogContent className="sm:max-w-[440px]" showCloseButton={false} dir={dir}>
             <DialogHeader className="flex flex-col items-center text-center">
               {state.options.variant === 'destructive' && (
                 <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-2">
@@ -59,7 +61,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 </div>
               )}
               <DialogTitle className="text-xl font-black">
-                {state.options.title || 'تأكيد الإجراء'}
+                {state.options.title || t('common.confirmAction')}
               </DialogTitle>
               <DialogDescription className="mt-2 text-sm text-muted-foreground text-center">
                 {state.options.message}
@@ -71,14 +73,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 onClick={handleCancel}
                 className="rounded-xl px-5 cursor-pointer"
               >
-                {state.options.cancelText || 'إلغاء'}
+                {state.options.cancelText || t('common.cancel')}
               </Button>
               <Button
                 variant={state.options.variant === 'destructive' ? 'destructive' : 'default'}
                 onClick={handleConfirm}
                 className="rounded-xl px-5 font-bold shadow-md cursor-pointer"
               >
-                {state.options.confirmText || 'تأكيد'}
+                {state.options.confirmText || t('common.confirm')}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -13,6 +13,7 @@ import {
   MessageSquare, Radio, Users, BookOpen, Heart, Film, UserPlus, Send, Info
 } from "lucide-react"
 import api from "@/lib/api"
+import { useLanguage } from "@/lib/i18n/language-context"
 
 function FacebookIcon({ className }: { className?: string }) {
   return (
@@ -51,55 +52,6 @@ interface FeatureBadge {
   label: string
 }
 
-const platformConfig: Record<string, { icon: React.ElementType; color: string; bg: string; gradient: string; gradientBg: string; label: string; description: string }> = {
-  FACEBOOK_PAGE: { 
-    icon: FacebookIcon, 
-    color: "text-[#1877F2]", 
-    bg: "bg-[#1877F2]/10", 
-    gradient: "from-[#1877F2] to-[#0d5cbf]",
-    gradientBg: "from-[#1877F2]/20 via-[#1877F2]/5 to-transparent",
-    label: "صفحة فيسبوك",
-    description: "ربط صفحات فيسبوك للرد التلقائي على التعليقات والرسائل"
-  },
-  INSTAGRAM: { 
-    icon: InstagramIcon, 
-    color: "text-[#E1306C]", 
-    bg: "bg-[#E1306C]/10", 
-    gradient: "from-[#F58529] via-[#DD2A7B] to-[#8134AF]",
-    gradientBg: "from-[#E1306C]/20 via-[#E1306C]/5 to-transparent",
-    label: "حساب انستغرام",
-    description: "ربط حساب انستغرام للرد على التعليقات والرسائل المباشرة"
-  },
-  WHATSAPP: { 
-    icon: WhatsAppIcon, 
-    color: "text-[#25D366]", 
-    bg: "bg-[#25D366]/10", 
-    gradient: "from-[#25D366] to-[#128C7E]",
-    gradientBg: "from-[#25D366]/20 via-[#25D366]/5 to-transparent",
-    label: "واتساب الأعمال",
-    description: "ربط واتساب Cloud API للتواصل مع العملاء"
-  },
-}
-
-const fbFeatures: FeatureBadge[] = [
-  { icon: MessageSquare, label: "تعليق → رسالة" },
-  { icon: MessageCircle, label: "رد تلقائي" },
-  { icon: Radio, label: "بث جماعي" },
-]
-
-const waFeatures: FeatureBadge[] = [
-  { icon: MessageCircle, label: "رد تلقائي" },
-  { icon: Radio, label: "بث جماعي" },
-  { icon: BookOpen, label: "كتالوج" },
-]
-
-const igFeatures: FeatureBadge[] = [
-  { icon: Send, label: "أتمتة DM" },
-  { icon: Heart, label: "ذكر القصص" },
-  { icon: Film, label: "تعليقات ريلز" },
-  { icon: UserPlus, label: "متابعة → ترحيب" },
-]
-
 function FeatureBadgeList({ features, accentColor }: { features: FeatureBadge[]; accentColor: string }) {
   return (
     <div className="flex flex-wrap gap-1.5 mb-5">
@@ -128,8 +80,56 @@ export default function ChannelsPage() {
 }
 
 function ChannelsContent() {
+  const { t, dir } = useLanguage()
   const searchParams = useSearchParams()
   const router = useRouter()
+
+  const platformConfig: Record<string, { icon: React.ElementType; color: string; bg: string; gradient: string; gradientBg: string; label: string }> = {
+    FACEBOOK_PAGE: {
+      icon: FacebookIcon,
+      color: "text-[#1877F2]",
+      bg: "bg-[#1877F2]/10",
+      gradient: "from-[#1877F2] to-[#0d5cbf]",
+      gradientBg: "from-[#1877F2]/20 via-[#1877F2]/5 to-transparent",
+      label: t("channelsPage.facebookPageLabel"),
+    },
+    INSTAGRAM: {
+      icon: InstagramIcon,
+      color: "text-[#E1306C]",
+      bg: "bg-[#E1306C]/10",
+      gradient: "from-[#F58529] via-[#DD2A7B] to-[#8134AF]",
+      gradientBg: "from-[#E1306C]/20 via-[#E1306C]/5 to-transparent",
+      label: t("channelsPage.instagramLabel"),
+    },
+    WHATSAPP: {
+      icon: WhatsAppIcon,
+      color: "text-[#25D366]",
+      bg: "bg-[#25D366]/10",
+      gradient: "from-[#25D366] to-[#128C7E]",
+      gradientBg: "from-[#25D366]/20 via-[#25D366]/5 to-transparent",
+      label: t("channelsPage.whatsappLabel"),
+    },
+  }
+
+  const fbFeatures: FeatureBadge[] = [
+    { icon: MessageSquare, label: t("channelsPage.featureCommentToMessage") },
+    { icon: MessageCircle, label: t("channelsPage.featureAutoReply") },
+    { icon: Radio, label: t("channelsPage.featureBroadcast") },
+  ]
+
+  const waFeatures: FeatureBadge[] = [
+    { icon: MessageCircle, label: t("channelsPage.featureAutoReply") },
+    { icon: Radio, label: t("channelsPage.featureBroadcast") },
+    { icon: BookOpen, label: t("channelsPage.featureCatalog") },
+  ]
+
+  const igFeatures: FeatureBadge[] = [
+    { icon: Send, label: t("channelsPage.featureDmAutomation") },
+    { icon: Heart, label: t("channelsPage.featureStoryMention") },
+    { icon: Film, label: t("channelsPage.featureReelsComments") },
+    { icon: UserPlus, label: t("channelsPage.featureFollowWelcome") },
+  ]
+
   const [channels, setChannels] = useState<Channel[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isConnectingFb, setIsConnectingFb] = useState(false)
@@ -153,10 +153,10 @@ function ChannelsContent() {
       const skipped = Number(searchParams.get("skipped") || "0")
       setBanner({
         type: "success",
-        text: `✅ تم ربط ${count} صفحة بنجاح!${skipped > 0 ? ` تم تخطي ${skipped} صفحة بسبب حد الخطة.` : ""}`,
+        text: t("channelsPage.connectedSuccessBanner", { count, skippedNote: skipped > 0 ? t("channelsPage.connectedSkippedNote", { count: skipped }) : "" }),
       })
     } else {
-      setBanner({ type: "error", text: "فشل ربط فيسبوك. حاول مرة أخرى أو تواصل مع الدعم." })
+      setBanner({ type: "error", text: t("channelsPage.facebookConnectFailedBanner") })
     }
     router.replace("/dashboard/channels")
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -169,11 +169,11 @@ function ChannelsContent() {
       if (res.data.configured && res.data.url) {
         window.location.href = res.data.url
       } else {
-        setBanner({ type: "error", text: res.data.message || "ربط فيسبوك غير مفعّل بعد. يجب على مدير المنصة ضبط إعدادات تطبيق فيسبوك." })
+        setBanner({ type: "error", text: res.data.message || t("channelsPage.facebookNotConfigured") })
         setIsConnectingFb(false)
       }
     } catch {
-      setBanner({ type: "error", text: "تعذر بدء عملية الربط. حاول مرة أخرى." })
+      setBanner({ type: "error", text: t("channelsPage.connectStartFailed") })
       setIsConnectingFb(false)
     }
   }
@@ -195,10 +195,10 @@ function ChannelsContent() {
         window.location.href = fb.data.url
         return
       }
-      setBanner({ type: "error", text: res.data.message || "ربط انستغرام غير مفعّل بعد. يجب على مدير المنصة ضبط إعدادات تطبيق Meta." })
+      setBanner({ type: "error", text: res.data.message || t("channelsPage.instagramNotConfigured") })
       setIsConnectingIg(false)
     } catch {
-      setBanner({ type: "error", text: "تعذر بدء عملية الربط. حاول مرة أخرى." })
+      setBanner({ type: "error", text: t("channelsPage.connectStartFailed") })
       setIsConnectingIg(false)
     }
   }
@@ -226,10 +226,10 @@ function ChannelsContent() {
       await api.delete(`/channels/${deleteTarget.id}`)
       setDeleteTarget(null)
       fetchChannels()
-      setBanner({ type: "success", text: "تم فصل القناة بنجاح." })
+      setBanner({ type: "success", text: t("channelsPage.disconnectSuccess") })
     } catch (error) {
       console.error("Failed to delete", error)
-      setBanner({ type: "error", text: "فشل حذف القناة. تأكد من صلاحياتك." })
+      setBanner({ type: "error", text: t("channelsPage.disconnectFailed") })
     } finally {
       setIsDeleting(false)
     }
@@ -240,7 +240,7 @@ function ChannelsContent() {
       setWaSubmitting(true)
       await api.post("/channels", {
         platform: "WHATSAPP",
-        name: waName || "واتساب الأعمال",
+        name: waName || t("channelsPage.whatsappDefaultName"),
         platformId: waPhoneId,
         accessToken: waToken,
       })
@@ -250,12 +250,12 @@ function ChannelsContent() {
       setWaPhoneId("")
       setWaToken("")
       fetchChannels()
-      setBanner({ type: "success", text: "✅ تم ربط واتساب بنجاح! تأكد من ضبط Webhook URL في لوحة Meta." })
+      setBanner({ type: "success", text: t("channelsPage.whatsappConnectSuccess") })
     } catch (error: unknown) {
       const axiosErr = error as { response?: { data?: { message?: string } } }
       setBanner({
         type: "error",
-        text: axiosErr.response?.data?.message || "فشل ربط واتساب. تأكد من صحة البيانات.",
+        text: axiosErr.response?.data?.message || t("channelsPage.whatsappConnectFailed"),
       })
     } finally {
       setWaSubmitting(false)
@@ -274,9 +274,9 @@ function ChannelsContent() {
           <div className="bg-gradient-to-br from-primary to-[oklch(0.62_0.15_230)] p-2.5 rounded-xl shadow-lg shadow-primary/25">
             <Share2 className="w-6 h-6 text-white" />
           </div>
-          قنوات التواصل
+          {t("channelsPage.title")}
         </h1>
-        <p className="text-muted-foreground mt-2">اربط حساباتك على المنصات الاجتماعية بنقرة واحدة — بدون أي إعدادات معقدة.</p>
+        <p className="text-muted-foreground mt-2">{t("channelsPage.subtitle")}</p>
       </div>
 
       {/* Banner */}
@@ -302,7 +302,7 @@ function ChannelsContent() {
                 <RefreshCw className="w-8 h-8 animate-spin text-primary" />
               </div>
             </div>
-            <span className="text-sm text-muted-foreground font-medium">جاري تحميل القنوات...</span>
+            <span className="text-sm text-muted-foreground font-medium">{t("channelsPage.loadingChannels")}</span>
           </div>
         </div>
       ) : (
@@ -319,8 +319,8 @@ function ChannelsContent() {
                     <FacebookIcon className="w-7 h-7 text-[#1877F2]" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-bold text-lg">فيسبوك</h3>
-                    <p className="text-sm text-muted-foreground truncate">ربط تلقائي عبر تسجيل الدخول</p>
+                    <h3 className="font-bold text-lg">{t("channelsPage.facebookCardTitle")}</h3>
+                    <p className="text-sm text-muted-foreground truncate">{t("channelsPage.facebookCardSubtitle")}</p>
                   </div>
                 </div>
 
@@ -331,7 +331,7 @@ function ChannelsContent() {
                 />
 
                 <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-                  اربط صفحات فيسبوك بنقرة واحدة عبر تسجيل الدخول بحساب فيسبوك للرد التلقائي على التعليقات والرسائل.
+                  {t("channelsPage.facebookCardDesc")}
                 </p>
 
                 <div className="mt-auto">
@@ -339,7 +339,7 @@ function ChannelsContent() {
                     <div className="mb-4 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
                       <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 font-bold">
                         <CheckCircle2 className="w-4 h-4" />
-                        {fbChannels.length} صفحة مرتبطة
+                        {t("channelsPage.pagesConnected", { count: fbChannels.length })}
                       </div>
                     </div>
                   )}
@@ -353,7 +353,7 @@ function ChannelsContent() {
                     ) : (
                       <FacebookIcon className="w-5 h-5" />
                     )}
-                    {fbChannels.length > 0 ? "ربط صفحات إضافية" : "ربط حساب فيسبوك"}
+                    {fbChannels.length > 0 ? t("channelsPage.connectMorePages") : t("channelsPage.connectFacebookAccount")}
                     <ArrowLeft className="w-4 h-4" />
                   </Button>
                 </div>
@@ -374,8 +374,8 @@ function ChannelsContent() {
                     <InstagramIcon className="w-7 h-7 text-[#DD2A7B]" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-bold text-lg bg-gradient-to-l from-[#F58529] via-[#DD2A7B] to-[#8134AF] bg-clip-text text-transparent">انستغرام</h3>
-                    <p className="text-sm text-muted-foreground truncate">أتمتة كاملة للرسائل والتفاعل</p>
+                    <h3 className="font-bold text-lg bg-gradient-to-l from-[#F58529] via-[#DD2A7B] to-[#8134AF] bg-clip-text text-transparent">{t("channelsPage.instagramCardTitle")}</h3>
+                    <p className="text-sm text-muted-foreground truncate">{t("channelsPage.instagramCardSubtitle")}</p>
                   </div>
                 </div>
 
@@ -389,19 +389,19 @@ function ChannelsContent() {
                 <div className="space-y-2 mb-5">
                   <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                     <Send className="w-3.5 h-3.5 text-[#DD2A7B] shrink-0" />
-                    <span>أتمتة الرسائل المباشرة (DM Automation)</span>
+                    <span>{t("channelsPage.igFeatureDm")}</span>
                   </div>
                   <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                     <Heart className="w-3.5 h-3.5 text-[#DD2A7B] shrink-0" />
-                    <span>الرد على ذكر القصص (Story Mention Replies)</span>
+                    <span>{t("channelsPage.igFeatureStoryMention")}</span>
                   </div>
                   <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                     <Film className="w-3.5 h-3.5 text-[#DD2A7B] shrink-0" />
-                    <span>الرد على تعليقات الريلز (Reels Comment Replies)</span>
+                    <span>{t("channelsPage.igFeatureReels")}</span>
                   </div>
                   <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                     <UserPlus className="w-3.5 h-3.5 text-[#DD2A7B] shrink-0" />
-                    <span>متابعة → رسالة ترحيب (Follow-to-DM)</span>
+                    <span>{t("channelsPage.igFeatureFollow")}</span>
                   </div>
                 </div>
 
@@ -410,7 +410,7 @@ function ChannelsContent() {
                     <div className="mb-4 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
                       <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 font-bold">
                         <CheckCircle2 className="w-4 h-4" />
-                        {igChannels.length} حساب مرتبط
+                        {t("channelsPage.accountsConnected", { count: igChannels.length })}
                       </div>
                     </div>
                   )}
@@ -418,7 +418,7 @@ function ChannelsContent() {
                   {/* Meta Business Suite note */}
                   <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[#8134AF]/5 border border-[#8134AF]/15 mb-3">
                     <Info className="w-3.5 h-3.5 text-[#8134AF] shrink-0" />
-                    <span className="text-[11px] text-muted-foreground leading-snug">يتم الربط عبر Meta Business Suite</span>
+                    <span className="text-[11px] text-muted-foreground leading-snug">{t("channelsPage.metaBusinessSuiteNote")}</span>
                   </div>
 
                   <Button
@@ -431,7 +431,7 @@ function ChannelsContent() {
                     ) : (
                       <InstagramIcon className="w-5 h-5" />
                     )}
-                    {igChannels.length > 0 ? "ربط حساب إضافي" : "ربط حساب Instagram"}
+                    {igChannels.length > 0 ? t("channelsPage.connectAnotherAccount") : t("channelsPage.connectInstagramAccount")}
                     <ArrowLeft className="w-4 h-4" />
                   </Button>
                 </div>
@@ -448,8 +448,8 @@ function ChannelsContent() {
                     <WhatsAppIcon className="w-7 h-7 text-[#25D366]" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-bold text-lg">واتساب الأعمال</h3>
-                    <p className="text-sm text-muted-foreground truncate">عبر WhatsApp Cloud API</p>
+                    <h3 className="font-bold text-lg">{t("channelsPage.whatsappCardTitle")}</h3>
+                    <p className="text-sm text-muted-foreground truncate">{t("channelsPage.whatsappCardSubtitle")}</p>
                   </div>
                 </div>
 
@@ -460,7 +460,7 @@ function ChannelsContent() {
                 />
 
                 <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-                  اربط رقم واتساب الأعمال الخاص بك لاستقبال الرسائل والرد عليها تلقائياً عبر Cloud API.
+                  {t("channelsPage.whatsappCardDesc")}
                 </p>
 
                 <div className="mt-auto">
@@ -468,7 +468,7 @@ function ChannelsContent() {
                     <div className="mb-4 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
                       <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 font-bold">
                         <CheckCircle2 className="w-4 h-4" />
-                        {waChannels.length} رقم مرتبط
+                        {t("channelsPage.numbersConnected", { count: waChannels.length })}
                       </div>
                     </div>
                   )}
@@ -478,7 +478,7 @@ function ChannelsContent() {
                     onClick={() => { setWaDialog(true); setWaStep(1) }}
                   >
                     <WhatsAppIcon className="w-5 h-5" />
-                    {waChannels.length > 0 ? "ربط رقم إضافي" : "ربط واتساب الأعمال"}
+                    {waChannels.length > 0 ? t("channelsPage.connectAnotherNumber") : t("channelsPage.connectWhatsappAccount")}
                     <ArrowLeft className="w-4 h-4" />
                   </Button>
                 </div>
@@ -491,7 +491,7 @@ function ChannelsContent() {
             <div>
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-emerald-500" />
-                القنوات المرتبطة
+                {t("channelsPage.connectedChannelsTitle")}
                 <Badge variant="secondary" className="font-bold">{channels.length}</Badge>
               </h2>
               <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
@@ -519,7 +519,7 @@ function ChannelsContent() {
                           </div>
                           <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 font-bold text-xs shrink-0">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-1.5" />
-                            متصل
+                            {t("channelsPage.connectedBadge")}
                           </Badge>
                         </div>
                         
@@ -532,7 +532,7 @@ function ChannelsContent() {
                             onClick={() => setDeleteTarget(channel)}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            فصل
+                            {t("channelsPage.disconnectBtn")}
                           </Button>
                         </div>
                       </CardContent>
@@ -550,13 +550,13 @@ function ChannelsContent() {
                 <div className="w-20 h-20 bg-gradient-to-br from-primary/20 to-primary/5 rounded-2xl flex items-center justify-center mb-6 animate-float">
                   <WifiOff className="w-10 h-10 text-primary" />
                 </div>
-                <h3 className="text-2xl font-black mb-3">لا توجد قنوات مرتبطة</h3>
+                <h3 className="text-2xl font-black mb-3">{t("channelsPage.emptyTitle")}</h3>
                 <p className="text-muted-foreground mb-8 max-w-md leading-relaxed">
-                  ابدأ بربط صفحتك على فيسبوك أو حساب انستغرام باستخدام الأزرار أعلاه لتفعيل الردود التلقائية على التعليقات والرسائل.
+                  {t("channelsPage.emptyDesc")}
                 </p>
                 <Button onClick={handleConnectFacebook} disabled={isConnectingFb} className="rounded-xl gap-2 h-12 px-8 shadow-lg shadow-primary/20 font-bold bg-[#1877F2] hover:bg-[#0d5cbf] text-white">
                   {isConnectingFb ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FacebookIcon className="w-5 h-5" />}
-                  ربط حساب فيسبوك
+                  {t("channelsPage.connectFacebookAccount")}
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
               </CardContent>
@@ -567,29 +567,28 @@ function ChannelsContent() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <DialogContent className="sm:max-w-[400px]" dir="rtl">
+        <DialogContent className="sm:max-w-[400px]" dir={dir}>
           <DialogHeader>
             <DialogTitle className="text-xl font-black flex items-center gap-3">
               <div className="p-2 bg-destructive/10 rounded-xl">
                 <Trash2 className="w-5 h-5 text-destructive" />
               </div>
-              تأكيد فصل القناة
+              {t("channelsPage.disconnectConfirmTitle")}
             </DialogTitle>
             <DialogDescription className="text-base leading-relaxed pt-2">
-              هل أنت متأكد من فصل <strong className="text-foreground">{deleteTarget?.name}</strong>؟ 
-              سيتوقف الرد الآلي على هذه القناة فوراً. يمكنك إعادة ربطها لاحقاً.
+              {t("channelsPage.disconnectConfirmMessage", { name: deleteTarget?.name || "" })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 pt-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)} className="rounded-xl">إلغاء</Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleDeleteChannel} 
-              disabled={isDeleting} 
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} className="rounded-xl">{t("channelsPage.cancel")}</Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteChannel}
+              disabled={isDeleting}
               className="rounded-xl gap-2"
             >
               {isDeleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-              تأكيد الفصل
+              {t("channelsPage.confirmDisconnect")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -597,16 +596,16 @@ function ChannelsContent() {
 
       {/* WhatsApp Connection Wizard */}
       <Dialog open={waDialog} onOpenChange={(open) => { if (!open) { setWaDialog(false); setWaStep(1) } }}>
-        <DialogContent className="sm:max-w-[520px]" dir="rtl">
+        <DialogContent className="sm:max-w-[520px]" dir={dir}>
           <DialogHeader>
             <DialogTitle className="text-xl font-black flex items-center gap-3">
               <div className="p-2.5 bg-[#25D366]/10 rounded-xl">
                 <WhatsAppIcon className="w-6 h-6 text-[#25D366]" />
               </div>
-              ربط واتساب الأعمال
+              {t("channelsPage.waWizardTitle")}
             </DialogTitle>
             <DialogDescription className="text-sm pt-1">
-              {waStep === 1 ? "اتبع الخطوات التالية للحصول على بيانات الربط" : "أدخل بيانات الربط من لوحة Meta Business"}
+              {waStep === 1 ? t("channelsPage.waStepInstructions") : t("channelsPage.waStepData")}
             </DialogDescription>
           </DialogHeader>
 
@@ -614,12 +613,12 @@ function ChannelsContent() {
           <div className="flex items-center gap-3 py-2">
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${waStep === 1 ? "bg-[#25D366]/10 text-[#25D366]" : "bg-muted text-muted-foreground"}`}>
               <span className="w-6 h-6 rounded-full bg-current/20 flex items-center justify-center text-xs">1</span>
-              التعليمات
+              {t("channelsPage.waStep1Label")}
             </div>
             <div className="flex-1 h-px bg-border" />
             <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${waStep === 2 ? "bg-[#25D366]/10 text-[#25D366]" : "bg-muted text-muted-foreground"}`}>
               <span className="w-6 h-6 rounded-full bg-current/20 flex items-center justify-center text-xs">2</span>
-              البيانات
+              {t("channelsPage.waStep2Label")}
             </div>
           </div>
 
@@ -628,103 +627,109 @@ function ChannelsContent() {
               <div className="bg-muted/50 rounded-xl p-4 space-y-3">
                 <h4 className="font-bold text-sm flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-[#25D366]/20 text-[#25D366] flex items-center justify-center text-xs font-black">1</span>
-                  إنشاء تطبيق Meta Business
+                  {t("channelsPage.waStep1Title")}
                 </h4>
                 <p className="text-sm text-muted-foreground leading-relaxed pr-8">
-                  اذهب إلى{" "}
+                  {t("channelsPage.waStep1Desc1")}{" "}
                   <a href="https://developers.facebook.com/apps" target="_blank" rel="noopener noreferrer" className="text-[#1877F2] hover:underline font-medium inline-flex items-center gap-1">
                     Meta for Developers
                     <ExternalLink className="w-3 h-3" />
                   </a>
-                  {" "}وأنشئ تطبيق جديد من نوع &quot;Business&quot;
+                  {" "}{t("channelsPage.waStep1Desc2")}
                 </p>
               </div>
 
               <div className="bg-muted/50 rounded-xl p-4 space-y-3">
                 <h4 className="font-bold text-sm flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-[#25D366]/20 text-[#25D366] flex items-center justify-center text-xs font-black">2</span>
-                  تفعيل WhatsApp Cloud API
+                  {t("channelsPage.waStep2Title")}
                 </h4>
                 <p className="text-sm text-muted-foreground leading-relaxed pr-8">
-                  من لوحة التطبيق → أضف منتج &quot;WhatsApp&quot; → اختر حساب الأعمال
+                  {t("channelsPage.waStep2Desc")}
                 </p>
               </div>
 
               <div className="bg-muted/50 rounded-xl p-4 space-y-3">
                 <h4 className="font-bold text-sm flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-[#25D366]/20 text-[#25D366] flex items-center justify-center text-xs font-black">3</span>
-                  نسخ البيانات المطلوبة
+                  {t("channelsPage.waStep3Title")}
                 </h4>
                 <p className="text-sm text-muted-foreground leading-relaxed pr-8">
-                  من قسم &quot;API Setup&quot;، انسخ <strong className="text-foreground">Phone Number ID</strong> و <strong className="text-foreground">Permanent Access Token</strong>
+                  {t("channelsPage.waStep3Desc", { phoneId: "@@PHONE@@", token: "@@TOKEN@@" }).split(/(@@PHONE@@|@@TOKEN@@)/).map((part, i) =>
+                    part === "@@PHONE@@" ? <strong key={i} className="text-foreground">Phone Number ID</strong>
+                    : part === "@@TOKEN@@" ? <strong key={i} className="text-foreground">Permanent Access Token</strong>
+                    : part
+                  )}
                 </p>
               </div>
 
               <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 flex items-start gap-3">
                 <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  تأكد من إنشاء <strong>Permanent Token</strong> وليس Temporary Token. الـ Temporary ينتهي بعد 24 ساعة.
+                  {t("channelsPage.waTokenWarning", { permanent: "@@PERMANENT@@" }).split("@@PERMANENT@@").map((part, i, arr) =>
+                    i < arr.length - 1 ? <span key={i}>{part}<strong>Permanent Token</strong></span> : <span key={i}>{part}</span>
+                  )}
                 </p>
               </div>
             </div>
           ) : (
             <div className="space-y-4 py-2">
               <div className="space-y-2">
-                <label className="text-sm font-bold">اسم القناة</label>
-                <Input 
-                  value={waName} 
-                  onChange={e => setWaName(e.target.value)} 
-                  placeholder="مثال: واتساب متجر حبقة" 
-                  className="rounded-xl h-11 bg-muted/30 border-border/50 focus:border-[#25D366]/50" 
+                <label className="text-sm font-bold">{t("channelsPage.channelNameLabel")}</label>
+                <Input
+                  value={waName}
+                  onChange={e => setWaName(e.target.value)}
+                  placeholder={t("channelsPage.channelNamePlaceholder")}
+                  className="rounded-xl h-11 bg-muted/30 border-border/50 focus:border-[#25D366]/50"
                 />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold flex items-center gap-2">
                   Phone Number ID
-                  <Badge variant="outline" className="text-[10px] font-normal">مطلوب</Badge>
+                  <Badge variant="outline" className="text-[10px] font-normal">{t("channelsPage.required")}</Badge>
                 </label>
-                <Input 
-                  value={waPhoneId} 
-                  onChange={e => setWaPhoneId(e.target.value)} 
-                  placeholder="مثال: 100234567890123" 
-                  className="rounded-xl h-11 bg-muted/30 border-border/50 focus:border-[#25D366]/50 font-mono text-sm" 
-                  dir="ltr" 
+                <Input
+                  value={waPhoneId}
+                  onChange={e => setWaPhoneId(e.target.value)}
+                  placeholder="e.g. 100234567890123"
+                  className="rounded-xl h-11 bg-muted/30 border-border/50 focus:border-[#25D366]/50 font-mono text-sm"
+                  dir="ltr"
                 />
-                <p className="text-xs text-muted-foreground">تجده في WhatsApp → API Setup → Phone Number ID</p>
+                <p className="text-xs text-muted-foreground">{t("channelsPage.phoneNumberIdHint")}</p>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold flex items-center gap-2">
                   Access Token
-                  <Badge variant="outline" className="text-[10px] font-normal">مطلوب</Badge>
+                  <Badge variant="outline" className="text-[10px] font-normal">{t("channelsPage.required")}</Badge>
                 </label>
-                <Input 
+                <Input
                   type="password"
-                  value={waToken} 
-                  onChange={e => setWaToken(e.target.value)} 
-                  placeholder="EAAxxxxxxx..." 
-                  className="rounded-xl h-11 bg-muted/30 border-border/50 focus:border-[#25D366]/50 font-mono text-sm" 
-                  dir="ltr" 
+                  value={waToken}
+                  onChange={e => setWaToken(e.target.value)}
+                  placeholder="EAAxxxxxxx..."
+                  className="rounded-xl h-11 bg-muted/30 border-border/50 focus:border-[#25D366]/50 font-mono text-sm"
+                  dir="ltr"
                 />
-                <p className="text-xs text-muted-foreground">يُشفّر ويُخزّن بأمان — لن يظهر مرة أخرى</p>
+                <p className="text-xs text-muted-foreground">{t("channelsPage.accessTokenHint")}</p>
               </div>
             </div>
           )}
 
           <DialogFooter className="gap-2 pt-2">
-            <Button variant="outline" onClick={() => { setWaDialog(false); setWaStep(1) }} className="rounded-xl">إلغاء</Button>
+            <Button variant="outline" onClick={() => { setWaDialog(false); setWaStep(1) }} className="rounded-xl">{t("channelsPage.cancel")}</Button>
             {waStep === 1 ? (
               <Button onClick={() => setWaStep(2)} className="rounded-xl gap-2 bg-[#25D366] hover:bg-[#1da851] text-white">
-                التالي — إدخال البيانات
+                {t("channelsPage.next")}
                 <ArrowLeft className="w-4 h-4" />
               </Button>
             ) : (
-              <Button 
-                onClick={handleConnectWhatsApp} 
+              <Button
+                onClick={handleConnectWhatsApp}
                 disabled={waSubmitting || !waPhoneId || !waToken}
                 className="rounded-xl gap-2 bg-[#25D366] hover:bg-[#1da851] text-white shadow-lg shadow-[#25D366]/20"
               >
                 {waSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <WhatsAppIcon className="w-4 h-4" />}
-                تأكيد الربط
+                {t("channelsPage.confirmConnect")}
               </Button>
             )}
           </DialogFooter>

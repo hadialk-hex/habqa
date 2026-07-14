@@ -14,13 +14,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/toast"
 import { useConfirm } from "@/components/ui/confirm-dialog"
 import api from "@/lib/api"
-import { 
-  Megaphone, Users, Calendar, AlertTriangle, Eye, Send, Ban, 
-  CheckCircle2, RefreshCw, BarChart2, Plus, Search, 
-  MessageCircle, Globe, Camera, ChevronLeft, ChevronRight, X 
+import { useLanguage } from "@/lib/i18n/language-context"
+import {
+  Megaphone, Users, Calendar, AlertTriangle, Eye, Send, Ban,
+  CheckCircle2, RefreshCw, BarChart2, Plus, Search,
+  MessageCircle, Globe, Camera, ChevronLeft, ChevronRight, X
 } from "lucide-react"
 
 export default function BroadcastsPage() {
+  const { t, locale, dir } = useLanguage()
+  const localeCode = locale === "ar" ? "ar-EG" : "en-US"
   const [mounted, setMounted] = useState(false)
   const { showToast } = useToast()
   const confirm = useConfirm()
@@ -56,7 +59,7 @@ export default function BroadcastsPage() {
       setCampaigns(res.data)
     } catch (err) {
       console.error("Error fetching campaigns:", err)
-      showToast("فشل في تحميل الحملات الإعلانية", "error")
+      showToast(t("broadcastsPage.fetchCampaignsFailed"), "error")
     } finally {
       setIsLoading(false)
     }
@@ -83,29 +86,29 @@ export default function BroadcastsPage() {
   const handleCreateCampaign = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) {
-      showToast("يرجى إدخال اسم الحملة", "error")
+      showToast(t("broadcastsPage.enterCampaignName"), "error")
       return
     }
     if (!content.trim()) {
-      showToast("يرجى إدخال محتوى الرسالة", "error")
+      showToast(t("broadcastsPage.enterMessageContent"), "error")
       return
     }
 
     const segmentTarget = targetType === "all" ? "all" : customTag.trim()
     if (targetType === "tag" && !segmentTarget) {
-      showToast("يرجى تحديد الوسم المستهدف", "error")
+      showToast(t("broadcastsPage.selectTargetTag"), "error")
       return
     }
 
     let scheduledTimeStr: string | undefined = undefined
     if (isScheduled) {
       if (!scheduledAt) {
-        showToast("يرجى تحديد وقت الجدولة", "error")
+        showToast(t("broadcastsPage.selectScheduleTime"), "error")
         return
       }
       const date = new Date(scheduledAt)
       if (isNaN(date.getTime()) || date.getTime() < Date.now()) {
-        showToast("يجب أن يكون وقت الجدولة في المستقبل", "error")
+        showToast(t("broadcastsPage.scheduleMustBeFuture"), "error")
         return
       }
       scheduledTimeStr = date.toISOString()
@@ -120,7 +123,7 @@ export default function BroadcastsPage() {
         scheduledAt: scheduledTimeStr,
       }
       const res = await api.post("/broadcasts", payload)
-      showToast(isScheduled ? "تمت جدولة الحملة بنجاح" : "تم إنشاء الحملة بنجاح كمسودة", "success")
+      showToast(isScheduled ? t("broadcastsPage.scheduledSuccess") : t("broadcastsPage.draftCreatedSuccess"), "success")
       setIsCreateOpen(false)
       // reset form
       setName("")
@@ -131,7 +134,7 @@ export default function BroadcastsPage() {
       setScheduledAt("")
       fetchCampaigns()
     } catch (err: any) {
-      const errMsg = err.response?.data?.message || "فشل إنشاء الحملة"
+      const errMsg = err.response?.data?.message || t("broadcastsPage.createCampaignFailed")
       showToast(errMsg, "error")
     } finally {
       setIsSubmitting(false)
@@ -140,39 +143,39 @@ export default function BroadcastsPage() {
 
   const handleExecute = async (id: string) => {
     const confirmed = await confirm({
-      title: "بدء بث الحملة الإعلانية",
-      message: "هل أنت متأكد من رغبتك في إرسال هذه الحملة فوراً للمشتركين المستهدفين؟",
-      confirmText: "نعم، أرسل الآن",
-      cancelText: "تراجع",
+      title: t("broadcastsPage.executeConfirmTitle"),
+      message: t("broadcastsPage.executeConfirmMessage"),
+      confirmText: t("broadcastsPage.sendNowConfirm"),
+      cancelText: t("broadcastsPage.goBack"),
       variant: "primary"
     })
     if (!confirmed) return
 
     try {
       await api.post(`/broadcasts/${id}/execute`)
-      showToast("تم إرسال الحملة بنجاح", "success")
+      showToast(t("broadcastsPage.sentSuccess"), "success")
       fetchCampaigns()
     } catch (err) {
-      showToast("فشل إرسال الحملة", "error")
+      showToast(t("broadcastsPage.sendFailed"), "error")
     }
   }
 
   const handleCancel = async (id: string) => {
     const confirmed = await confirm({
-      title: "إلغاء جدولة الحملة",
-      message: "هل أنت متأكد من رغبتك في إلغاء هذه الحملة المجدولة؟",
-      confirmText: "نعم، إلغاء",
-      cancelText: "تراجع",
+      title: t("broadcastsPage.cancelConfirmTitle"),
+      message: t("broadcastsPage.cancelConfirmMessage"),
+      confirmText: t("broadcastsPage.confirmCancelYes"),
+      cancelText: t("broadcastsPage.goBack"),
       variant: "destructive"
     })
     if (!confirmed) return
 
     try {
       await api.post(`/broadcasts/${id}/cancel`)
-      showToast("تم إلغاء جدولة الحملة", "success")
+      showToast(t("broadcastsPage.cancelledSuccess"), "success")
       fetchCampaigns()
     } catch (err) {
-      showToast("فشل إلغاء الحملة", "error")
+      showToast(t("broadcastsPage.cancelFailed"), "error")
     }
   }
 
@@ -195,13 +198,13 @@ export default function BroadcastsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "SENT":
-        return <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg">مكتملة</Badge>
+        return <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-lg">{t("broadcastsPage.statusSent")}</Badge>
       case "SCHEDULED":
-        return <Badge className="bg-secondary/15 text-secondary border border-secondary/20 rounded-lg">مجدولة</Badge>
+        return <Badge className="bg-secondary/15 text-secondary border border-secondary/20 rounded-lg">{t("broadcastsPage.statusScheduled")}</Badge>
       case "CANCELLED":
-        return <Badge className="bg-destructive/10 text-destructive border border-destructive/20 rounded-lg">ملغاة</Badge>
+        return <Badge className="bg-destructive/10 text-destructive border border-destructive/20 rounded-lg">{t("broadcastsPage.statusCancelled")}</Badge>
       default:
-        return <Badge className="bg-muted text-muted-foreground border border-border rounded-lg">مسودة</Badge>
+        return <Badge className="bg-muted text-muted-foreground border border-border rounded-lg">{t("broadcastsPage.statusDraft")}</Badge>
     }
   }
 
@@ -219,23 +222,23 @@ export default function BroadcastsPage() {
   const paginatedCampaigns = filteredCampaigns.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
   return (
-    <div className="flex flex-col gap-6" dir="rtl">
+    <div className="flex flex-col gap-6" dir={dir}>
       {/* Welcome & Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className={`${mounted ? 'animate-fade-in-up' : 'opacity-0'}`}>
           <h1 className="text-3xl font-black tracking-tight flex items-center gap-2">
             <Megaphone className="w-8 h-8 text-primary" />
-            الحملات الإعلانية وبث الرسائل
+            {t("broadcastsPage.title")}
           </h1>
-          <p className="text-muted-foreground mt-1 text-base">إدارة حملات البث الموجهة والمجدولة للمشتركين</p>
+          <p className="text-muted-foreground mt-1 text-base">{t("broadcastsPage.subtitle")}</p>
         </div>
 
-        <Button 
+        <Button
           onClick={() => setIsCreateOpen(true)}
           className="bg-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all cursor-pointer flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
-          حملة جديدة
+          {t("broadcastsPage.newCampaign")}
         </Button>
       </div>
 
@@ -243,20 +246,20 @@ export default function BroadcastsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/40 p-4 rounded-2xl border border-border/50">
         <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); setCurrentPage(1); }} className="w-full md:w-auto">
           <TabsList className="bg-accent/40 rounded-xl p-1 flex gap-1">
-            <TabsTrigger value="all" className="rounded-lg text-xs font-bold px-4 py-2 cursor-pointer">الكل</TabsTrigger>
-            <TabsTrigger value="DRAFT" className="rounded-lg text-xs font-bold px-4 py-2 cursor-pointer">مسودات</TabsTrigger>
-            <TabsTrigger value="SCHEDULED" className="rounded-lg text-xs font-bold px-4 py-2 cursor-pointer">المجدولة</TabsTrigger>
-            <TabsTrigger value="SENT" className="rounded-lg text-xs font-bold px-4 py-2 cursor-pointer">المرسلة</TabsTrigger>
-            <TabsTrigger value="CANCELLED" className="rounded-lg text-xs font-bold px-4 py-2 cursor-pointer">الملغاة</TabsTrigger>
+            <TabsTrigger value="all" className="rounded-lg text-xs font-bold px-4 py-2 cursor-pointer">{t("broadcastsPage.tabAll")}</TabsTrigger>
+            <TabsTrigger value="DRAFT" className="rounded-lg text-xs font-bold px-4 py-2 cursor-pointer">{t("broadcastsPage.tabDraft")}</TabsTrigger>
+            <TabsTrigger value="SCHEDULED" className="rounded-lg text-xs font-bold px-4 py-2 cursor-pointer">{t("broadcastsPage.tabScheduled")}</TabsTrigger>
+            <TabsTrigger value="SENT" className="rounded-lg text-xs font-bold px-4 py-2 cursor-pointer">{t("broadcastsPage.tabSent")}</TabsTrigger>
+            <TabsTrigger value="CANCELLED" className="rounded-lg text-xs font-bold px-4 py-2 cursor-pointer">{t("broadcastsPage.tabCancelled")}</TabsTrigger>
           </TabsList>
         </Tabs>
 
         <div className="relative w-full md:w-64">
           <Search className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input 
+          <Input
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            placeholder="بحث في محتوى الحملة..." 
+            placeholder={t("broadcastsPage.searchPlaceholder")}
             className="pr-10 bg-accent/30 border-border/50 rounded-xl text-xs placeholder:text-muted-foreground/60 focus:border-primary focus:outline-none"
           />
         </div>
@@ -266,7 +269,7 @@ export default function BroadcastsPage() {
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <RefreshCw className="w-8 h-8 text-primary animate-spin" />
-          <span className="text-muted-foreground text-sm font-medium">جاري تحميل الحملات...</span>
+          <span className="text-muted-foreground text-sm font-medium">{t("broadcastsPage.loadingCampaigns")}</span>
         </div>
       ) : filteredCampaigns.length === 0 ? (
         <Card className="border-none shadow-md bg-card/20 py-16 text-center">
@@ -274,12 +277,12 @@ export default function BroadcastsPage() {
             <div className="p-4 bg-accent/20 rounded-full">
               <Megaphone className="w-10 h-10 text-muted-foreground" />
             </div>
-            <h3 className="font-bold text-lg">لا توجد حملات إعلانية</h3>
+            <h3 className="font-bold text-lg">{t("broadcastsPage.noCampaignsTitle")}</h3>
             <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-              لم نجد أي حملات مطابقة لبحثك. يمكنك بدء إنشاء حملتك الإعلانية الأولى الآن ببث رسائل للمشتركين.
+              {t("broadcastsPage.noCampaignsDesc")}
             </p>
             <Button onClick={() => setIsCreateOpen(true)} variant="outline" className="rounded-xl mt-2 cursor-pointer">
-              إنشاء حملتك الأولى
+              {t("broadcastsPage.createFirstCampaign")}
             </Button>
           </CardContent>
         </Card>
@@ -296,7 +299,7 @@ export default function BroadcastsPage() {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-bold">
                         {getPlatformIcon(channels.find(ch => ch.id === c.connectionId)?.platform || "FACEBOOK_PAGE")}
-                        <span>{channels.find(ch => ch.id === c.connectionId)?.name || "صفحة البث"}</span>
+                        <span>{channels.find(ch => ch.id === c.connectionId)?.name || t("broadcastsPage.broadcastChannelFallback")}</span>
                       </div>
                       {getStatusBadge(c.status)}
                     </div>
@@ -308,21 +311,21 @@ export default function BroadcastsPage() {
 
                   <CardContent className="pb-4 pt-1 space-y-3.5 border-t border-border/30 mt-1">
                     <div className="flex justify-between text-xs font-bold text-muted-foreground">
-                      <span>الجمهور المستهدف:</span>
+                      <span>{t("broadcastsPage.targetAudience")}</span>
                       <Badge variant="outline" className="text-[10px] font-semibold border-border/80 text-foreground">
-                        {c.segmentTarget === "all" ? "جميع المشتركين" : `@${c.segmentTarget}`}
+                        {c.segmentTarget === "all" ? t("broadcastsPage.allSubscribers") : `@${c.segmentTarget}`}
                       </Badge>
                     </div>
 
                     <div className="flex justify-between text-xs font-bold text-muted-foreground">
-                      <span>تاريخ الإنشاء:</span>
-                      <span>{new Date(c.createdAt).toLocaleDateString('ar-EG', { dateStyle: 'medium' })}</span>
+                      <span>{t("broadcastsPage.createdDate")}</span>
+                      <span>{new Date(c.createdAt).toLocaleDateString(localeCode, { dateStyle: 'medium' })}</span>
                     </div>
 
                     {c.status === "SCHEDULED" && c.scheduledAt && (
                       <div className="flex justify-between text-xs font-bold text-[#22d3ee] bg-secondary/5 p-2 rounded-lg border border-secondary/15">
-                        <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> وقت البث:</span>
-                        <span>{new Date(c.scheduledAt).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                        <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {t("broadcastsPage.broadcastTime")}</span>
+                        <span>{new Date(c.scheduledAt).toLocaleString(localeCode, { dateStyle: 'short', timeStyle: 'short' })}</span>
                       </div>
                     )}
 
@@ -330,11 +333,11 @@ export default function BroadcastsPage() {
                       <div className="grid grid-cols-2 gap-2 bg-emerald-500/5 p-2.5 rounded-xl border border-emerald-500/10">
                         <div className="text-center">
                           <p className="text-sm font-black text-emerald-400">{c.sentCount}</p>
-                          <p className="text-[10px] text-muted-foreground font-bold mt-0.5">مرسلة</p>
+                          <p className="text-[10px] text-muted-foreground font-bold mt-0.5">{t("broadcastsPage.sentLabel")}</p>
                         </div>
                         <div className="text-center border-r border-border/30">
                           <p className="text-sm font-black text-emerald-400">{c.deliveredCount}</p>
-                          <p className="text-[10px] text-muted-foreground font-bold mt-0.5">مستلمة</p>
+                          <p className="text-[10px] text-muted-foreground font-bold mt-0.5">{t("broadcastsPage.deliveredLabel")}</p>
                         </div>
                       </div>
                     )}
@@ -349,29 +352,29 @@ export default function BroadcastsPage() {
                     className="flex-1 rounded-xl text-xs font-bold hover:bg-accent/40 cursor-pointer flex items-center gap-1.5"
                   >
                     <Eye className="w-3.5 h-3.5" />
-                    عرض التفاصيل
+                    {t("broadcastsPage.viewDetails")}
                   </Button>
 
                   {c.status === "DRAFT" && (
-                    <Button 
-                      onClick={() => handleExecute(c.id)} 
-                      size="sm" 
+                    <Button
+                      onClick={() => handleExecute(c.id)}
+                      size="sm"
                       className="flex-1 bg-primary text-primary-foreground font-bold rounded-xl text-xs shadow-md cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <Send className="w-3.5 h-3.5 text-[#0a0a0f]" />
-                      إرسال الآن
+                      {t("broadcastsPage.sendNow")}
                     </Button>
                   )}
 
                   {c.status === "SCHEDULED" && (
-                    <Button 
-                      onClick={() => handleCancel(c.id)} 
+                    <Button
+                      onClick={() => handleCancel(c.id)}
                       variant="destructive"
-                      size="sm" 
+                      size="sm"
                       className="flex-1 font-bold rounded-xl text-xs cursor-pointer flex items-center justify-center gap-1.5"
                     >
                       <Ban className="w-3.5 h-3.5" />
-                      إلغاء الجدولة
+                      {t("broadcastsPage.cancelSchedule")}
                     </Button>
                   )}
                 </div>
@@ -392,7 +395,7 @@ export default function BroadcastsPage() {
                 <ChevronRight className="w-4 h-4" />
               </Button>
               <span className="text-xs font-bold text-muted-foreground">
-                صفحة {currentPage} من {pageCount}
+                {t("broadcastsPage.pageOf", { page: currentPage, total: pageCount })}
               </span>
               <Button 
                 variant="outline"
@@ -410,40 +413,44 @@ export default function BroadcastsPage() {
 
       {/* Creation Modal Wizard */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-[550px] border-none bg-card/95 backdrop-blur shadow-2xl p-6 rounded-2xl" dir="rtl">
+        <DialogContent className="sm:max-w-[550px] border-none bg-card/95 backdrop-blur shadow-2xl p-6 rounded-2xl" dir={dir}>
           <DialogHeader className="text-right">
-            <DialogTitle className="text-2xl font-black">إنشاء حملة بث جديدة</DialogTitle>
+            <DialogTitle className="text-2xl font-black">{t("broadcastsPage.createCampaignTitle")}</DialogTitle>
             <DialogDescription className="text-muted-foreground text-xs mt-1">
-              املأ البيانات لبدء إرسال رسائل جماعية للشرائح المستهدفة.
+              {t("broadcastsPage.createCampaignDesc")}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreateCampaign} className="space-y-4.5 mt-2">
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-foreground">اسم الحملة الإعلانية</Label>
-              <Input 
+              <Label className="text-xs font-bold text-foreground">{t("broadcastsPage.campaignNameLabel")}</Label>
+              <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="مثال: خصومات نهاية الأسبوع للعملاء المميزين"
+                placeholder={t("broadcastsPage.campaignNamePlaceholder")}
                 className="bg-accent/40 border-border/50 rounded-xl text-xs placeholder:text-muted-foreground/50 focus:border-primary"
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-foreground">قناة البث</Label>
+              <Label className="text-xs font-bold text-foreground">{t("broadcastsPage.broadcastChannelLabel")}</Label>
               {channels.length === 0 ? (
                 <div className="text-xs text-destructive bg-destructive/5 p-3 rounded-xl border border-destructive/10 font-bold">
-                  لم تقم بربط أي قنوات تواصل بعد! يرجى ربط قناة من صفحة "قنوات التواصل" أولاً لتتمكن من البث.
+                  {t("broadcastsPage.noChannelsWarning")}
                 </div>
               ) : (
-                <Select value={selectedChannelId} onValueChange={(val) => setSelectedChannelId(val || "")}>
+                <Select
+                  value={selectedChannelId}
+                  onValueChange={(val) => setSelectedChannelId(val || "")}
+                  items={Object.fromEntries(channels.map(ch => [ch.id, `${ch.name} (${ch.platform === "WHATSAPP" ? t("subscribersPage.platformWhatsapp") : ch.platform === "INSTAGRAM" ? t("subscribersPage.platformInstagram") : t("subscribersPage.platformFacebook")})`]))}
+                >
                   <SelectTrigger className="bg-accent/40 border-border/50 rounded-xl text-xs text-right">
-                    <SelectValue placeholder="اختر قناة التواصل" />
+                    <SelectValue placeholder={t("broadcastsPage.selectChannelPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border/50 rounded-xl">
                     {channels.map(ch => (
                       <SelectItem key={ch.id} value={ch.id} className="text-xs font-semibold cursor-pointer">
-                        {ch.name} ({ch.platform === "WHATSAPP" ? "واتساب" : ch.platform === "INSTAGRAM" ? "انستغرام" : "فيسبوك"})
+                        {ch.name} ({ch.platform === "WHATSAPP" ? t("subscribersPage.platformWhatsapp") : ch.platform === "INSTAGRAM" ? t("subscribersPage.platformInstagram") : t("subscribersPage.platformFacebook")})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -452,11 +459,11 @@ export default function BroadcastsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-foreground">محتوى رسالة البث</Label>
-              <Textarea 
+              <Label className="text-xs font-bold text-foreground">{t("broadcastsPage.messageContentLabel")}</Label>
+              <Textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="اكتب رسالتك هنا... تدعم حبقة الردود الآلية المتنوعة."
+                placeholder={t("broadcastsPage.messageContentPlaceholder")}
                 rows={4}
                 className="bg-accent/40 border-border/50 rounded-xl text-xs placeholder:text-muted-foreground/50 focus:border-primary leading-relaxed resize-none"
               />
@@ -464,25 +471,29 @@ export default function BroadcastsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-foreground">الشريحة المستهدفة</Label>
-                <Select value={targetType} onValueChange={(val: any) => setTargetType(val)}>
+                <Label className="text-xs font-bold text-foreground">{t("broadcastsPage.targetSegmentLabel")}</Label>
+                <Select
+                  value={targetType}
+                  onValueChange={(val: any) => setTargetType(val)}
+                  items={{ all: t("broadcastsPage.allSubscribers"), tag: t("broadcastsPage.byTag") }}
+                >
                   <SelectTrigger className="bg-accent/40 border-border/50 rounded-xl text-xs text-right">
-                    <SelectValue placeholder="شريحة الجمهور" />
+                    <SelectValue placeholder={t("broadcastsPage.audienceSegmentPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent className="bg-card border-border/50 rounded-xl">
-                    <SelectItem value="all" className="text-xs font-semibold cursor-pointer">جميع المشتركين</SelectItem>
-                    <SelectItem value="tag" className="text-xs font-semibold cursor-pointer">حسب وسام محدد</SelectItem>
+                    <SelectItem value="all" className="text-xs font-semibold cursor-pointer">{t("broadcastsPage.allSubscribers")}</SelectItem>
+                    <SelectItem value="tag" className="text-xs font-semibold cursor-pointer">{t("broadcastsPage.byTag")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {targetType === "tag" && (
                 <div className="space-y-2 animate-fade-in">
-                  <Label className="text-xs font-bold text-foreground">الوسم المستهدف</Label>
-                  <Input 
+                  <Label className="text-xs font-bold text-foreground">{t("broadcastsPage.targetTagLabel")}</Label>
+                  <Input
                     value={customTag}
                     onChange={(e) => setCustomTag(e.target.value)}
-                    placeholder="اكتب الوسم مثل: vip"
+                    placeholder={t("broadcastsPage.targetTagPlaceholder")}
                     className="bg-accent/40 border-border/50 rounded-xl text-xs focus:border-primary"
                   />
                 </div>
@@ -492,10 +503,10 @@ export default function BroadcastsPage() {
             <div className="border-t border-border/30 pt-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex flex-col gap-0.5">
-                  <Label className="text-xs font-bold text-foreground">جدولة البث</Label>
-                  <span className="text-[10px] text-muted-foreground font-semibold">تفعيل جدولة البث لوقت لاحق بدلاً من الإرسال الفوري</span>
+                  <Label className="text-xs font-bold text-foreground">{t("broadcastsPage.scheduleLabel")}</Label>
+                  <span className="text-[10px] text-muted-foreground font-semibold">{t("broadcastsPage.scheduleHint")}</span>
                 </div>
-                <input 
+                <input
                   type="checkbox"
                   checked={isScheduled}
                   onChange={(e) => setIsScheduled(e.target.checked)}
@@ -505,8 +516,8 @@ export default function BroadcastsPage() {
 
               {isScheduled && (
                 <div className="space-y-2 animate-fade-in">
-                  <Label className="text-xs font-bold text-foreground">تاريخ ووقت البث المجدول</Label>
-                  <Input 
+                  <Label className="text-xs font-bold text-foreground">{t("broadcastsPage.scheduledDateTimeLabel")}</Label>
+                  <Input
                     type="datetime-local"
                     value={scheduledAt}
                     onChange={(e) => setScheduledAt(e.target.value)}
@@ -517,20 +528,20 @@ export default function BroadcastsPage() {
             </div>
 
             <DialogFooter className="gap-2 sm:justify-start pt-4 border-t border-border/20">
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => setIsCreateOpen(false)}
                 className="rounded-xl text-xs font-bold cursor-pointer"
               >
-                تراجع
+                {t("broadcastsPage.back")}
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={isSubmitting || channels.length === 0}
                 className="bg-primary text-primary-foreground font-bold rounded-xl text-xs shadow-md cursor-pointer flex items-center gap-1.5"
               >
-                {isSubmitting ? "جاري الإنشاء..." : isScheduled ? "جدولة البث" : "حفظ كمسودة"}
+                {isSubmitting ? t("broadcastsPage.creating") : isScheduled ? t("broadcastsPage.scheduleBroadcast") : t("broadcastsPage.saveDraft")}
               </Button>
             </DialogFooter>
           </form>
@@ -539,13 +550,13 @@ export default function BroadcastsPage() {
 
       {/* Campaign Details Panel Drawer */}
       <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <SheetContent side="left" className="w-full sm:max-w-md border-none bg-card/95 backdrop-blur shadow-2xl p-6 flex flex-col justify-between" dir="rtl">
+        <SheetContent side="left" className="w-full sm:max-w-md border-none bg-card/95 backdrop-blur shadow-2xl p-6 flex flex-col justify-between" dir={dir}>
           <div>
             <SheetHeader className="text-right p-0 mb-4 flex flex-row items-center justify-between border-b border-border/30 pb-4">
               <div>
-                <SheetTitle className="text-2xl font-black">تفاصيل الحملة الإعلانية</SheetTitle>
+                <SheetTitle className="text-2xl font-black">{t("broadcastsPage.detailsTitle")}</SheetTitle>
                 <SheetDescription className="text-muted-foreground text-xs mt-0.5">
-                  تفاصيل إعدادات الحملة ومؤشرات الأداء.
+                  {t("broadcastsPage.detailsSubtitle")}
                 </SheetDescription>
               </div>
               <Button variant="ghost" size="icon" onClick={() => setIsDetailsOpen(false)} className="rounded-xl cursor-pointer">
@@ -558,32 +569,32 @@ export default function BroadcastsPage() {
                 {/* Details Section */}
                 <div className="space-y-3 bg-accent/10 p-4.5 rounded-2xl border border-border/40">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-muted-foreground font-bold">الحالة:</span>
+                    <span className="text-xs text-muted-foreground font-bold">{t("broadcastsPage.statusLabel")}</span>
                     {getStatusBadge(selectedCampaign.status)}
                   </div>
                   <div className="flex justify-between items-center border-t border-border/20 pt-2.5">
-                    <span className="text-xs text-muted-foreground font-bold">اسم الحملة:</span>
+                    <span className="text-xs text-muted-foreground font-bold">{t("broadcastsPage.campaignNameColonLabel")}</span>
                     <span className="text-xs font-black">{selectedCampaign.name}</span>
                   </div>
                   <div className="flex justify-between items-center border-t border-border/20 pt-2.5">
-                    <span className="text-xs text-muted-foreground font-bold">الجمهور المستهدف:</span>
+                    <span className="text-xs text-muted-foreground font-bold">{t("broadcastsPage.targetAudience")}</span>
                     <Badge variant="outline" className="text-[10px] font-semibold">
-                      {selectedCampaign.segmentTarget === "all" ? "جميع المشتركين" : `@${selectedCampaign.segmentTarget}`}
+                      {selectedCampaign.segmentTarget === "all" ? t("broadcastsPage.allSubscribers") : `@${selectedCampaign.segmentTarget}`}
                     </Badge>
                   </div>
                   <div className="flex justify-between items-center border-t border-border/20 pt-2.5">
-                    <span className="text-xs text-muted-foreground font-bold">تاريخ البث:</span>
+                    <span className="text-xs text-muted-foreground font-bold">{t("broadcastsPage.broadcastDateLabel")}</span>
                     <span className="text-xs font-semibold">
-                      {selectedCampaign.scheduledAt 
-                        ? new Date(selectedCampaign.scheduledAt).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })
-                        : new Date(selectedCampaign.createdAt).toLocaleDateString('ar-EG', { dateStyle: 'medium' })}
+                      {selectedCampaign.scheduledAt
+                        ? new Date(selectedCampaign.scheduledAt).toLocaleString(localeCode, { dateStyle: 'short', timeStyle: 'short' })
+                        : new Date(selectedCampaign.createdAt).toLocaleDateString(localeCode, { dateStyle: 'medium' })}
                     </span>
                   </div>
                 </div>
 
                 {/* Message Content */}
                 <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-muted-foreground">نص رسالة البث</h4>
+                  <h4 className="text-xs font-bold text-muted-foreground">{t("broadcastsPage.messageContentTitle")}</h4>
                   <div className="bg-accent/25 p-4 rounded-2xl text-xs leading-relaxed border border-border/30 max-h-36 overflow-y-auto">
                     {selectedCampaign.content}
                   </div>
@@ -594,7 +605,7 @@ export default function BroadcastsPage() {
                   <div className="space-y-4 pt-2">
                     <h4 className="text-xs font-bold text-muted-foreground flex items-center gap-1.5">
                       <BarChart2 className="w-4 h-4 text-primary" />
-                      إحصائيات إنجاز وتوصيل الرسائل
+                      {t("broadcastsPage.deliveryStatsTitle")}
                     </h4>
 
                     {(() => {
@@ -613,7 +624,7 @@ export default function BroadcastsPage() {
                           {/* Sent -> Delivered */}
                           <div className="space-y-2">
                             <div className="flex justify-between text-xs font-bold">
-                              <span>رسائل مستلمة ({delivered} / {sent})</span>
+                              <span>{t("broadcastsPage.messagesDelivered", { delivered, sent })}</span>
                               <span className="text-[#4d9fff]">{percentDelivered}%</span>
                             </div>
                             <div className="h-2.5 bg-accent/40 rounded-full overflow-hidden">
@@ -624,7 +635,7 @@ export default function BroadcastsPage() {
                           {/* Delivered -> Read */}
                           <div className="space-y-2">
                             <div className="flex justify-between text-xs font-bold">
-                              <span>تمت قراءتها ({read} / {delivered})</span>
+                              <span>{t("broadcastsPage.messagesRead", { read, delivered })}</span>
                               <span className="text-[#22d3ee]">{percentRead}%</span>
                             </div>
                             <div className="h-2.5 bg-accent/40 rounded-full overflow-hidden">
@@ -635,7 +646,7 @@ export default function BroadcastsPage() {
                           {/* Read -> Clicked */}
                           <div className="space-y-2">
                             <div className="flex justify-between text-xs font-bold">
-                              <span>تم النقر على روابطها ({clicked} / {read})</span>
+                              <span>{t("broadcastsPage.linksClicked", { clicked, read })}</span>
                               <span className="text-primary">{percentClicked}%</span>
                             </div>
                             <div className="h-2.5 bg-accent/40 rounded-full overflow-hidden">
@@ -653,32 +664,32 @@ export default function BroadcastsPage() {
 
           <div className="border-t border-border/20 pt-4 flex gap-2">
             {selectedCampaign && selectedCampaign.status === "DRAFT" && (
-              <Button 
+              <Button
                 onClick={() => { setIsDetailsOpen(false); handleExecute(selectedCampaign.id); }}
                 className="flex-1 bg-primary text-primary-foreground font-bold rounded-xl text-xs cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <Send className="w-3.5 h-3.5 text-[#0a0a0f]" />
-                بث الحملة الآن
+                {t("broadcastsPage.broadcastNow")}
               </Button>
             )}
 
             {selectedCampaign && selectedCampaign.status === "SCHEDULED" && (
-              <Button 
+              <Button
                 onClick={() => { setIsDetailsOpen(false); handleCancel(selectedCampaign.id); }}
                 variant="destructive"
                 className="flex-1 font-bold rounded-xl text-xs cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <Ban className="w-3.5 h-3.5" />
-                إلغاء جدولة الحملة
+                {t("broadcastsPage.cancelScheduleAction")}
               </Button>
             )}
 
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setIsDetailsOpen(false)}
               className="flex-1 rounded-xl text-xs font-bold cursor-pointer"
             >
-              إغلاق النافذة
+              {t("broadcastsPage.closeWindow")}
             </Button>
           </div>
         </SheetContent>

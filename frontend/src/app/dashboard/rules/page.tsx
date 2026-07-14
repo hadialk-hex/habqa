@@ -17,6 +17,7 @@ import api from "@/lib/api"
 import { PostPicker, PickedPost } from "@/components/post-picker"
 import { useConfirm } from "@/components/ui/confirm-dialog"
 import { useToast } from "@/components/ui/toast"
+import { useLanguage } from "@/lib/i18n/language-context"
 
 interface Rule {
   id: string
@@ -232,17 +233,18 @@ const PREDEFINED_TEMPLATES: PredefinedTemplate[] = [
   }
 ]
 
-const DAYS_OF_WEEK = [
-  { key: "sat", label: "السبت" },
-  { key: "sun", label: "الأحد" },
-  { key: "mon", label: "الإثنين" },
-  { key: "tue", label: "الثلاثاء" },
-  { key: "wed", label: "الأربعاء" },
-  { key: "thu", label: "الخميس" },
-  { key: "fri", label: "الجمعة" },
-]
-
 export default function RulesPage() {
+  const { t, locale, dir } = useLanguage()
+  const localeCode = locale === "ar" ? "ar-EG" : "en-US"
+  const DAYS_OF_WEEK = [
+    { key: "sat", label: t("rulesPage.dayShortSat") },
+    { key: "sun", label: t("rulesPage.dayShortSun") },
+    { key: "mon", label: t("rulesPage.dayShortMon") },
+    { key: "tue", label: t("rulesPage.dayShortTue") },
+    { key: "wed", label: t("rulesPage.dayShortWed") },
+    { key: "thu", label: t("rulesPage.dayShortThu") },
+    { key: "fri", label: t("rulesPage.dayShortFri") },
+  ]
   const confirm = useConfirm()
   const { showToast } = useToast()
   const [rules, setRules] = useState<Rule[]>([])
@@ -360,7 +362,7 @@ export default function RulesPage() {
 
     // Sort
     if (sortBy === "name") {
-      result.sort((a, b) => a.name.localeCompare(b.name, 'ar'))
+      result.sort((a, b) => a.name.localeCompare(b.name, localeCode))
     } else if (sortBy === "triggers") {
       result.sort((a, b) => (b.triggerCount || 0) - (a.triggerCount || 0))
     } else {
@@ -400,10 +402,10 @@ export default function RulesPage() {
 
       if (editingRuleId) {
         await api.put(`/rules/${editingRuleId}`, payload)
-        setBanner({ type: "success", text: "✅ تم تحديث القاعدة بنجاح." })
+        setBanner({ type: "success", text: t("rulesPage.ruleUpdatedSuccess") })
       } else {
         await api.post("/rules", payload)
-        setBanner({ type: "success", text: "✅ تم إنشاء القاعدة بنجاح." })
+        setBanner({ type: "success", text: t("rulesPage.ruleCreatedSuccess") })
       }
 
       setIsDialogOpen(false)
@@ -411,7 +413,7 @@ export default function RulesPage() {
       fetchRules()
     } catch (error) {
       console.error("Failed to save rule", error)
-      setBanner({ type: "error", text: "فشل حفظ القاعدة. حاول مرة أخرى." })
+      setBanner({ type: "error", text: t("rulesPage.saveRuleFailed") })
     } finally {
       setIsSubmitting(false)
     }
@@ -440,7 +442,7 @@ export default function RulesPage() {
     if (rule.postId) {
       setSelectedPost({
         id: rule.postId,
-        message: "تم اختيار هذا المنشور مسبقاً",
+        message: t("rulesPage.postAlreadySelected"),
         picture: "",
         commentsCount: 0,
         channelName: "",
@@ -600,16 +602,16 @@ export default function RulesPage() {
   }
 
   const formatArabicDate = (dateStr: string | null | undefined) => {
-    if (!dateStr) return "لم يتم التفعيل بعد"
+    if (!dateStr) return t("rulesPage.notTriggeredYet")
     try {
       const date = new Date(dateStr)
-      if (isNaN(date.getTime())) return "لم يتم التفعيل بعد"
-      return new Intl.DateTimeFormat("ar-EG", {
+      if (isNaN(date.getTime())) return t("rulesPage.notTriggeredYet")
+      return new Intl.DateTimeFormat(localeCode, {
         dateStyle: "medium",
         timeStyle: "short"
       }).format(date)
     } catch (e) {
-      return "لم يتم التفعيل بعد"
+      return t("rulesPage.notTriggeredYet")
     }
   }
 
@@ -631,7 +633,7 @@ export default function RulesPage() {
       }
 
       const payload = {
-        name: `نسخة من ${rule.name}`,
+        name: t("rulesPage.copyOfRuleName", { name: rule.name }),
         triggerType: rule.triggerType,
         postId: rule.postId || null,
         keywords: rule.keywords || "",
@@ -643,11 +645,11 @@ export default function RulesPage() {
         replyMessages: parsedMessages,
       }
       await api.post("/rules", payload)
-      showToast(`✅ تم نسخ قاعدة "${rule.name}" بنجاح`, "success")
+      showToast(t("rulesPage.ruleClonedSuccess", { name: rule.name }), "success")
       fetchRules()
     } catch (error) {
       console.error("Failed to clone rule", error)
-      showToast("فشل نسخ القاعدة. حاول مرة أخرى.", "error")
+      showToast(t("rulesPage.cloneRuleFailed"), "error")
     }
   }
 
@@ -676,12 +678,12 @@ export default function RulesPage() {
     try {
       const ids = Array.from(selectedRuleIds)
       await Promise.all(ids.map(id => api.put(`/rules/${id}`, { isActive: true })))
-      showToast(`✅ تم تفعيل ${ids.length} قاعدة بنجاح`, "success")
+      showToast(t("rulesPage.bulkActivateSuccess", { count: ids.length }), "success")
       setSelectedRuleIds(new Set())
       fetchRules()
     } catch (error) {
       console.error("Bulk activate failed", error)
-      showToast("فشل تفعيل القواعد المحددة.", "error")
+      showToast(t("rulesPage.bulkActivateFailed"), "error")
     }
   }
 
@@ -689,33 +691,33 @@ export default function RulesPage() {
     try {
       const ids = Array.from(selectedRuleIds)
       await Promise.all(ids.map(id => api.put(`/rules/${id}`, { isActive: false })))
-      showToast(`✅ تم تعطيل ${ids.length} قاعدة بنجاح`, "success")
+      showToast(t("rulesPage.bulkDeactivateSuccess", { count: ids.length }), "success")
       setSelectedRuleIds(new Set())
       fetchRules()
     } catch (error) {
       console.error("Bulk deactivate failed", error)
-      showToast("فشل تعطيل القواعد المحددة.", "error")
+      showToast(t("rulesPage.bulkDeactivateFailed"), "error")
     }
   }
 
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedRuleIds)
     const confirmed = await confirm({
-      title: "تأكيد حذف القواعد المحددة",
-      message: `هل أنت متأكد من حذف ${ids.length} قاعدة؟ سيتوقف الرد الآلي المرتبط بها فوراً.`,
+      title: t("rulesPage.bulkDeleteConfirmTitle"),
+      message: t("rulesPage.bulkDeleteConfirmMessage", { count: ids.length }),
       variant: "destructive",
-      confirmText: "تأكيد الحذف",
-      cancelText: "إلغاء"
+      confirmText: t("rulesPage.confirmDelete"),
+      cancelText: t("rulesPage.cancel")
     })
     if (confirmed) {
       try {
         await Promise.all(ids.map(id => api.delete(`/rules/${id}`)))
-        showToast(`✅ تم حذف ${ids.length} قاعدة بنجاح`, "success")
+        showToast(t("rulesPage.bulkDeleteSuccess", { count: ids.length }), "success")
         setSelectedRuleIds(new Set())
         fetchRules()
       } catch (error) {
         console.error("Bulk delete failed", error)
-        showToast("فشل حذف القواعد المحددة.", "error")
+        showToast(t("rulesPage.bulkDeleteFailed"), "error")
       }
     }
   }
@@ -731,9 +733,9 @@ export default function RulesPage() {
             <div className="bg-gradient-to-br from-primary to-[oklch(0.62_0.15_230)] p-2.5 rounded-xl shadow-lg shadow-primary/25">
               <Zap className="w-6 h-6 text-white" />
             </div>
-            الردود الآلية
+            {t("rulesPage.title")}
           </h1>
-          <p className="text-muted-foreground mt-2 font-medium">إدارة قواعد الرد الآلي على التعليقات والرسائل.</p>
+          <p className="text-muted-foreground mt-2 font-medium">{t("rulesPage.subtitle")}</p>
         </div>
         
         <div className="flex gap-2 w-full sm:w-auto">
@@ -743,7 +745,7 @@ export default function RulesPage() {
             className="gap-2 rounded-xl px-5 h-11 font-bold border-primary/30 hover:bg-primary/10 cursor-pointer w-full sm:w-auto"
           >
             <LayoutGrid className="w-4 h-4 text-primary" />
-            مكتبة القوالب الجاهزة
+            {t("rulesPage.templatesLibraryBtn")}
           </Button>
 
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -752,15 +754,15 @@ export default function RulesPage() {
           }}>
             <DialogTrigger render={<Button className="gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all rounded-xl px-6 h-11 font-bold cursor-pointer w-full sm:w-auto" />}>
               <Plus className="w-4 h-4" />
-              إضافة قاعدة جديدة
+              {t("rulesPage.addNewRuleBtn")}
             </DialogTrigger>
-            <DialogContent className={`${isSequentialEnabled ? 'sm:max-w-[1100px]' : 'sm:max-w-[650px]'} max-h-[90vh] overflow-y-auto transition-all duration-300`} dir="rtl">
+            <DialogContent className={`${isSequentialEnabled ? 'sm:max-w-[1100px]' : 'sm:max-w-[650px]'} max-h-[90vh] overflow-y-auto transition-all duration-300`} dir={dir}>
               <DialogHeader>
                 <DialogTitle className="text-2xl font-black">
-                  {editingRuleId ? "تعديل قاعدة الرد الآلي" : "إنشاء قاعدة رد آلي جديدة"}
+                  {editingRuleId ? t("rulesPage.editRuleTitle") : t("rulesPage.createRuleTitle")}
                 </DialogTitle>
                 <DialogDescription className="font-medium">
-                  يمكنك تخصيص الرد ليكون عاماً لجميع المنشورات أو مخصصاً لمنشور محدد، مع دعم إرفاق الصور والفيديوهات والردود المتسلسلة.
+                  {t("rulesPage.dialogDesc")}
                 </DialogDescription>
               </DialogHeader>
               
@@ -768,30 +770,30 @@ export default function RulesPage() {
                 {/* Form Inputs Column */}
                 <div className="flex-1 space-y-6">
                   <div className="grid gap-2">
-                    <Label htmlFor="name" className="font-bold">اسم القاعدة (للتنظيم الداخلي)</Label>
-                    <Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder="مثال: رد الخصومات 50%" className="rounded-xl h-11 font-medium" />
+                    <Label htmlFor="name" className="font-bold">{t("rulesPage.ruleNameLabel")}</Label>
+                    <Input id="name" value={name} onChange={e => setName(e.target.value)} placeholder={t("rulesPage.ruleNamePlaceholder")} className="rounded-xl h-11 font-medium" />
                   </div>
 
                   <div className="grid gap-2">
-                    <Label className="font-bold">نطاق عمل القاعدة</Label>
+                    <Label className="font-bold">{t("rulesPage.ruleScopeLabel")}</Label>
                     <Tabs value={ruleType} onValueChange={setRuleType} className="w-full">
                       <TabsList className="grid w-full grid-cols-3 rounded-xl h-11">
                         <TabsTrigger value="GLOBAL" className="rounded-lg gap-2 font-bold cursor-pointer">
                           <Globe2 className="w-4 h-4" />
-                          رد عام
+                          {t("rulesPage.scopeGlobal")}
                         </TabsTrigger>
                         <TabsTrigger value="POST" className="rounded-lg gap-2 font-bold cursor-pointer">
                           <Target className="w-4 h-4" />
-                          مخصص لمنشور
+                          {t("rulesPage.scopePost")}
                         </TabsTrigger>
                         <TabsTrigger value="STORY" className="rounded-lg gap-2 font-bold cursor-pointer">
                           <Play className="w-4 h-4" />
-                          ستوري
+                          {t("rulesPage.scopeStory")}
                         </TabsTrigger>
                       </TabsList>
                       <TabsContent value="STORY" className="pt-4 border-t mt-4">
                         <div className="grid gap-2">
-                          <Label className="font-bold text-sm">نوع تفاعل الستوري</Label>
+                          <Label className="font-bold text-sm">{t("rulesPage.storyTriggerTypeLabel")}</Label>
                           <div className="grid grid-cols-2 gap-2">
                             <button
                               type="button"
@@ -803,7 +805,7 @@ export default function RulesPage() {
                               }`}
                             >
                               <Send className="w-4 h-4 shrink-0" />
-                              رد على الستوري
+                              {t("rulesPage.storyReplyOption")}
                             </button>
                             <button
                               type="button"
@@ -815,13 +817,13 @@ export default function RulesPage() {
                               }`}
                             >
                               <Sparkles className="w-4 h-4 shrink-0" />
-                              منشن في ستوري
+                              {t("rulesPage.storyMentionOption")}
                             </button>
                           </div>
                           <p className="text-xs text-muted-foreground leading-relaxed mt-1">
                             {storyTrigger === "STORY_REPLY"
-                              ? "عندما يرد أحد على ستوري حسابك، يصله الرد الخاص تلقائياً. اترك الكلمات المفتاحية فارغة للرد على أي تفاعل."
-                              : "عندما يذكرك أحد في ستوري حسابه، يصله رد شكر تلقائي — أقوى أداة لمكافأة المشاركة."}
+                              ? t("rulesPage.storyReplyHint")
+                              : t("rulesPage.storyMentionHint")}
                           </p>
                         </div>
                       </TabsContent>
@@ -839,11 +841,11 @@ export default function RulesPage() {
                               )}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-bold line-clamp-2">
-                                  {selectedPost.message || <span className="italic text-muted-foreground">منشور بدون نص</span>}
+                                  {selectedPost.message || <span className="italic text-muted-foreground">{t("rulesPage.postWithoutText")}</span>}
                                 </p>
                                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5 font-medium">
                                   <MessageCircle className="w-3 h-3" />
-                                  {selectedPost.commentsCount} تعليق · {selectedPost.channelName}
+                                  {t("rulesPage.commentsCountChannel", { count: selectedPost.commentsCount, channel: selectedPost.channelName })}
                                 </p>
                               </div>
                               <Button
@@ -864,11 +866,11 @@ export default function RulesPage() {
                               onClick={() => setIsPickerOpen(true)}
                             >
                               <Newspaper className="w-5 h-5 text-primary" />
-                              اختيار منشور من الصفحة
+                              {t("rulesPage.selectPostFromPage")}
                             </Button>
                           )}
                           <p className="text-xs text-muted-foreground font-medium">
-                            سيتم تنفيذ هذه القاعدة فقط عندما يعلق المستخدم على المنشور المحدد.
+                            {t("rulesPage.postRuleHint")}
                           </p>
 
                           {!selectedPost && (
@@ -878,14 +880,14 @@ export default function RulesPage() {
                                 onClick={() => setShowManualId(!showManualId)}
                                 className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 text-right w-fit cursor-pointer font-medium"
                               >
-                                {showManualId ? 'إخفاء الإدخال اليدوي' : 'أو أدخل معرف المنشور يدوياً (متقدم)'}
+                                {showManualId ? t("rulesPage.hideManualInput") : t("rulesPage.orEnterPostIdManually")}
                               </button>
                               {showManualId && (
                                 <Input
                                   id="postId"
                                   value={postId}
                                   onChange={e => setPostId(e.target.value)}
-                                  placeholder="مثال: 123456789_987654321"
+                                  placeholder={t("rulesPage.postIdPlaceholder")}
                                   className="rounded-xl h-11"
                                   dir="ltr"
                                 />
@@ -898,9 +900,9 @@ export default function RulesPage() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label htmlFor="keywords" className="font-bold">الكلمات المفتاحية (اختياري)</Label>
-                    <Input id="keywords" value={keywords} onChange={e => setKeywords(e.target.value)} placeholder="مثال: تفاصيل، السعر، بكم (افصل بفاصلة)" className="rounded-xl h-11 font-medium" />
-                    <p className="text-xs text-muted-foreground font-medium">إذا تركتها فارغة، سيتم الرد على أي تعليق.</p>
+                    <Label htmlFor="keywords" className="font-bold">{t("rulesPage.keywordsLabel")}</Label>
+                    <Input id="keywords" value={keywords} onChange={e => setKeywords(e.target.value)} placeholder={t("rulesPage.keywordsPlaceholder")} className="rounded-xl h-11 font-medium" />
+                    <p className="text-xs text-muted-foreground font-medium">{t("rulesPage.keywordsHint")}</p>
 
                     {/* --- NEW: Keyword Conflict Warnings --- */}
                     {keywordConflicts.length > 0 && (
@@ -908,7 +910,7 @@ export default function RulesPage() {
                         {keywordConflicts.map((c, i) => (
                           <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold">
                             <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                            <span>تنبيه: الكلمة &lsquo;{c.keyword}&rsquo; مستخدمة أيضاً في قاعدة &lsquo;{c.ruleName}&rsquo;</span>
+                            <span>{t("rulesPage.keywordConflictWarning", { keyword: c.keyword, ruleName: c.ruleName })}</span>
                           </div>
                         ))}
                       </div>
@@ -921,9 +923,9 @@ export default function RulesPage() {
                       <div className="space-y-0.5">
                         <Label className="font-bold text-sm flex items-center gap-2">
                           <Clock className="w-4 h-4 text-primary" />
-                          جدولة زمنية
+                          {t("rulesPage.schedulingLabel")}
                         </Label>
-                        <p className="text-xs text-muted-foreground font-medium">تفعيل القاعدة فقط في أوقات وأيام محددة.</p>
+                        <p className="text-xs text-muted-foreground font-medium">{t("rulesPage.schedulingHint")}</p>
                       </div>
                       <Switch
                         checked={scheduleEnabled}
@@ -934,7 +936,7 @@ export default function RulesPage() {
                     {scheduleEnabled && (
                       <div className="p-4 rounded-xl border bg-accent/10 space-y-4">
                         <div className="grid gap-2">
-                          <Label className="text-xs font-bold">أيام التفعيل</Label>
+                          <Label className="text-xs font-bold">{t("rulesPage.activeDaysLabel")}</Label>
                           <div className="flex flex-wrap gap-2">
                             {DAYS_OF_WEEK.map(day => (
                               <button
@@ -960,7 +962,7 @@ export default function RulesPage() {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="grid gap-1">
-                            <Label className="text-xs font-bold">من الساعة</Label>
+                            <Label className="text-xs font-bold">{t("rulesPage.fromTimeLabel")}</Label>
                             <Input
                               type="time"
                               value={scheduleStartTime}
@@ -970,7 +972,7 @@ export default function RulesPage() {
                             />
                           </div>
                           <div className="grid gap-1">
-                            <Label className="text-xs font-bold">إلى الساعة</Label>
+                            <Label className="text-xs font-bold">{t("rulesPage.toTimeLabel")}</Label>
                             <Input
                               type="time"
                               value={scheduleEndTime}
@@ -987,29 +989,29 @@ export default function RulesPage() {
                   <div className="grid gap-2 border-t pt-4">
                     <Label className="text-lg font-black flex items-center gap-2">
                       <Sparkles className="w-5 h-5 text-primary" />
-                      محتوى الرد
+                      {t("rulesPage.replyContentLabel")}
                     </Label>
 
                     <div className="grid gap-4 mt-2">
                       <div className="grid gap-2">
-                        <Label htmlFor="replyText" className="font-bold">الرد العلني على التعليق</Label>
+                        <Label htmlFor="replyText" className="font-bold">{t("rulesPage.publicReplyLabel")}</Label>
                         <Textarea
                           id="replyText"
                           value={replyText}
                           onChange={e => setReplyText(e.target.value)}
-                          placeholder="مرحباً! تفضل التفاصيل..."
+                          placeholder={t("rulesPage.publicReplyPlaceholder")}
                           className="min-h-[90px] rounded-xl font-medium"
                         />
                         <p className="text-xs text-muted-foreground font-medium">
-                          💡 نصيحة: اكتب عدة صيغ مفصولة بـ <code className="bg-accent px-1.5 py-0.5 rounded font-bold" dir="ltr">|||</code> وسيُرسل واحدة عشوائياً كل مرة.
+                          {t("rulesPage.variantsTip").split("|||").map((part, i, arr) => i < arr.length - 1 ? <span key={i}>{part}<code className="bg-accent px-1.5 py-0.5 rounded font-bold" dir="ltr">|||</code></span> : <span key={i}>{part}</span>)}
                         </p>
                       </div>
 
                       {/* Sequential Messages Switch */}
                       <div className="flex items-center justify-between p-4 rounded-xl border bg-accent/20">
                         <div className="space-y-0.5">
-                          <Label className="font-bold text-sm">تفعيل الردود المتسلسلة (إرسال عدة رسائل)</Label>
-                          <p className="text-xs text-muted-foreground font-medium">إرسال تسلسل رسائل متعددة للعميل في الخاص بدلاً من رسالة واحدة.</p>
+                          <Label className="font-bold text-sm">{t("rulesPage.sequentialToggleLabel")}</Label>
+                          <p className="text-xs text-muted-foreground font-medium">{t("rulesPage.sequentialToggleHint")}</p>
                         </div>
                         <Switch
                           checked={isSequentialEnabled}
@@ -1023,7 +1025,7 @@ export default function RulesPage() {
                           <div className="flex justify-between items-center">
                             <Label className="font-black text-base flex items-center gap-2 text-primary">
                               <MessageSquareText className="w-4 h-4" />
-                              تسلسل الرسائل الخاصة ({replyMessages.length} من 5)
+                              {t("rulesPage.sequenceMessagesLabel", { count: replyMessages.length })}
                             </Label>
                             {replyMessages.length < 5 && (
                               <Button
@@ -1034,7 +1036,7 @@ export default function RulesPage() {
                                 className="rounded-lg font-bold border-primary/30 text-primary hover:bg-primary/5 cursor-pointer"
                               >
                                 <Plus className="w-3.5 h-3.5 ml-1" />
-                                إضافة رسالة
+                                {t("rulesPage.addMessageBtn")}
                               </Button>
                             )}
                           </div>
@@ -1043,7 +1045,7 @@ export default function RulesPage() {
                             {replyMessages.map((msg, idx) => (
                               <div key={idx} className="p-4 border rounded-xl bg-card relative space-y-3 shadow-sm">
                                 <div className="flex justify-between items-center border-b pb-2">
-                                  <span className="font-bold text-sm text-muted-foreground">الرسالة #{idx + 1}</span>
+                                  <span className="font-bold text-sm text-muted-foreground">{t("rulesPage.messageNumberLabel", { n: idx + 1 })}</span>
                                   <div className="flex items-center gap-1">
                                     <Button
                                       type="button"
@@ -1083,7 +1085,7 @@ export default function RulesPage() {
                                 {idx > 0 && (
                                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-accent/20 border border-border/50">
                                     <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                                    <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">تأخير</span>
+                                    <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">{t("rulesPage.delayLabel")}</span>
                                     <Input
                                       type="number"
                                       min={0}
@@ -1093,14 +1095,15 @@ export default function RulesPage() {
                                       className="h-7 w-16 text-xs rounded text-center"
                                       dir="ltr"
                                     />
-                                    <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">ثانية قبل إرسال هذه الرسالة</span>
+                                    <span className="text-xs text-muted-foreground font-medium whitespace-nowrap">{t("rulesPage.secondsBeforeSend")}</span>
                                   </div>
                                 )}
 
                                 <div className="grid gap-2">
-                                  <Label className="text-xs font-bold">نوع الرسالة</Label>
-                                  <Select 
-                                    value={msg.type} 
+                                  <Label className="text-xs font-bold">{t("rulesPage.messageTypeLabel")}</Label>
+                                  <Select
+                                    value={msg.type}
+                                    items={{ TEXT: t("rulesPage.typeTextOption"), IMAGE: t("rulesPage.typeImageOption"), VIDEO: t("rulesPage.typeVideoOption"), CAROUSEL: t("rulesPage.typeCarouselOption"), QUICK_REPLIES: t("rulesPage.typeQuickRepliesOption") }}
                                     onValueChange={(val) => {
                                       const updated = [...replyMessages]
                                       const prevDelay = updated[idx].delay
@@ -1127,25 +1130,25 @@ export default function RulesPage() {
                                     }}
                                   >
                                     <SelectTrigger className="rounded-lg h-9 text-xs">
-                                      <SelectValue placeholder="اختر النوع" />
+                                      <SelectValue placeholder={t("rulesPage.selectTypePlaceholder")} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="TEXT">نصي (TEXT)</SelectItem>
-                                      <SelectItem value="IMAGE">صورة (IMAGE)</SelectItem>
-                                      <SelectItem value="VIDEO">فيديو (VIDEO)</SelectItem>
-                                      <SelectItem value="CAROUSEL">كارت متحرك (CAROUSEL)</SelectItem>
-                                      <SelectItem value="QUICK_REPLIES">ردود سريعة (QUICK REPLIES)</SelectItem>
+                                      <SelectItem value="TEXT">{t("rulesPage.typeTextOption")}</SelectItem>
+                                      <SelectItem value="IMAGE">{t("rulesPage.typeImageOption")}</SelectItem>
+                                      <SelectItem value="VIDEO">{t("rulesPage.typeVideoOption")}</SelectItem>
+                                      <SelectItem value="CAROUSEL">{t("rulesPage.typeCarouselOption")}</SelectItem>
+                                      <SelectItem value="QUICK_REPLIES">{t("rulesPage.typeQuickRepliesOption")}</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
 
                                 {msg.type === "TEXT" && (
                                   <div className="grid gap-1">
-                                    <Label className="text-xs font-bold">نص الرسالة</Label>
+                                    <Label className="text-xs font-bold">{t("rulesPage.messageTextLabel")}</Label>
                                     <Textarea
                                       value={msg.text || ""}
                                       onChange={(e) => handleUpdateMessageField(idx, "text", e.target.value)}
-                                      placeholder="مرحباً! كيف يمكنني مساعدتك؟"
+                                      placeholder={t("rulesPage.messageTextPlaceholder")}
                                       className="min-h-[70px] rounded-lg text-xs"
                                     />
                                   </div>
@@ -1154,7 +1157,7 @@ export default function RulesPage() {
                                 {msg.type === "IMAGE" && (
                                   <div className="grid gap-2">
                                     <div className="grid gap-1">
-                                      <Label className="text-xs font-bold">رابط الصورة</Label>
+                                      <Label className="text-xs font-bold">{t("rulesPage.imageUrlLabel")}</Label>
                                       <Input
                                         value={msg.imageUrl || ""}
                                         onChange={(e) => handleUpdateMessageField(idx, "imageUrl", e.target.value)}
@@ -1163,11 +1166,11 @@ export default function RulesPage() {
                                       />
                                     </div>
                                     <div className="grid gap-1">
-                                      <Label className="text-xs font-bold">شرح الصورة (Caption) - اختياري</Label>
+                                      <Label className="text-xs font-bold">{t("rulesPage.imageCaptionLabel")}</Label>
                                       <Input
                                         value={msg.caption || ""}
                                         onChange={(e) => handleUpdateMessageField(idx, "caption", e.target.value)}
-                                        placeholder="شاهد منتجاتنا الحصرية"
+                                        placeholder={t("rulesPage.imageCaptionPlaceholder")}
                                         className="h-9 rounded-lg text-xs"
                                       />
                                     </div>
@@ -1178,7 +1181,7 @@ export default function RulesPage() {
                                 {msg.type === "VIDEO" && (
                                   <div className="grid gap-2">
                                     <div className="grid gap-1">
-                                      <Label className="text-xs font-bold">رابط الفيديو</Label>
+                                      <Label className="text-xs font-bold">{t("rulesPage.videoUrlLabel")}</Label>
                                       <Input
                                         value={msg.videoUrl || ""}
                                         onChange={(e) => handleUpdateMessageField(idx, "videoUrl", e.target.value)}
@@ -1188,11 +1191,11 @@ export default function RulesPage() {
                                       />
                                     </div>
                                     <div className="grid gap-1">
-                                      <Label className="text-xs font-bold">شرح الفيديو (Caption) - اختياري</Label>
+                                      <Label className="text-xs font-bold">{t("rulesPage.videoCaptionLabel")}</Label>
                                       <Input
                                         value={msg.caption || ""}
                                         onChange={(e) => handleUpdateMessageField(idx, "caption", e.target.value)}
-                                        placeholder="شاهد الفيديو التوضيحي"
+                                        placeholder={t("rulesPage.videoCaptionPlaceholder")}
                                         className="h-9 rounded-lg text-xs"
                                       />
                                     </div>
@@ -1213,7 +1216,7 @@ export default function RulesPage() {
                                 {msg.type === "CAROUSEL" && (
                                   <div className="space-y-3 bg-accent/20 p-3 rounded-lg border">
                                     <div className="flex justify-between items-center">
-                                      <Label className="text-xs font-bold">الكروت المعروضة ({msg.cards?.length || 0})</Label>
+                                      <Label className="text-xs font-bold">{t("rulesPage.cardsShownLabel", { count: msg.cards?.length || 0 })}</Label>
                                       {(msg.cards?.length || 0) < 5 && (
                                         <Button
                                           type="button"
@@ -1226,7 +1229,7 @@ export default function RulesPage() {
                                           }}
                                           className="h-6 rounded text-[10px] font-bold text-primary hover:bg-primary/5 cursor-pointer"
                                         >
-                                          + إضافة كارت
+                                          {t("rulesPage.addCardBtn")}
                                         </Button>
                                       )}
                                     </div>
@@ -1234,7 +1237,7 @@ export default function RulesPage() {
                                     {(msg.cards || []).map((card: any, cIdx: number) => (
                                       <div key={cIdx} className="p-3 border rounded bg-card space-y-2 relative">
                                         <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground border-b pb-1">
-                                          <span>الكارت #{cIdx + 1}</span>
+                                          <span>{t("rulesPage.cardNumberLabel", { n: cIdx + 1 })}</span>
                                           {(msg.cards || []).length > 1 && (
                                             <button
                                               type="button"
@@ -1245,13 +1248,13 @@ export default function RulesPage() {
                                               }}
                                               className="text-destructive hover:underline cursor-pointer"
                                             >
-                                              حذف الكارت
+                                              {t("rulesPage.deleteCardBtn")}
                                             </button>
                                           )}
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
                                           <div className="grid gap-1">
-                                            <Label className="text-[10px]">العنوان الرئيسي</Label>
+                                            <Label className="text-[10px]">{t("rulesPage.mainTitleLabel")}</Label>
                                             <Input
                                               value={card.title || ""}
                                               onChange={(e) => {
@@ -1263,7 +1266,7 @@ export default function RulesPage() {
                                             />
                                           </div>
                                           <div className="grid gap-1">
-                                            <Label className="text-[10px]">العنوان الفرعي</Label>
+                                            <Label className="text-[10px]">{t("rulesPage.subtitleLabel")}</Label>
                                             <Input
                                               value={card.subtitle || ""}
                                               onChange={(e) => {
@@ -1276,7 +1279,7 @@ export default function RulesPage() {
                                           </div>
                                         </div>
                                         <div className="grid gap-1">
-                                          <Label className="text-[10px]">رابط الصورة</Label>
+                                          <Label className="text-[10px]">{t("rulesPage.imageUrlLabel")}</Label>
                                           <Input
                                             value={card.imageUrl || ""}
                                             onChange={(e) => {
@@ -1291,7 +1294,7 @@ export default function RulesPage() {
                                         {/* Carousel Card Buttons */}
                                         <div className="space-y-1 border-t pt-2">
                                           <div className="flex justify-between items-center text-[10px]">
-                                            <span className="font-bold">أزرار الكارت ({card.buttons?.length || 0})</span>
+                                            <span className="font-bold">{t("rulesPage.cardButtonsLabel", { count: card.buttons?.length || 0 })}</span>
                                             {(card.buttons?.length || 0) < 3 && (
                                               <button
                                                 type="button"
@@ -1302,7 +1305,7 @@ export default function RulesPage() {
                                                 }}
                                                 className="text-primary hover:underline font-bold cursor-pointer"
                                               >
-                                                + إضافة زر
+                                                {t("rulesPage.addButtonBtn")}
                                               </button>
                                             )}
                                           </div>
@@ -1310,6 +1313,7 @@ export default function RulesPage() {
                                             <div key={bIdx} className="grid grid-cols-3 gap-1 items-center bg-accent/10 p-1.5 rounded">
                                               <Select
                                                 value={btn.type}
+                                                items={{ url: t("rulesPage.urlTypeOption"), postback: t("rulesPage.postbackTypeOption") }}
                                                 onValueChange={(val) => {
                                                   const updated = [...replyMessages]
                                                   updated[idx].cards[cIdx].buttons[bIdx] = { type: val, title: "", [val === 'url' ? 'url' : 'payload']: "" }
@@ -1320,12 +1324,12 @@ export default function RulesPage() {
                                                   <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                  <SelectItem value="url">رابط URL</SelectItem>
-                                                  <SelectItem value="postback">حدث Postback</SelectItem>
+                                                  <SelectItem value="url">{t("rulesPage.urlTypeOption")}</SelectItem>
+                                                  <SelectItem value="postback">{t("rulesPage.postbackTypeOption")}</SelectItem>
                                                 </SelectContent>
                                               </Select>
                                               <Input
-                                                placeholder="عنوان الزر"
+                                                placeholder={t("rulesPage.buttonTitlePlaceholder")}
                                                 value={btn.title || ""}
                                                 onChange={(e) => {
                                                   const updated = [...replyMessages]
@@ -1336,7 +1340,7 @@ export default function RulesPage() {
                                               />
                                               <div className="flex items-center gap-1">
                                                 <Input
-                                                  placeholder={btn.type === 'url' ? "رابط" : "حمولة حدث"}
+                                                  placeholder={btn.type === 'url' ? t("rulesPage.linkPlaceholder") : t("rulesPage.payloadPlaceholder")}
                                                   value={btn.type === 'url' ? (btn.url || "") : (btn.payload || "")}
                                                   onChange={(e) => {
                                                     const updated = [...replyMessages]
@@ -1374,17 +1378,17 @@ export default function RulesPage() {
                                 {msg.type === "QUICK_REPLIES" && (
                                   <div className="space-y-3 bg-accent/20 p-3 rounded-lg border">
                                     <div className="grid gap-1">
-                                      <Label className="text-xs font-bold">نص التوجيه (Prompt Text)</Label>
+                                      <Label className="text-xs font-bold">{t("rulesPage.promptTextLabel")}</Label>
                                       <Input
                                         value={msg.text || ""}
                                         onChange={(e) => handleUpdateMessageField(idx, "text", e.target.value)}
-                                        placeholder="اختر أحد الخيارات للبدء:"
+                                        placeholder={t("rulesPage.promptTextPlaceholder")}
                                         className="h-8 text-xs rounded-lg"
                                       />
                                     </div>
                                     <div className="space-y-1.5">
                                       <div className="flex justify-between items-center text-[10px] font-bold">
-                                        <span>خيارات الرد السريع ({msg.replies?.length || 0})</span>
+                                        <span>{t("rulesPage.quickReplyOptionsLabel", { count: msg.replies?.length || 0 })}</span>
                                         {(msg.replies?.length || 0) < 10 && (
                                           <button
                                             type="button"
@@ -1395,14 +1399,14 @@ export default function RulesPage() {
                                             }}
                                             className="text-primary hover:underline font-bold cursor-pointer"
                                           >
-                                            + إضافة خيار
+                                            {t("rulesPage.addOptionBtn")}
                                           </button>
                                         )}
                                       </div>
                                       {(msg.replies || []).map((chip: any, rIdx: number) => (
                                         <div key={rIdx} className="grid grid-cols-2 gap-1 items-center bg-accent/10 p-1.5 rounded">
                                           <Input
-                                            placeholder="عنوان الخيار"
+                                            placeholder={t("rulesPage.optionTitlePlaceholder")}
                                             value={chip.title || ""}
                                             onChange={(e) => {
                                               const updated = [...replyMessages]
@@ -1413,7 +1417,7 @@ export default function RulesPage() {
                                           />
                                           <div className="flex items-center gap-1">
                                             <Input
-                                              placeholder="الحمولة Payload"
+                                              placeholder={t("rulesPage.payloadLabel2")}
                                               value={chip.payload || ""}
                                               onChange={(e) => {
                                                 const updated = [...replyMessages]
@@ -1451,35 +1455,35 @@ export default function RulesPage() {
                           <div className="grid gap-2">
                             <Label htmlFor="privateText" className="flex items-center gap-1.5 font-bold">
                               <Send className="w-3.5 h-3.5 text-primary" />
-                              رسالة خاصة تلقائية (Comment-to-DM)
+                              {t("rulesPage.autoPrivateMessageLabel")}
                             </Label>
                             <Textarea
                               id="privateText"
                               value={privateText}
                               onChange={e => setPrivateText(e.target.value)}
-                              placeholder="أهلاً! أرسلنا لك التفاصيل هنا على الخاص..."
+                              placeholder={t("rulesPage.autoPrivateMessagePlaceholder")}
                               className="min-h-[80px] rounded-xl font-medium"
                             />
-                            <p className="text-xs text-muted-foreground font-medium">تُرسل تلقائياً على ماسنجر لصاحب التعليق. اتركها فارغة إذا لا تريد إرسال رسالة خاصة.</p>
+                            <p className="text-xs text-muted-foreground font-medium">{t("rulesPage.autoPrivateMessageHint")}</p>
                           </div>
 
                           <div className="grid gap-2">
-                            <Label className="font-bold">إرفاق وسائط (صورة/فيديو)</Label>
-                            <Select value={mediaType} onValueChange={(val) => setMediaType(val || "NONE")}>
+                            <Label className="font-bold">{t("rulesPage.attachMediaLabel")}</Label>
+                            <Select value={mediaType} onValueChange={(val) => setMediaType(val || "NONE")} items={{ NONE: t("rulesPage.noMediaOption"), IMAGE: t("rulesPage.imageOption"), VIDEO: t("rulesPage.videoOption") }}>
                               <SelectTrigger className="rounded-xl h-11 text-sm font-medium">
-                                <SelectValue placeholder="اختر نوع المرفق" />
+                                <SelectValue placeholder={t("rulesPage.selectAttachmentType")} />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="NONE">بدون وسائط</SelectItem>
-                                <SelectItem value="IMAGE">صورة (Image)</SelectItem>
-                                <SelectItem value="VIDEO">فيديو (Video)</SelectItem>
+                                <SelectItem value="NONE">{t("rulesPage.noMediaOption")}</SelectItem>
+                                <SelectItem value="IMAGE">{t("rulesPage.imageOption")}</SelectItem>
+                                <SelectItem value="VIDEO">{t("rulesPage.videoOption")}</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
 
                           {mediaType !== "NONE" && (
                             <div className="grid gap-2 p-4 border rounded-xl bg-accent/30">
-                              <Label htmlFor="mediaUrl" className="font-bold">رابط الـ {mediaType === 'IMAGE' ? 'صورة' : 'فيديو'}</Label>
+                              <Label htmlFor="mediaUrl" className="font-bold">{t("rulesPage.mediaUrlLabel", { type: mediaType === 'IMAGE' ? t("rulesPage.mediaTypeImage") : t("rulesPage.mediaTypeVideo") })}</Label>
                               <Input 
                                 id="mediaUrl" 
                                 value={mediaUrl} 
@@ -1511,7 +1515,7 @@ export default function RulesPage() {
                     <div className="flex justify-between items-center">
                       <Label className="font-black text-sm flex items-center gap-1">
                         <Smartphone className="w-4 h-4 text-primary" />
-                        معاينة الهاتف المحمول
+                        {t("rulesPage.mobilePreviewLabel")}
                       </Label>
                       <div className="flex rounded-lg border overflow-hidden p-0.5 bg-muted">
                         <button
@@ -1542,11 +1546,11 @@ export default function RulesPage() {
                       <div className={`h-16 pt-6 px-4 flex items-center gap-2 border-b z-10 ${previewPlatform === 'MESSENGER' ? 'bg-[#0a0a0f] border-border text-white' : 'bg-[#005c4b] border-[#025143] text-white'}`}>
                         <ChevronRight className="w-4 h-4 shrink-0 rotate-180" />
                         <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0 border border-primary/20 text-xs font-bold text-primary">
-                          آلي
+                          {t("rulesPage.botInitial")}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold truncate">مساعد حبقة</p>
-                          <p className="text-[9px] text-emerald-400 font-medium">نشط الآن</p>
+                          <p className="text-xs font-bold truncate">{t("rulesPage.botAssistantName")}</p>
+                          <p className="text-[9px] text-emerald-400 font-medium">{t("rulesPage.activeNowLabel")}</p>
                         </div>
                       </div>
 
@@ -1556,7 +1560,7 @@ export default function RulesPage() {
                         {/* Public comment reply (Simulated as first message if present) */}
                         {replyText && (
                           <div className="self-stretch bg-accent/20 p-2.5 rounded-lg border border-border/30 text-[10px] text-muted-foreground mb-2 text-right">
-                            <span className="font-bold block text-foreground mb-1 text-xs">💬 رد علني على تعليق العميل:</span>
+                            <span className="font-bold block text-foreground mb-1 text-xs">{t("rulesPage.publicCommentReplyLabel")}</span>
                             {replyText}
                           </div>
                         )}
@@ -1609,7 +1613,7 @@ export default function RulesPage() {
                                   <div className="w-10 h-10 rounded-full bg-primary/80 flex items-center justify-center">
                                     <Play className="w-5 h-5 text-primary-foreground fill-primary-foreground" />
                                   </div>
-                                  <span className="absolute bottom-1.5 left-1.5 text-[8px] text-white/70 bg-black/50 px-1.5 py-0.5 rounded font-medium">فيديو</span>
+                                  <span className="absolute bottom-1.5 left-1.5 text-[8px] text-white/70 bg-black/50 px-1.5 py-0.5 rounded font-medium">{t("rulesPage.videoBadge")}</span>
                                 </div>
                               </div>
                             )
@@ -1626,13 +1630,13 @@ export default function RulesPage() {
                                       </div>
                                     )}
                                     <div className="p-2 space-y-1 flex-1">
-                                      <p className="font-bold text-white truncate">{card.title || "عنوان الكارت"}</p>
-                                      <p className="text-[9px] text-muted-foreground line-clamp-2">{card.subtitle || "وصف الكارت"}</p>
+                                      <p className="font-bold text-white truncate">{card.title || t("rulesPage.cardTitleFallback")}</p>
+                                      <p className="text-[9px] text-muted-foreground line-clamp-2">{card.subtitle || t("rulesPage.cardSubtitleFallback")}</p>
                                     </div>
                                     <div className="border-t border-border/50 flex flex-col shrink-0">
                                       {(card.buttons || []).map((btn: any, bIdx: number) => (
                                         <div key={bIdx} className="p-1.5 text-center text-primary font-bold border-b last:border-b-0 border-border/30 hover:bg-white/5 truncate">
-                                          {btn.title || "زر"}
+                                          {btn.title || t("rulesPage.buttonFallback")}
                                         </div>
                                       ))}
                                     </div>
@@ -1655,7 +1659,7 @@ export default function RulesPage() {
                                       key={rIdx}
                                       className={`px-3 py-1 rounded-full border text-[10px] font-bold text-primary border-primary bg-primary/10`}
                                     >
-                                      {reply.title || "خيار"}
+                                      {reply.title || t("rulesPage.optionFallback")}
                                     </span>
                                   ))}
                                 </div>
@@ -1670,7 +1674,7 @@ export default function RulesPage() {
                       <div className="h-12 border-t border-border bg-[#0a0a0f] shrink-0 flex items-center px-3 justify-between">
                         <div className="w-6 h-6 rounded-full bg-accent/20"></div>
                         <div className="flex-1 bg-accent/10 border border-border/30 h-7 mx-2 rounded-full px-3 text-[10px] text-muted-foreground flex items-center">
-                          اكتب رسالة...
+                          {t("rulesPage.typeMessagePlaceholder")}
                         </div>
                         <Send className="w-4 h-4 text-primary" />
                       </div>
@@ -1680,10 +1684,10 @@ export default function RulesPage() {
               </div>
               
               <DialogFooter className="sm:justify-end gap-2 border-t pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-xl cursor-pointer font-bold">إلغاء</Button>
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-xl cursor-pointer font-bold">{t("rulesPage.cancel")}</Button>
                 <Button type="button" onClick={handleSaveRule} disabled={isSubmitting || !name || (!replyText && !privateText && !isSequentialEnabled) || (ruleType === 'POST' && !selectedPost && !postId)} className="rounded-xl gap-2 shadow-lg shadow-primary/20 cursor-pointer font-bold">
                   {isSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  {editingRuleId ? "تحديث وتفعيل" : "حفظ وتفعيل"}
+                  {editingRuleId ? t("rulesPage.updateAndActivate") : t("rulesPage.saveAndActivate")}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -1699,7 +1703,7 @@ export default function RulesPage() {
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <Input
-                placeholder="ابحث بالاسم أو الكلمات المفتاحية..."
+                placeholder={t("rulesPage.searchPlaceholder")}
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="pr-10 rounded-xl h-10 font-medium"
@@ -1707,40 +1711,40 @@ export default function RulesPage() {
             </div>
 
             {/* Filter by Type */}
-            <Select value={filterType} onValueChange={(val) => setFilterType(val as typeof filterType)}>
+            <Select value={filterType} onValueChange={(val) => setFilterType(val as typeof filterType)} items={{ ALL: t("rulesPage.allTypes"), GLOBAL: t("rulesPage.globalType"), POST: t("rulesPage.postType") }}>
               <SelectTrigger className="rounded-xl h-10 w-full sm:w-[160px] text-xs font-bold">
                 <Filter className="w-3.5 h-3.5 ml-1.5 text-muted-foreground" />
-                <SelectValue placeholder="النوع" />
+                <SelectValue placeholder={t("rulesPage.typeFilterPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">جميع الأنواع</SelectItem>
-                <SelectItem value="GLOBAL">عام (GLOBAL)</SelectItem>
-                <SelectItem value="POST">مخصص لمنشور (POST)</SelectItem>
+                <SelectItem value="ALL">{t("rulesPage.allTypes")}</SelectItem>
+                <SelectItem value="GLOBAL">{t("rulesPage.globalType")}</SelectItem>
+                <SelectItem value="POST">{t("rulesPage.postType")}</SelectItem>
               </SelectContent>
             </Select>
 
             {/* Filter by Status */}
-            <Select value={filterStatus} onValueChange={(val) => setFilterStatus(val as typeof filterStatus)}>
+            <Select value={filterStatus} onValueChange={(val) => setFilterStatus(val as typeof filterStatus)} items={{ ALL: t("rulesPage.allStatuses"), ACTIVE: t("rulesPage.activeStatusOption"), INACTIVE: t("rulesPage.inactiveStatusOption") }}>
               <SelectTrigger className="rounded-xl h-10 w-full sm:w-[150px] text-xs font-bold">
                 <ToggleRight className="w-3.5 h-3.5 ml-1.5 text-muted-foreground" />
-                <SelectValue placeholder="الحالة" />
+                <SelectValue placeholder={t("rulesPage.statusFilterPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">جميع الحالات</SelectItem>
-                <SelectItem value="ACTIVE">مفعلة</SelectItem>
-                <SelectItem value="INACTIVE">معطلة</SelectItem>
+                <SelectItem value="ALL">{t("rulesPage.allStatuses")}</SelectItem>
+                <SelectItem value="ACTIVE">{t("rulesPage.activeStatusOption")}</SelectItem>
+                <SelectItem value="INACTIVE">{t("rulesPage.inactiveStatusOption")}</SelectItem>
               </SelectContent>
             </Select>
 
             {/* Sort By */}
-            <Select value={sortBy} onValueChange={(val) => setSortBy(val as typeof sortBy)}>
+            <Select value={sortBy} onValueChange={(val) => setSortBy(val as typeof sortBy)} items={{ date: t("rulesPage.sortByDate"), name: t("rulesPage.sortByName"), triggers: t("rulesPage.sortByTriggers") }}>
               <SelectTrigger className="rounded-xl h-10 w-full sm:w-[150px] text-xs font-bold">
-                <SelectValue placeholder="ترتيب" />
+                <SelectValue placeholder={t("rulesPage.sortPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="date">تاريخ الإنشاء</SelectItem>
-                <SelectItem value="name">الاسم</SelectItem>
-                <SelectItem value="triggers">عدد التفعيلات</SelectItem>
+                <SelectItem value="date">{t("rulesPage.sortByDate")}</SelectItem>
+                <SelectItem value="name">{t("rulesPage.sortByName")}</SelectItem>
+                <SelectItem value="triggers">{t("rulesPage.sortByTriggers")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1752,10 +1756,10 @@ export default function RulesPage() {
                 checked={isAllSelected}
                 onCheckedChange={handleSelectAll}
               />
-              <span className="text-xs font-bold text-muted-foreground">تحديد الكل</span>
+              <span className="text-xs font-bold text-muted-foreground">{t("rulesPage.selectAllLabel")}</span>
               <span className="text-xs text-muted-foreground font-medium">|</span>
               <span className="text-xs font-bold text-muted-foreground">
-                عرض {filteredRules.length} من {rules.length} قاعدة
+                {t("rulesPage.showingRulesCount", { shown: filteredRules.length, total: rules.length })}
               </span>
             </div>
 
@@ -1764,7 +1768,7 @@ export default function RulesPage() {
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="text-xs font-bold">
                   <CheckSquare className="w-3 h-3 ml-1" />
-                  {selectedRuleIds.size} محددة
+                  {t("rulesPage.selectedCount", { count: selectedRuleIds.size })}
                 </Badge>
                 <Button
                   variant="outline"
@@ -1772,7 +1776,7 @@ export default function RulesPage() {
                   onClick={handleBulkActivate}
                   className="rounded-lg text-xs font-bold h-8 gap-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 cursor-pointer"
                 >
-                  تفعيل المحددة
+                  {t("rulesPage.activateSelected")}
                 </Button>
                 <Button
                   variant="outline"
@@ -1780,7 +1784,7 @@ export default function RulesPage() {
                   onClick={handleBulkDeactivate}
                   className="rounded-lg text-xs font-bold h-8 gap-1 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 cursor-pointer"
                 >
-                  تعطيل المحددة
+                  {t("rulesPage.deactivateSelected")}
                 </Button>
                 <Button
                   variant="outline"
@@ -1789,7 +1793,7 @@ export default function RulesPage() {
                   className="rounded-lg text-xs font-bold h-8 gap-1 border-destructive/30 text-destructive hover:bg-destructive/10 cursor-pointer"
                 >
                   <Trash2 className="w-3 h-3" />
-                  حذف المحددة
+                  {t("rulesPage.deleteSelected")}
                 </Button>
               </div>
             )}
@@ -1801,7 +1805,7 @@ export default function RulesPage() {
         <div className="flex justify-center items-center h-40">
           <div className="flex flex-col items-center gap-3">
             <RefreshCw className="w-8 h-8 animate-spin text-primary" />
-            <span className="text-sm text-muted-foreground font-medium">جاري تحميل القواعد...</span>
+            <span className="text-sm text-muted-foreground font-medium">{t("rulesPage.loadingRules")}</span>
           </div>
         </div>
       ) : rules.length === 0 ? (
@@ -1810,13 +1814,13 @@ export default function RulesPage() {
             <div className="w-20 h-20 bg-gradient-to-br from-primary/20 to-primary/5 rounded-2xl flex items-center justify-center mb-6 animate-float">
               <MessageSquareText className="w-10 h-10 text-primary" />
             </div>
-            <h3 className="text-2xl font-black mb-3">لا توجد قواعد بعد</h3>
+            <h3 className="text-2xl font-black mb-3">{t("rulesPage.noRulesYetTitle")}</h3>
             <p className="text-muted-foreground mb-8 max-w-md leading-relaxed font-medium">
-              لم تقم بإنشاء أي قواعد للرد الآلي. ابدأ بإنشاء قاعدة للرد على تعليقات عملائك تلقائياً وباحترافية.
+              {t("rulesPage.noRulesYetDesc")}
             </p>
             <Button onClick={() => setIsDialogOpen(true)} className="rounded-xl gap-2 h-12 px-8 shadow-lg shadow-primary/20 font-bold cursor-pointer">
               <Plus className="w-5 h-5" />
-              إنشاء قاعدتك الأولى
+              {t("rulesPage.createFirstRule")}
             </Button>
           </CardContent>
         </Card>
@@ -1824,9 +1828,9 @@ export default function RulesPage() {
         <Card className="border-dashed border-2 shadow-none bg-accent/20">
           <CardContent className="flex flex-col items-center justify-center p-12 text-center">
             <Search className="w-12 h-12 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-black mb-2">لا توجد نتائج</h3>
+            <h3 className="text-xl font-black mb-2">{t("rulesPage.noResultsTitle")}</h3>
             <p className="text-muted-foreground text-sm font-medium">
-              لا توجد قواعد تطابق معايير البحث الحالية. حاول تعديل عوامل التصفية.
+              {t("rulesPage.noResultsDesc")}
             </p>
           </CardContent>
         </Card>
@@ -1856,35 +1860,35 @@ export default function RulesPage() {
                       {rule.postId && (
                         <Badge variant="secondary" className="text-[10px] h-5 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-bold">
                           <Target className="w-3 h-3 ml-1" />
-                          مخصص
+                          {t("rulesPage.customBadge")}
                         </Badge>
                       )}
                       {rule.replyMessages && (
                         <Badge variant="secondary" className="text-[10px] h-5 bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400 font-bold">
-                          متسلسل
+                          {t("rulesPage.sequentialBadge")}
                         </Badge>
                       )}
                     </CardTitle>
                     <CardDescription className="flex items-center gap-1.5 font-medium">
                       {rule.triggerType === 'KEYWORD' ? (
                         <span className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-muted-foreground">كلمات:</span>
+                          <span className="text-muted-foreground">{t("rulesPage.keywordsColonLabel")}</span>
                           <span className="font-bold text-foreground bg-accent px-2 py-0.5 rounded-md text-xs">{rule.keywords}</span>
                         </span>
                       ) : rule.triggerType === 'STORY_REPLY' ? (
                         <span className="flex items-center gap-1.5">
                           <Play className="w-3.5 h-3.5 text-muted-foreground" />
-                          الرد على تفاعل الستوري
+                          {t("rulesPage.storyReplyTriggerLabel")}
                         </span>
                       ) : rule.triggerType === 'STORY_MENTION' ? (
                         <span className="flex items-center gap-1.5">
                           <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
-                          شكر تلقائي عند المنشن في ستوري
+                          {t("rulesPage.storyMentionTriggerLabel")}
                         </span>
                       ) : (
                         <span className="flex items-center gap-1.5">
                           <Globe2 className="w-3.5 h-3.5 text-muted-foreground" />
-                          الرد على أي تعليق
+                          {t("rulesPage.anyCommentTriggerLabel")}
                         </span>
                       )}
                     </CardDescription>
@@ -1897,7 +1901,7 @@ export default function RulesPage() {
                     size="icon"
                     className="h-8 w-8 rounded-lg hover:bg-accent cursor-pointer text-muted-foreground hover:text-foreground"
                     onClick={() => handleCloneRule(rule)}
-                    title="نسخ"
+                    title={t("rulesPage.copyTooltip")}
                   >
                     <Copy className="w-4 h-4" />
                   </Button>
@@ -1919,23 +1923,23 @@ export default function RulesPage() {
                   <div>
                     <div className="font-bold mb-1 text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                       <MessageSquareText className="w-3.5 h-3.5" />
-                      الرد العلني
+                      {t("rulesPage.publicReplyCardLabel")}
                     </div>
-                    <p className="line-clamp-2 leading-relaxed font-medium">{rule.replyText || <span className="italic text-muted-foreground">بدون نص</span>}</p>
+                    <p className="line-clamp-2 leading-relaxed font-medium">{rule.replyText || <span className="italic text-muted-foreground">{t("rulesPage.withoutTextFallback")}</span>}</p>
                   </div>
                   
                   {rule.replyMessages ? (
                     <div>
                       <div className="font-bold mb-1 text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                         <Send className="w-3.5 h-3.5" />
-                        الردود المتسلسلة
+                        {t("rulesPage.sequentialRepliesLabel")}
                       </div>
                       <div className="flex gap-1 flex-wrap">
                         {(() => {
                           const msgs = typeof rule.replyMessages === 'string' ? JSON.parse(rule.replyMessages) : rule.replyMessages
                           return (Array.isArray(msgs) ? msgs : []).map((m: any, mIdx: number) => (
                             <Badge key={mIdx} variant="outline" className="text-[10px] px-2 py-0.5 rounded bg-card text-primary font-bold">
-                              {m.type === 'TEXT' ? 'نص' : m.type === 'IMAGE' ? 'صورة' : m.type === 'VIDEO' ? 'فيديو' : m.type === 'CAROUSEL' ? 'كاروسيل' : 'خيارات'}
+                              {m.type === 'TEXT' ? t("rulesPage.typeTextBadge") : m.type === 'IMAGE' ? t("rulesPage.typeImageBadge") : m.type === 'VIDEO' ? t("rulesPage.typeVideoBadge") : m.type === 'CAROUSEL' ? t("rulesPage.typeCarouselBadge") : t("rulesPage.typeOptionsBadge")}
                             </Badge>
                           ))
                         })()}
@@ -1947,13 +1951,13 @@ export default function RulesPage() {
                         {rule.replyMedia && (
                           <Badge variant="outline" className="gap-1.5 bg-card rounded-lg text-xs font-bold">
                             {typeof rule.replyMedia === 'string' && rule.replyMedia.includes('.mp4') ? <Video className="w-3 h-3" /> : <ImageIcon className="w-3 h-3" />}
-                            مرفق وسائط
+                            {t("rulesPage.mediaAttachedBadge")}
                           </Badge>
                         )}
                         {rule.privateText && (
                           <Badge variant="outline" className="gap-1.5 bg-card rounded-lg text-xs text-primary border-primary/30 font-bold">
                             <Send className="w-3 h-3" />
-                            رسالة خاصة
+                            {t("rulesPage.privateMessageBadge")}
                           </Badge>
                         )}
                       </div>
@@ -1964,11 +1968,11 @@ export default function RulesPage() {
                 {/* Rules Analytics Display */}
                 <div className="grid grid-cols-2 gap-2 bg-muted/30 p-2.5 rounded-xl border border-border/30 text-xs font-bold text-muted-foreground">
                   <div className="space-y-0.5">
-                    <span className="block text-[10px] text-muted-foreground/75">إجمالي التفعيلات</span>
+                    <span className="block text-[10px] text-muted-foreground/75">{t("rulesPage.totalTriggersLabel")}</span>
                     <span className="text-foreground text-sm font-black">{rule.triggerCount || 0}</span>
                   </div>
                   <div className="space-y-0.5">
-                    <span className="block text-[10px] text-muted-foreground/75">آخر تفعيل</span>
+                    <span className="block text-[10px] text-muted-foreground/75">{t("rulesPage.lastTriggeredLabel")}</span>
                     <span className="text-foreground truncate block font-black">{formatArabicDate(rule.lastTriggeredAt)}</span>
                   </div>
                 </div>
@@ -1980,7 +1984,7 @@ export default function RulesPage() {
                       onCheckedChange={() => toggleRuleActive(rule)} 
                     />
                     <span className={`text-sm font-bold ${rule.isActive ? 'text-emerald-500' : 'text-muted-foreground'}`}>
-                      {rule.isActive ? 'مفعل' : 'معطل'}
+                      {rule.isActive ? t("rulesPage.activeLabel") : t("rulesPage.inactiveLabel")}
                     </span>
                   </div>
                   
@@ -1990,20 +1994,20 @@ export default function RulesPage() {
                     className="h-9 w-9 text-destructive hover:bg-destructive/10 rounded-xl cursor-pointer"
                     onClick={async () => {
                       const confirmed = await confirm({
-                        title: "تأكيد حذف القاعدة",
-                        message: `هل أنت متأكد من حذف قاعدة "${rule.name}"؟ سيتوقف الرد الآلي المرتبط بها فوراً.`,
+                        title: t("rulesPage.deleteRuleConfirmTitle"),
+                        message: t("rulesPage.deleteRuleConfirmMessage", { name: rule.name }),
                         variant: "destructive",
-                        confirmText: "تأكيد الحذف",
-                        cancelText: "إلغاء"
+                        confirmText: t("rulesPage.confirmDelete"),
+                        cancelText: t("rulesPage.cancel")
                       })
                       if (confirmed) {
                         try {
                           await api.delete(`/rules/${rule.id}`)
                           fetchRules()
-                          setBanner({ type: "success", text: "✅ تم حذف القاعدة بنجاح." })
+                          setBanner({ type: "success", text: t("rulesPage.ruleDeletedSuccess") })
                         } catch (error) {
                           console.error("Failed to delete", error)
-                          setBanner({ type: "error", text: "فشل حذف القاعدة. حاول مرة أخرى." })
+                          setBanner({ type: "error", text: t("rulesPage.deleteRuleFailed") })
                         }
                       }
                     }}
@@ -2020,29 +2024,30 @@ export default function RulesPage() {
 
     {/* Predefined Templates Modal */}
     <Dialog open={isTemplatesOpen} onOpenChange={setIsTemplatesOpen}>
-      <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto" dir="rtl">
+      <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto" dir={dir}>
         <DialogHeader>
           <DialogTitle className="text-2xl font-black flex items-center gap-2">
             <LayoutGrid className="w-6 h-6 text-primary" />
-            مكتبة القوالب الجاهزة
+            {t("rulesPage.templatesLibraryBtn")}
           </DialogTitle>
           <DialogDescription className="font-medium">
-            اختر قالباً جاهزاً من المكتبة لتعبئة النموذج وتفعيل قاعدة الرد الآلي في ثوانٍ معدودة.
+            {t("rulesPage.templatesModalDesc")}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-6 py-4">
           {["عام", "مطاعم", "عيادات", "متاجر"].map((sector) => {
             const sectorTemplates = PREDEFINED_TEMPLATES.filter(
-              (t) => (t.sector || "عام") === sector
+              (tpl) => (tpl.sector || "عام") === sector
             )
             if (sectorTemplates.length === 0) return null
             const sectorEmoji: Record<string, string> = { "عام": "⚡", "مطاعم": "🍽️", "عيادات": "🩺", "متاجر": "🛍️" }
+            const sectorLabelKeys: Record<string, string> = { "عام": "sectorGeneral", "مطاعم": "sectorRestaurants", "عيادات": "sectorClinics", "متاجر": "sectorStores" }
             return (
               <div key={sector} className="space-y-3">
                 <h3 className="text-sm font-black text-muted-foreground flex items-center gap-2 border-b border-border/50 pb-2">
                   <span>{sectorEmoji[sector]}</span>
-                  قوالب {sector === "عام" ? "عامة" : `قطاع ال${sector}`}
+                  {sector === "عام" ? t("rulesPage.generalTemplates") : t("rulesPage.sectorTemplates", { sector: t(`rulesPage.${sectorLabelKeys[sector]}`) })}
                 </h3>
                 {sectorTemplates.map((tpl, tIdx) => (
                   <Card key={tIdx} className="hover:border-primary/50 transition-all cursor-pointer bg-accent/15 border" onClick={() => applyTemplate(tpl)}>
@@ -2052,17 +2057,17 @@ export default function RulesPage() {
                     </CardHeader>
                     <CardContent className="space-y-2 text-xs font-medium">
                       <div>
-                        <span className="text-muted-foreground">الكلمات المفتاحية: </span>
+                        <span className="text-muted-foreground">{t("rulesPage.keywordsColonLabel2")}</span>
                         <span className="font-bold text-foreground">{tpl.keywords}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">الرد العلني: </span>
+                        <span className="text-muted-foreground">{t("rulesPage.publicReplyColonLabel")}</span>
                         <span className="text-foreground line-clamp-1">{tpl.replyText}</span>
                       </div>
                       <div className="flex gap-2 items-center">
-                        <span className="text-muted-foreground">نوع الرسائل المرفقة: </span>
+                        <span className="text-muted-foreground">{t("rulesPage.attachedMessageTypeLabel")}</span>
                         <span className="bg-primary/20 text-primary px-2 py-0.5 rounded font-black">
-                          متسلسل ({tpl.replyMessages.length} رسائل)
+                          {t("rulesPage.sequentialMessagesCount", { count: tpl.replyMessages.length })}
                         </span>
                       </div>
                     </CardContent>
@@ -2074,7 +2079,7 @@ export default function RulesPage() {
         </div>
 
         <DialogFooter className="sm:justify-end">
-          <Button type="button" variant="outline" onClick={() => setIsTemplatesOpen(false)} className="rounded-xl cursor-pointer font-bold">إغلاق</Button>
+          <Button type="button" variant="outline" onClick={() => setIsTemplatesOpen(false)} className="rounded-xl cursor-pointer font-bold">{t("rulesPage.close")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
