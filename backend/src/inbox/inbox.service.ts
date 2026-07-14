@@ -4,10 +4,15 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ChannelsService } from '../channels/channels.service';
+import { GRAPH_API_BASE } from '../common/graph-api';
 
 @Injectable()
 export class InboxService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private channelsService: ChannelsService,
+  ) {}
 
   async getConversations(
     tenantId: string,
@@ -93,13 +98,69 @@ export class InboxService {
     });
   }
 
-  private async sendPlatformMessage(connection: any, content: string) {
-    if (
-      connection.accessToken &&
-      (connection.accessToken.toLowerCase().includes('revoked') ||
-        connection.accessToken.toLowerCase().includes('invalid'))
-    ) {
+  private async sendPlatformMessage(
+    connection: any,
+    customerId: string,
+    content: string,
+  ) {
+    if (!connection.accessToken) {
       throw new Error('Revoked token');
+    }
+
+    const token = this.channelsService.getDecryptedAccessToken(
+      connection.accessToken,
+    );
+    if (!token) {
+      throw new Error('Revoked token');
+    }
+
+    if (connection.platform === 'WHATSAPP') {
+      // WhatsApp Cloud API
+      const response = await fetch(
+        `${GRAPH_API_BASE}/${connection.platformId}/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: customerId,
+            type: 'text',
+            text: { body: content },
+          }),
+        },
+      );
+      if (!response.ok) {
+        const err: any = await response.json().catch(() => ({}));
+        throw new Error(
+          err?.error?.message || `WhatsApp API error: ${response.status}`,
+        );
+      }
+    } else {
+      // Facebook Messenger & Instagram DM — use Send API
+      const response = await fetch(
+        `${GRAPH_API_BASE}/me/messages`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            messaging_type: 'RESPONSE',
+            recipient: { id: customerId },
+            message: { text: content },
+          }),
+        },
+      );
+      if (!response.ok) {
+        const err: any = await response.json().catch(() => ({}));
+        throw new Error(
+          err?.error?.message || `Graph API error: ${response.status}`,
+        );
+      }
     }
   }
 
@@ -137,7 +198,7 @@ export class InboxService {
     }
 
     try {
-      await this.sendPlatformMessage(conv.connection, content);
+      await this.sendPlatformMessage(conv.connection, conv.customerId, content);
     } catch (error: any) {
       if (error.message === 'Revoked token') {
         await this.prisma.platformConnection.update({

@@ -6,6 +6,7 @@ import { PlatformSettingsService } from '../settings/platform-settings.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { FlowEngineService } from '../flows/flow-engine.service';
 import { getPlanLimits, startOfCurrentMonth } from '../common/plan-limits';
+import { GRAPH_API_BASE } from '../common/graph-api';
 
 @Injectable()
 export class WebhooksService {
@@ -546,7 +547,7 @@ export class WebhooksService {
 
     try {
       const response = await fetch(
-        `https://graph.facebook.com/v19.0/${commentId}/comments`,
+        `${GRAPH_API_BASE}/${commentId}/comments`,
         {
           method: 'POST',
           headers: {
@@ -640,7 +641,7 @@ export class WebhooksService {
     );
     try {
       const response = await fetch(
-        `https://graph.facebook.com/v19.0/me/messages`,
+        `${GRAPH_API_BASE}/me/messages`,
         {
           method: 'POST',
           headers: {
@@ -648,6 +649,7 @@ export class WebhooksService {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
+            messaging_type: 'RESPONSE',
             recipient: { id: senderId },
             message: { text: replyText },
           }),
@@ -969,7 +971,7 @@ export class WebhooksService {
         const recipient = psid ? { id: psid } : { comment_id: commentId };
         try {
           const response = await fetch(
-            `https://graph.facebook.com/v19.0/me/messages`,
+            `${GRAPH_API_BASE}/me/messages`,
             {
               method: 'POST',
               headers: {
@@ -1205,7 +1207,7 @@ export class WebhooksService {
         let isSuccess = false;
         try {
           const response = await fetch(
-            `https://graph.facebook.com/v19.0/me/messages`,
+            `${GRAPH_API_BASE}/me/messages`,
             {
               method: 'POST',
               headers: {

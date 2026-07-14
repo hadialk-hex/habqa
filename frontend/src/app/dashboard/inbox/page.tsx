@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/toast"
 import api from "@/lib/api"
 import dynamic from "next/dynamic"
 import { useLanguage } from "@/lib/i18n/language-context"
+import { createSocket } from "@/lib/socket"
 
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false })
 
@@ -152,6 +153,11 @@ export default function InboxPage() {
   const isNearBottomRef = useRef(true)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
 
+  // ─── Real-time (WebSocket) refs — kept current so the socket handler,
+  //     which is registered once on mount, always sees the latest values.
+  const activeChatIdRef = useRef<string | null>(null)
+  const fetchConversationsRef = useRef<() => void>(() => {})
+
   const checkIfNearBottom = useCallback(() => {
     const el = messagesContainerRef.current
     if (!el) return
@@ -259,6 +265,35 @@ export default function InboxPage() {
   useEffect(() => {
     scrollToBottom()
   }, [messages, scrollToBottom])
+
+  // Keep refs fresh so the once-registered socket handler never reads stale state.
+  useEffect(() => { activeChatIdRef.current = activeChat?.id ?? null })
+  useEffect(() => { fetchConversationsRef.current = fetchConversations })
+
+  // ─── Real-time inbox ───────────────────────────────────────────────────
+  // Open a WebSocket on mount and append any newly-persisted message the
+  // instant it arrives (inbound from a customer, or a teammate's reply) —
+  // no page refresh needed. The conversation list is refreshed too so
+  // ordering and unread badges stay accurate.
+  useEffect(() => {
+    const socket = createSocket()
+    if (!socket) return
+    const onNewMessage = (msg: any) => {
+      if (!msg?.id) return
+      if (msg.conversationId && msg.conversationId === activeChatIdRef.current) {
+        setMessages((prev) =>
+          prev.some((m) => m.id === msg.id) ? prev : [...prev, msg],
+        )
+        isNearBottomRef.current = true
+      }
+      fetchConversationsRef.current()
+    }
+    socket.on("new_message", onNewMessage)
+    return () => {
+      socket.off("new_message", onNewMessage)
+      socket.disconnect()
+    }
+  }, [])
 
   const fetchMessages = async (convId: string) => {
     setIsLoadingMsgs(true)

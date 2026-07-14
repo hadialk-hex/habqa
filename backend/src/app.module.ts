@@ -30,6 +30,7 @@ import { MailModule } from './mail/mail.module';
 import { AiModule } from './ai/ai.module';
 import { FlowsModule } from './flows/flows.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { RealtimeModule } from './realtime/realtime.module';
 
 @Module({
   imports: [
@@ -52,8 +53,10 @@ import { NotificationsModule } from './notifications/notifications.module';
         const redisHost = configService.get<string>('REDIS_HOST');
         if (redisHost) {
           const port = configService.get<number>('REDIS_PORT') || 6379;
+          const password = configService.get<string>('REDIS_PASSWORD');
           const store = await redisStore({
             socket: { host: redisHost, port: Number(port) },
+            ...(password ? { password } : {}),
           });
           return { store };
         }
@@ -71,6 +74,9 @@ import { NotificationsModule } from './notifications/notifications.module';
               connection: {
                 host: configService.get<string>('REDIS_HOST') || 'localhost',
                 port: Number(configService.get<number>('REDIS_PORT') || 6379),
+                ...(configService.get<string>('REDIS_PASSWORD')
+                  ? { password: configService.get<string>('REDIS_PASSWORD') }
+                  : {}),
               },
             }),
           }),
@@ -97,6 +103,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     AiModule,
     FlowsModule,
     NotificationsModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [
@@ -117,7 +124,9 @@ export class AppModule implements NestModule {
       .apply((req: any, res: any, next: () => void) => {
         res.setHeader('X-Content-Type-Options', 'nosniff');
         res.setHeader('X-Frame-Options', 'DENY');
-        res.setHeader('X-XSS-Protection', '1; mode=block');
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+        res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+        res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
         next();
       })
       .forRoutes('*');

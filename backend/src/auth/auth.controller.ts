@@ -94,6 +94,7 @@ export class AuthController {
       req.user.id,
       dto.name || undefined,
       dto.password,
+      dto.currentPassword,
     );
   }
 }

@@ -1,17 +1,20 @@
 import {
   Injectable,
   Optional,
+  Logger,
   NotFoundException,
   ConflictException,
   BadRequestException,
   ForbiddenException,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
 
 import { ConfigService } from '@nestjs/config';
 import { getPlanLimits } from '../common/plan-limits';
 import { PlatformSettingsService } from '../settings/platform-settings.service';
+import { GRAPH_API_BASE } from '../common/graph-api';
 
 const ALGORITHM = 'aes-256-cbc';
 const IV_LENGTH = 16;
@@ -237,7 +240,7 @@ export class ChannelsService {
       this.configService.get<string>('FACEBOOK_REDIRECT_URI') ||
       '';
 
-    const tokenUrl = `https://graph.facebook.com/v18.0/oauth/access_token?client_id=${clientId}&redirect_uri=${redirectUri}&client_secret=${clientSecret}&code=${code}`;
+    const tokenUrl = `${GRAPH_API_BASE}/oauth/access_token?client_id=${clientId}&redirect_uri=${redirectUri}&client_secret=${clientSecret}&code=${code}`;
 
     const tokenResponse = await fetch(tokenUrl);
     if (!tokenResponse.ok) {
@@ -249,7 +252,20 @@ export class ChannelsService {
       throw new BadRequestException('Facebook access token not returned');
     }
 
-    const accountsUrl = `https://graph.facebook.com/v18.0/me/accounts?access_token=${userAccessToken}`;
+    // Exchange short-lived user token for a long-lived one (60 days)
+    let longLivedUserToken = userAccessToken;
+    try {
+      const llUrl = `${GRAPH_API_BASE}/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${userAccessToken}`;
+      const llResponse = await fetch(llUrl);
+      if (llResponse.ok) {
+        const llData: any = await llResponse.json();
+        if (llData.access_token) longLivedUserToken = llData.access_token;
+      }
+    } catch {
+      // Proceed with short-lived token if exchange fails
+    }
+
+    const accountsUrl = `${GRAPH_API_BASE}/me/accounts?access_token=${longLivedUserToken}`;
     const accountsResponse = await fetch(accountsUrl);
     if (!accountsResponse.ok) {
       throw new BadRequestException('Failed to fetch Facebook pages');
@@ -270,7 +286,7 @@ export class ChannelsService {
 
           // Subscribe the app to this page's webhook events
           try {
-            const subscribeUrl = `https://graph.facebook.com/v18.0/${page.id}/subscribed_apps`;
+            const subscribeUrl = `${GRAPH_API_BASE}/${page.id}/subscribed_apps`;
             await fetch(subscribeUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -396,7 +412,7 @@ export class ChannelsService {
       throw new BadRequestException('Access token is missing');
     }
 
-    const url = `https://graph.facebook.com/v19.0/${conn.platformId}?fields=name,about,picture,fan_count&access_token=${token}`;
+    const url = `${GRAPH_API_BASE}/${conn.platformId}?fields=name,about,picture,fan_count&access_token=${token}`;
     try {
       const response = await fetch(url);
       if (!response.ok) {
@@ -446,11 +462,11 @@ export class ChannelsService {
     if (conn.platform === 'INSTAGRAM') {
       const fields =
         'id,caption,media_type,media_url,thumbnail_url,timestamp,permalink,comments_count';
-      url = `https://graph.facebook.com/v19.0/${conn.platformId}/media?fields=${fields}&limit=${safeLimit}&access_token=${token}`;
+      url = `${GRAPH_API_BASE}/${conn.platformId}/media?fields=${fields}&limit=${safeLimit}&access_token=${token}`;
     } else {
       const fields =
         'id,message,story,created_time,full_picture,permalink_url,comments.summary(true).limit(0)';
-      url = `https://graph.facebook.com/v19.0/${conn.platformId}/posts?fields=${fields}&limit=${safeLimit}&access_token=${token}`;
+      url = `${GRAPH_API_BASE}/${conn.platformId}/posts?fields=${fields}&limit=${safeLimit}&access_token=${token}`;
     }
     if (after) {
       url += `&after=${encodeURIComponent(after)}`;
@@ -557,5 +573,51 @@ export class ChannelsService {
       // ignore
     }
     return null;
+  }
+
+  // ─── Token Refresh Cron (daily at 3 AM) ───────────────────────
+  private readonly logger = new Logger(ChannelsService.name);
+
+  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  async refreshExpiringTokens() {
+    // Find connections updated more than 50 days ago (tokens expire at 60 days)
+    const fiftyDaysAgo = new Date();
+    fiftyDaysAgo.setDate(fiftyDaysAgo.getDate() - 50);
+
+    const connections = await this.prisma.platformConnection.findMany({
+      where: {
+        isActive: true,
+        platform: { in: ['FACEBOOK_PAGE', 'INSTAGRAM'] },
+        updatedAt: { lt: fiftyDaysAgo },
+      },
+    });
+
+    this.logger.log(`Found ${connections.length} tokens nearing expiry`);
+
+    for (const conn of connections) {
+      try {
+        if (!conn.accessToken) continue;
+        const currentToken = this.getDecryptedAccessToken(conn.accessToken);
+        if (!currentToken) continue;
+
+        // For Facebook Page tokens derived from long-lived user tokens,
+        // we refresh by calling the token endpoint again
+        const refreshUrl = `${GRAPH_API_BASE}/oauth/access_token?grant_type=fb_exchange_token&client_id=${this.configService.get('FACEBOOK_APP_ID')}&client_secret=${this.configService.get('FACEBOOK_APP_SECRET')}&fb_exchange_token=${currentToken}`;
+
+        const response = await fetch(refreshUrl);
+        if (response.ok) {
+          const data: any = await response.json();
+          if (data.access_token && data.access_token !== currentToken) {
+            await this.prisma.platformConnection.update({
+              where: { id: conn.id },
+              data: { accessToken: encrypt(data.access_token) },
+            });
+            this.logger.log(`Refreshed token for ${conn.platform} connection ${conn.id}`);
+          }
+        }
+      } catch (err) {
+        this.logger.warn(`Failed to refresh token for connection ${conn.id}: ${err}`);
+      }
+    }
   }
 }

@@ -59,10 +59,11 @@ services:
     image: redis:7-alpine
     container_name: hubqa_redis
     restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD:-hubqa_redis_secret_2026}
     ports:
       - "6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-hubqa_redis_secret_2026}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -89,14 +90,17 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/hubqa?schema=public
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/hubqa?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: supersecretjwtkey1234567890
-      ENCRYPTION_KEY: "super-secret-encryption-key-32ch"
-      APP_SECRET: "facebook-app-secret-key"
-      ALLOWED_ORIGINS: "http://localhost:1998,https://hubqa.hex-tic.xyz"
-      FRONTEND_URL: "https://hubqa.hex-tic.xyz"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-hubqa_redis_secret_2026}
+      JWT_SECRET: ${JWT_SECRET:-CHANGE_ME_IN_PRODUCTION}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-CHANGE_ME_IN_PRODUCTION_32CH}
+      APP_SECRET: ${FACEBOOK_APP_SECRET:-}
+      FACEBOOK_APP_ID: ${FACEBOOK_APP_ID:-}
+      FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:1998,https://hubqa.hex-tic.xyz}
+      FRONTEND_URL: ${FRONTEND_URL:-https://hubqa.hex-tic.xyz}
     depends_on:
       postgres:
         condition: service_healthy

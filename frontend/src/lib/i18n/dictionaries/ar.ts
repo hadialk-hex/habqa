@@ -567,6 +567,8 @@ export const ar = {
     timezoneCairo: "(GMT+02:00) القاهرة",
     changePasswordTitle: "تغيير كلمة المرور",
     changePasswordSubtitle: "تأكد من استخدام كلمة مرور قوية لحماية حسابك.",
+    currentPassword: "كلمة المرور الحالية",
+    currentPasswordRequired: "أدخل كلمة المرور الحالية",
     newPassword: "كلمة المرور الجديدة",
     confirmNewPassword: "تأكيد كلمة المرور الجديدة",
     updating: "جاري التحديث...",

@@ -569,6 +569,8 @@ export const en: Dictionary = {
     timezoneCairo: "(GMT+02:00) Cairo",
     changePasswordTitle: "Change Password",
     changePasswordSubtitle: "Make sure to use a strong password to protect your account.",
+    currentPassword: "Current Password",
+    currentPasswordRequired: "Enter your current password",
     newPassword: "New Password",
     confirmNewPassword: "Confirm New Password",
     updating: "Updating...",

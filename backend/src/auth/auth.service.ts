@@ -183,8 +183,9 @@ export class AuthService {
       where: { email },
     });
 
+    // Security: always return success to prevent user enumeration
     if (!user) {
-      throw new NotFoundException('المستخدم غير موجود');
+      return { message: 'إذا كان البريد مسجلاً، سيتم إرسال رابط إعادة التعيين' };
     }
 
     const token = 'reset_' + crypto.randomBytes(32).toString('hex');
@@ -200,7 +201,7 @@ export class AuthService {
     const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
     await this.mailService?.sendPasswordReset(email, resetUrl);
 
-    return { message: 'تم إرسال رابط إعادة التعيين' };
+    return { message: 'إذا كان البريد مسجلاً، سيتم إرسال رابط إعادة التعيين' };
   }
 
   async resetPassword(dto: ResetPasswordDto) {
@@ -266,12 +267,31 @@ export class AuthService {
     };
   }
 
-  async updateProfile(userId: string, name?: string, password?: string) {
+  async updateProfile(
+    userId: string,
+    name?: string,
+    password?: string,
+    currentPassword?: string,
+  ) {
     const data: any = {};
     if (name !== undefined) {
       data.name = name;
     }
     if (password !== undefined) {
+      // Require current password verification before allowing change
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+      if (!user || !user.password) {
+        throw new BadRequestException('المستخدم غير موجود أو لا يملك كلمة مرور');
+      }
+      if (!currentPassword) {
+        throw new BadRequestException('يجب إدخال كلمة المرور الحالية للتحقق');
+      }
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        throw new BadRequestException('كلمة المرور الحالية غير صحيحة');
+      }
       data.password = await bcrypt.hash(password, 10);
     }
     return this.prisma.user.update({
@@ -289,7 +309,6 @@ export class AuthService {
       email: user.email,
       tenantId: primaryTenantId,
       role: role,
-      pwSig: user.password ? user.password.slice(-8) : '',
     };
 
     return {

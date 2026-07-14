@@ -131,6 +131,10 @@ export default function SettingsPage() {
   }
 
   const handleUpdatePassword = async () => {
+    if (!currentPassword.trim()) {
+      showToast(t('settingsPage.currentPasswordRequired') || 'أدخل كلمة المرور الحالية', "error")
+      return
+    }
     if (!newPassword.trim()) {
       showToast(t('settingsPage.passwordRequired'), "error")
       return
@@ -141,7 +145,7 @@ export default function SettingsPage() {
     }
     setIsUpdatingPassword(true)
     try {
-      await api.patch('/auth/profile', { password: newPassword })
+      await api.patch('/auth/profile', { password: newPassword, currentPassword })
       showToast(t('settingsPage.passwordUpdatedSuccess'), "success")
       setCurrentPassword("")
       setNewPassword("")
@@ -307,6 +311,16 @@ export default function SettingsPage() {
                 <CardDescription>{t('settingsPage.changePasswordSubtitle')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold">{t('settingsPage.currentPassword') || 'كلمة المرور الحالية'}</label>
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="rounded-xl h-11"
+                  />
+                </div>
                 <div className="space-y-2">
                   <label className="text-sm font-bold">{t('settingsPage.newPassword')}</label>
                   <Input

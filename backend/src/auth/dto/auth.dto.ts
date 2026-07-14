@@ -41,6 +41,10 @@ export class UpdateProfileDto {
   @IsString()
   @MinLength(6, { message: 'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل' })
   password?: string;
+
+  @IsOptional()
+  @IsString()
+  currentPassword?: string;
 }
 
 export class RequestPasswordResetDto {
