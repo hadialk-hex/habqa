@@ -28,6 +28,7 @@ const fieldLabelKeys: Record<string, string> = {
   SMTP_USER: "fieldSmtpUser",
   SMTP_PASS: "fieldSmtpPass",
   SMTP_FROM: "fieldSmtpFrom",
+  SMTP_REPLY_TO: "fieldSmtpReplyTo",
   FACEBOOK_APP_ID: "fieldFacebookAppId",
   FACEBOOK_APP_SECRET: "fieldFacebookAppSecret",
   FACEBOOK_REDIRECT_URI: "fieldFacebookRedirectUri",

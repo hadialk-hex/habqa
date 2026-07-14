@@ -713,6 +713,7 @@ export const en: Dictionary = {
     fieldSmtpUser: "Username",
     fieldSmtpPass: "Password / API Key",
     fieldSmtpFrom: "From Address",
+    fieldSmtpReplyTo: "Reply-To Address — optional",
     fieldFacebookAppId: "App ID",
     fieldFacebookAppSecret: "App Secret",
     fieldFacebookRedirectUri: "Redirect URI (OAuth)",

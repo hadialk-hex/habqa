@@ -711,6 +711,7 @@ export const ar = {
     fieldSmtpUser: "اسم المستخدم",
     fieldSmtpPass: "كلمة المرور / مفتاح API",
     fieldSmtpFrom: "عنوان المرسل",
+    fieldSmtpReplyTo: "عنوان الرد (Reply-To) — اختياري",
     fieldFacebookAppId: "App ID",
     fieldFacebookAppSecret: "App Secret",
     fieldFacebookRedirectUri: "رابط إعادة التوجيه (OAuth)",

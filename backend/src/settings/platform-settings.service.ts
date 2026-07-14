@@ -21,6 +21,7 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
   { key: 'SMTP_USER', label: 'اسم المستخدم', group: 'mail', secret: false, placeholder: 'resend' },
   { key: 'SMTP_PASS', label: 'كلمة المرور / مفتاح API', group: 'mail', secret: true },
   { key: 'SMTP_FROM', label: 'عنوان المرسل', group: 'mail', secret: false, placeholder: 'حبقة Hubqa <no-reply@yourdomain.com>' },
+  { key: 'SMTP_REPLY_TO', label: 'عنوان الرد (Reply-To) — اختياري', group: 'mail', secret: false, placeholder: 'support@yourdomain.com' },
   // ===== تطبيق ميتا =====
   { key: 'FACEBOOK_APP_ID', label: 'App ID', group: 'meta', secret: false, placeholder: '1234567890' },
   { key: 'FACEBOOK_APP_SECRET', label: 'App Secret', group: 'meta', secret: true },
