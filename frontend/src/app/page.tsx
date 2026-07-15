@@ -268,6 +268,11 @@ export default function Home() {
           <div className="flex items-center gap-3">
             <LanguageSwitcher className="hidden sm:inline-flex" />
             <ThemeToggle />
+            <Link href="/login" className="hidden sm:inline-block">
+              <Button variant="ghost" className="rounded-full px-5 font-bold hover:bg-primary/10 hover:text-primary transition-all duration-300">
+                {t("landing.nav.login")}
+              </Button>
+            </Link>
             <Link href="/register" className="hidden sm:inline-block">
               <Button className="gap-2 rounded-full px-5 shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 transition-all duration-300">
                 {t("landing.nav.startFree")}

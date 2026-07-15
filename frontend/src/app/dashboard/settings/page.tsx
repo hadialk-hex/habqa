@@ -31,6 +31,13 @@ export default function SettingsPage() {
     ENTERPRISE: { name: t('settingsPage.planEnterpriseName'), sub: t('settingsPage.planEnterpriseSub') },
   }
 
+  // Real billing details per plan (mirrors backend plan-limits + landing pricing).
+  const planBilling: Record<string, { price: string; connections: string; replies: string; supportKey: string }> = {
+    STARTER: { price: '$0', connections: '1', replies: '100', supportKey: 'supportStandard' },
+    PRO: { price: '$29', connections: '5', replies: '∞', supportKey: 'supportPriority' },
+    ENTERPRISE: { price: '$99', connections: '∞', replies: '∞', supportKey: 'supportPriority' },
+  }
+
   const [activeTab, setActiveTab] = useState('profile')
   const { user, updateUser } = useAuth()
   const { showToast } = useToast()
@@ -172,25 +179,27 @@ export default function SettingsPage() {
 
       <div className="flex flex-col gap-6">
         {/* Settings Navigation — horizontal top tabs */}
-        <div className="flex items-center gap-1 p-1 rounded-2xl bg-muted/70 backdrop-blur-sm border border-border/40 overflow-x-auto no-scrollbar w-full sm:w-fit">
-          {settingsNav.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-200 text-sm font-bold whitespace-nowrap shrink-0 ${
-                activeTab === item.id
-                  ? 'bg-card text-primary shadow-md'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-              }`}
-            >
-              <item.icon className="w-4 h-4" />
-              {item.name}
-            </button>
-          ))}
+        <div className="flex justify-center w-full">
+          <div className="flex items-center gap-1 p-1 rounded-2xl bg-muted/70 backdrop-blur-sm border border-border/40 overflow-x-auto no-scrollbar w-full sm:w-fit">
+            {settingsNav.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl transition-all duration-200 text-sm font-bold whitespace-nowrap shrink-0 ${
+                  activeTab === item.id
+                    ? 'bg-card text-primary shadow-md'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                }`}
+              >
+                <item.icon className="w-4 h-4" />
+                {item.name}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Settings Content */}
-        <div className="space-y-6 max-w-3xl">
+        <div className="space-y-6 max-w-3xl mx-auto w-full">
           {activeTab === 'profile' && (
             <>
               <Card className="border-none shadow-lg animate-fade-in-up">
@@ -453,29 +462,36 @@ export default function SettingsPage() {
                 <CardDescription>{t('settingsPage.billingSubtitle')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="p-5 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/15">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <p className="font-black text-lg gradient-text">{t('settingsPage.planProName')}</p>
-                      <p className="text-sm text-muted-foreground mt-1" dir="ltr">$29 / month</p>
+                {(() => {
+                  const pb = planBilling[currentPlan || 'STARTER'] || planBilling.STARTER
+                  return (
+                    <div className="p-5 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/15">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <p className="font-black text-lg gradient-text">
+                            {currentPlan ? (planLabels[currentPlan]?.name || currentPlan) : t('settingsPage.loading')}
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-1" dir="ltr">{pb.price} / month</p>
+                        </div>
+                        <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-lg text-xs font-bold">{t('settingsPage.active')}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4 text-center border-t border-border/30 pt-4">
+                        <div>
+                          <p className="font-black text-lg">{pb.connections}</p>
+                          <p className="text-xs text-muted-foreground">{t('settingsPage.connectedPages')}</p>
+                        </div>
+                        <div>
+                          <p className="font-black text-lg">{pb.replies}</p>
+                          <p className="text-xs text-muted-foreground">{t('settingsPage.monthlyReplies')}</p>
+                        </div>
+                        <div>
+                          <p className="font-black text-lg">{t(`settingsPage.${pb.supportKey}`)}</p>
+                          <p className="text-xs text-muted-foreground">{t('settingsPage.technicalSupport')}</p>
+                        </div>
+                      </div>
                     </div>
-                    <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1 rounded-lg text-xs font-bold">{t('settingsPage.active')}</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4 text-center border-t border-border/30 pt-4">
-                    <div>
-                      <p className="font-black text-lg">5</p>
-                      <p className="text-xs text-muted-foreground">{t('settingsPage.connectedPages')}</p>
-                    </div>
-                    <div>
-                      <p className="font-black text-lg">∞</p>
-                      <p className="text-xs text-muted-foreground">{t('settingsPage.monthlyReplies')}</p>
-                    </div>
-                    <div>
-                      <p className="font-black text-lg">{t('settingsPage.supportPriority')}</p>
-                      <p className="text-xs text-muted-foreground">{t('settingsPage.technicalSupport')}</p>
-                    </div>
-                  </div>
-                </div>
+                  )
+                })()}
               </CardContent>
             </Card>
           )}

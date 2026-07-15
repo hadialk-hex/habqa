@@ -769,7 +769,7 @@ export default function AdminPage() {
 
       {/* ─── Tabs ─── */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="flex overflow-x-auto no-scrollbar md:grid md:grid-cols-6 w-full max-w-4xl mx-auto rounded-2xl h-auto md:h-13 p-1.5 bg-muted/70 backdrop-blur-sm gap-1 border border-border/40">
+        <TabsList className="flex overflow-x-auto no-scrollbar md:grid md:grid-cols-6 w-full rounded-2xl h-auto md:h-13 p-1.5 bg-muted/70 backdrop-blur-sm gap-2 border border-border/40 mb-6">
           <TabsTrigger value="overview" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
             <BarChart3 className="w-4 h-4" /> {t("adminPage.tabOverview")}
           </TabsTrigger>

@@ -596,6 +596,7 @@ export const en: Dictionary = {
     connectedPages: "Connected pages",
     monthlyReplies: "Monthly replies",
     supportPriority: "Priority",
+    supportStandard: "Standard",
     technicalSupport: "Support",
     notificationsTitle: "Notification Settings",
     notificationsSubtitle: "Control which notifications you want to receive.",

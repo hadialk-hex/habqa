@@ -594,6 +594,7 @@ export const ar = {
     connectedPages: "صفحات متصلة",
     monthlyReplies: "ردود شهرية",
     supportPriority: "أولوية",
+    supportStandard: "قياسي",
     technicalSupport: "دعم فني",
     notificationsTitle: "إعدادات الإشعارات",
     notificationsSubtitle: "تحكم في الإشعارات التي تريد استلامها.",
