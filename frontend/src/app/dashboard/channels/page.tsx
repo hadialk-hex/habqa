@@ -159,7 +159,7 @@ function ChannelsContent() {
       setBanner({ type: "error", text: t("channelsPage.facebookConnectFailedBanner") })
     }
     router.replace("/dashboard/channels")
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [searchParams])
 
   const handleConnectFacebook = async () => {

@@ -64,13 +64,14 @@ export function PostPicker({ open, onOpenChange, onSelect }: PostPickerProps) {
         }
       })
       .catch(() => setError("فشل تحميل القنوات"))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [open])
 
   const fetchPosts = useCallback(async (chId: string, cursor?: string) => {
     if (!chId) return
     try {
-      cursor ? setIsLoadingMore(true) : setIsLoading(true)
+      if (cursor) setIsLoadingMore(true)
+      else setIsLoading(true)
       setError(null)
       const params = new URLSearchParams({ limit: "12" })
       if (cursor) params.set("after", cursor)
@@ -171,7 +172,7 @@ export function PostPicker({ open, onOpenChange, onSelect }: PostPickerProps) {
                 >
                   <div className="h-32 bg-muted/40 flex items-center justify-center overflow-hidden">
                     {post.picture ? (
-                      // eslint-disable-next-line @next/next/no-img-element
+                       
                       <img src={post.picture} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     ) : (
                       <ImageOff className="w-8 h-8 text-muted-foreground/40" />

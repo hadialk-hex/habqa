@@ -832,7 +832,7 @@ export default function RulesPage() {
                           {selectedPost ? (
                             <div className="flex gap-3 p-3 border rounded-xl bg-accent/30 items-start">
                               {selectedPost.picture ? (
-                                // eslint-disable-next-line @next/next/no-img-element
+                                 
                                 <img src={selectedPost.picture} alt="" className="w-16 h-16 rounded-lg object-cover shrink-0 border" />
                               ) : (
                                 <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -1494,7 +1494,7 @@ export default function RulesPage() {
                               {mediaUrl && (
                                 <div className="mt-2 rounded-xl overflow-hidden border max-h-[200px] flex justify-center bg-muted/30">
                                   {mediaType === 'IMAGE' ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
+                                     
                                     <img src={mediaUrl} alt="Preview" className="max-h-[200px] object-contain" onError={(e) => e.currentTarget.style.display = 'none'} />
                                   ) : (
                                     <video src={mediaUrl} controls className="max-h-[200px] w-full" />
@@ -1592,7 +1592,7 @@ export default function RulesPage() {
                                   </div>
                                 )}
                                 <div className="rounded-xl overflow-hidden border border-border/30 max-h-[140px]">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  { }
                                   <img src={msg.imageUrl} alt="" className="w-full h-full object-cover" />
                                 </div>
                               </div>
@@ -1625,7 +1625,7 @@ export default function RulesPage() {
                                   <div key={cIdx} className="w-[180px] bg-slate-900 border border-border/50 rounded-xl overflow-hidden shrink-0 flex flex-col text-[10px]">
                                     {card.imageUrl && (
                                       <div className="h-[90px] w-full overflow-hidden bg-accent/20">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        { }
                                         <img src={card.imageUrl} alt="" className="w-full h-full object-cover" />
                                       </div>
                                     )}

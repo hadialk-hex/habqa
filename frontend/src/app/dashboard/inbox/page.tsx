@@ -247,12 +247,6 @@ export default function InboxPage() {
     }
   }
 
-  useEffect(() => {
-    fetchConversations()
-    fetchTeamMembers()
-    fetchCannedResponses()
-  }, [searchQuery, filterStatus])
-
   const fetchCannedResponses = async () => {
     try {
       const res = await api.get('/inbox/canned-responses')
@@ -261,6 +255,12 @@ export default function InboxPage() {
       console.error(err)
     }
   }
+
+  useEffect(() => {
+    fetchConversations()
+    fetchTeamMembers()
+    fetchCannedResponses()
+  }, [searchQuery, filterStatus])
 
   useEffect(() => {
     scrollToBottom()

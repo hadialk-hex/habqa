@@ -568,15 +568,6 @@ export default function AdminPage() {
     downloadCSV("users.csv", headers, rows)
   }
 
-  const exportLogsCSV = () => {
-    const headers = tList("adminPage.csvLogHeaders")
-    const rows = filteredLogs.map(l => [
-      l.action, l.entityType, l.user?.email || "—",
-      l.tenant?.name || "—", new Date(l.createdAt).toLocaleString(localeCode)
-    ])
-    downloadCSV("audit-logs.csv", headers, rows)
-  }
-
   /* ─── Filtered logs (enhanced with date range + full text search + clickable action filter) ─── */
   const filteredLogs = useMemo(() => {
     return logs.filter(log => {
@@ -616,6 +607,15 @@ export default function AdminPage() {
       return true
     })
   }, [logs, logActionFilter, logEntityFilter, logEmailSearch, logDateFrom, logDateTo, logFullTextSearch])
+
+  const exportLogsCSV = () => {
+    const headers = tList("adminPage.csvLogHeaders")
+    const rows = filteredLogs.map(l => [
+      l.action, l.entityType, l.user?.email || "—",
+      l.tenant?.name || "—", new Date(l.createdAt).toLocaleString(localeCode)
+    ])
+    downloadCSV("audit-logs.csv", headers, rows)
+  }
 
   /* ─── Unique entity types from logs ─── */
   const uniqueEntityTypes = useMemo(() => {

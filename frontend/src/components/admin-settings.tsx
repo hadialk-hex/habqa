@@ -132,7 +132,7 @@ export function AdminSettings() {
   const groups: ("mail" | "meta" | "ai")[] = ["mail", "meta", "ai"]
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl">
+    <div className="flex flex-col gap-6 w-full max-w-6xl mx-auto">
       {banner && (
         <div className={`flex items-center gap-3 p-4 rounded-xl text-sm font-bold animate-fade-in ${
           banner.type === "success"
@@ -145,12 +145,16 @@ export function AdminSettings() {
         </div>
       )}
 
+      {/* Two-column grid on large screens so the settings tab uses the full
+          page width instead of one narrow column; the mail card (5 fields)
+          spans the full row, meta + AI share the second row. */}
+      <div className="grid gap-6 xl:grid-cols-2 items-start">
       {groups.map(group => {
         const meta = groupMeta[group]
         const GroupIcon = meta.icon
         const groupSettings = settings.filter(s => s.group === group)
         return (
-          <Card key={group} className="border-none shadow-lg">
+          <Card key={group} className={`border-none shadow-lg ${group === "mail" ? "xl:col-span-2" : ""}`}>
             <CardHeader>
               <CardTitle className="text-lg font-black flex items-center gap-2">
                 <GroupIcon className="w-5 h-5 text-primary" />
@@ -186,6 +190,7 @@ export function AdminSettings() {
           </Card>
         )
       })}
+      </div>
 
       <div className="flex items-center gap-3 justify-end">
         <Button variant="outline" className="rounded-xl gap-2 font-bold" disabled={isTesting} onClick={handleTestEmail}>
