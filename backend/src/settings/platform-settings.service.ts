@@ -112,6 +112,19 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     group: 'ai',
     secret: true,
   },
+  {
+    key: 'GEMINI_API_KEY',
+    label: 'مفتاح Google Gemini API',
+    group: 'ai',
+    secret: true,
+  },
+  {
+    key: 'AI_PROVIDER',
+    label: 'مزوّد الذكاء الاصطناعي المفضّل',
+    group: 'ai',
+    secret: false,
+    placeholder: 'claude أو gemini (الافتراضي: claude)',
+  },
 ];
 
 const VALID_KEYS = new Set(SETTING_DEFINITIONS.map((d) => d.key));

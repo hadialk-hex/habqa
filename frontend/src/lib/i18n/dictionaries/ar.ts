@@ -723,6 +723,8 @@ export const ar = {
     fieldInstagramAppSecret: "Instagram App Secret",
     fieldInstagramRedirectUri: "رابط إعادة توجيه انستغرام",
     fieldAnthropicApiKey: "مفتاح Anthropic API",
+    fieldGeminiApiKey: "مفتاح Google Gemini API",
+    fieldAiProvider: "مزوّد الذكاء الاصطناعي المفضّل (claude أو gemini)",
   },
   channelsPage: {
     title: "قنوات التواصل",

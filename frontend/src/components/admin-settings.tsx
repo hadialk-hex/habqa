@@ -37,6 +37,8 @@ const fieldLabelKeys: Record<string, string> = {
   INSTAGRAM_APP_SECRET: "fieldInstagramAppSecret",
   INSTAGRAM_REDIRECT_URI: "fieldInstagramRedirectUri",
   ANTHROPIC_API_KEY: "fieldAnthropicApiKey",
+  GEMINI_API_KEY: "fieldGeminiApiKey",
+  AI_PROVIDER: "fieldAiProvider",
 }
 
 // Admin panel section: edits platform-wide settings stored in the DB.

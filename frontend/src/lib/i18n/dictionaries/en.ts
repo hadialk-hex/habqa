@@ -725,6 +725,8 @@ export const en: Dictionary = {
     fieldInstagramAppSecret: "Instagram App Secret",
     fieldInstagramRedirectUri: "Instagram Redirect URI",
     fieldAnthropicApiKey: "Anthropic API Key",
+    fieldGeminiApiKey: "Google Gemini API Key",
+    fieldAiProvider: "Preferred AI provider (claude or gemini)",
   },
   channelsPage: {
     title: "Channels",
