@@ -205,6 +205,20 @@ export class ChannelsController {
     return this.channelsService.getConnection(req.user.tenantId, id);
   }
 
+  // Webhook diagnostics: shows whether the page is actually subscribed to the
+  // app (with the "messages" field) — the reason messages do/don't arrive.
+  @UseGuards(JwtAuthGuard)
+  @Get(':id/webhook-status')
+  async getWebhookStatus(@Request() req: any, @Param('id') id: string) {
+    return this.channelsService.getWebhookStatus(req.user.tenantId, id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/webhook-subscribe')
+  async subscribeWebhook(@Request() req: any, @Param('id') id: string) {
+    return this.channelsService.subscribeWebhook(req.user.tenantId, id);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get(':id/posts')
   async getChannelPosts(

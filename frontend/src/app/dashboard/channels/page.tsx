@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import {
   Trash2, ShieldCheck, RefreshCw, MessageCircle, Share2, WifiOff,
   CheckCircle2, AlertTriangle, X, ExternalLink, Zap, ArrowLeft,
-  MessageSquare, Radio, Users, BookOpen, Heart, Film, UserPlus, Send, Info
+  MessageSquare, Radio, Users, BookOpen, Heart, Film, UserPlus, Send, Info,
+  Webhook, Wrench
 } from "lucide-react"
 import api from "@/lib/api"
 import { useLanguage } from "@/lib/i18n/language-context"
@@ -137,6 +138,46 @@ function ChannelsContent() {
   const [banner, setBanner] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Channel | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  // Webhook diagnostics per channel: did Facebook actually register our app
+  // on this page with the "messages" field? (The reason messages do/don't
+  // reach the inbox.)
+  interface WebhookState {
+    loading?: boolean
+    fixing?: boolean
+    subscribed?: boolean
+    hasMessagesField?: boolean
+    error?: string
+  }
+  const [webhookStatus, setWebhookStatus] = useState<Record<string, WebhookState>>({})
+
+  const checkWebhook = async (channelId: string) => {
+    setWebhookStatus(prev => ({ ...prev, [channelId]: { loading: true } }))
+    try {
+      const res = await api.get(`/channels/${channelId}/webhook-status`)
+      setWebhookStatus(prev => ({ ...prev, [channelId]: res.data }))
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } }
+      setWebhookStatus(prev => ({
+        ...prev,
+        [channelId]: { error: axiosErr.response?.data?.message || t("channelsPage.webhookCheckFailed") },
+      }))
+    }
+  }
+
+  const fixWebhook = async (channelId: string) => {
+    setWebhookStatus(prev => ({ ...prev, [channelId]: { ...prev[channelId], fixing: true } }))
+    try {
+      await api.post(`/channels/${channelId}/webhook-subscribe`)
+      await checkWebhook(channelId)
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } }
+      setWebhookStatus(prev => ({
+        ...prev,
+        [channelId]: { error: axiosErr.response?.data?.message || t("channelsPage.webhookFixFailed") },
+      }))
+    }
+  }
   const [waDialog, setWaDialog] = useState(false)
   const [waStep, setWaStep] = useState(1)
   const [waName, setWaName] = useState("")
@@ -525,16 +566,74 @@ function ChannelsContent() {
                         
                         <div className="flex justify-between items-center pt-3 border-t border-border/50">
                           <span className="text-xs text-muted-foreground font-mono truncate" dir="ltr">ID: {channel.platformId}</span>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-destructive hover:bg-destructive/10 rounded-lg h-8 px-3 text-xs gap-1.5 shrink-0" 
-                            onClick={() => setDeleteTarget(channel)}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            {t("channelsPage.disconnectBtn")}
-                          </Button>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {channel.platform === "FACEBOOK_PAGE" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="rounded-lg h-8 px-3 text-xs gap-1.5"
+                                disabled={webhookStatus[channel.id]?.loading}
+                                onClick={() => checkWebhook(channel.id)}
+                              >
+                                {webhookStatus[channel.id]?.loading
+                                  ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  : <Webhook className="w-3.5 h-3.5" />}
+                                {t("channelsPage.webhookCheckBtn")}
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:bg-destructive/10 rounded-lg h-8 px-3 text-xs gap-1.5"
+                              onClick={() => setDeleteTarget(channel)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              {t("channelsPage.disconnectBtn")}
+                            </Button>
+                          </div>
                         </div>
+
+                        {(() => {
+                          const ws = webhookStatus[channel.id]
+                          if (!ws || ws.loading) return null
+                          const healthy = ws.subscribed && ws.hasMessagesField
+                          return (
+                            <div className={`mt-3 flex items-start gap-2 p-2.5 rounded-lg text-xs font-medium ${
+                              healthy
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                            }`}>
+                              {healthy
+                                ? <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                                : <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />}
+                              <div className="flex-1 min-w-0">
+                                <p className="leading-relaxed">
+                                  {healthy
+                                    ? t("channelsPage.webhookOk")
+                                    : ws.error
+                                      ? ws.error
+                                      : ws.subscribed
+                                        ? t("channelsPage.webhookNoMessagesField")
+                                        : t("channelsPage.webhookNotSubscribed")}
+                                </p>
+                                {!healthy && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-2 rounded-lg h-7 px-2.5 text-[11px] gap-1"
+                                    disabled={ws.fixing}
+                                    onClick={() => fixWebhook(channel.id)}
+                                  >
+                                    {ws.fixing
+                                      ? <RefreshCw className="w-3 h-3 animate-spin" />
+                                      : <Wrench className="w-3 h-3" />}
+                                    {t("channelsPage.webhookFixBtn")}
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })()}
                       </CardContent>
                     </Card>
                   )

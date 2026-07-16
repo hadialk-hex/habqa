@@ -284,10 +284,14 @@ export class ChannelsService {
             accessToken: page.access_token,
           });
 
-          // Subscribe the app to this page's webhook events
+          // Subscribe the app to this page's webhook events.
+          // Non-fatal: a subscription failure shouldn't block the page
+          // connection — but log the real Graph error so it never fails
+          // silently (missing pages_manage_metadata is the classic cause of
+          // "connected but no messages arrive").
           try {
             const subscribeUrl = `${GRAPH_API_BASE}/${page.id}/subscribed_apps`;
-            await fetch(subscribeUrl, {
+            const subRes = await fetch(subscribeUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: new URLSearchParams({
@@ -296,8 +300,18 @@ export class ChannelsService {
                 access_token: page.access_token,
               }).toString(),
             });
-          } catch {
-            // non-fatal: webhook subscription failure shouldn't block page connection
+            const subData: any = await subRes.json().catch(() => ({}));
+            if (!subRes.ok || subData?.success !== true) {
+              this.logger.warn(
+                `Webhook subscription failed for page ${page.id}: ${
+                  subData?.error?.message || `HTTP ${subRes.status}`
+                }`,
+              );
+            }
+          } catch (err) {
+            this.logger.warn(
+              `Webhook subscription request errored for page ${page.id}: ${String(err)}`,
+            );
           }
 
           connected++;
@@ -436,6 +450,94 @@ export class ChannelsService {
         error.message || 'Facebook Graph API request failed',
       );
     }
+  }
+
+  // Diagnostic: is our app actually subscribed to this page's webhook events?
+  // Messages only arrive when /{page-id}/subscribed_apps includes the app with
+  // the "messages" field — the OAuth auto-subscribe can fail silently (e.g.
+  // missing pages_manage_metadata), so this surfaces the real Graph state.
+  async getWebhookStatus(tenantId: string, id: string) {
+    const conn = await this.prisma.platformConnection.findFirst({
+      where: { id, tenantId },
+    });
+    if (!conn) {
+      throw new NotFoundException('القناة غير موجودة');
+    }
+    if (conn.platform !== 'FACEBOOK_PAGE') {
+      throw new BadRequestException(
+        'فحص الويبهوك متاح لصفحات فيسبوك فقط حالياً',
+      );
+    }
+    if (!conn.accessToken) {
+      throw new BadRequestException(
+        'لا يوجد توكن وصول لهذه القناة. أعد ربط القناة عبر فيسبوك أولاً.',
+      );
+    }
+    const token = this.getDecryptedAccessToken(conn.accessToken);
+    const url = `${GRAPH_API_BASE}/${conn.platformId}/subscribed_apps?access_token=${token}`;
+    const response = await fetch(url);
+    const data: any = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return {
+        subscribed: false,
+        hasMessagesField: false,
+        error:
+          data?.error?.message ||
+          'فشل الاستعلام من فيسبوك. قد يكون التوكن منتهي الصلاحية — أعد ربط القناة.',
+      };
+    }
+    const apps: any[] = Array.isArray(data?.data) ? data.data : [];
+    const fields: string[] = apps.flatMap((a) =>
+      Array.isArray(a?.subscribed_fields) ? a.subscribed_fields : [],
+    );
+    return {
+      subscribed: apps.length > 0,
+      hasMessagesField: fields.includes('messages'),
+      subscribedFields: fields,
+      apps: apps.map((a) => ({ id: a?.id, name: a?.name })),
+    };
+  }
+
+  // Re-run the page → app webhook subscription and surface the real Graph
+  // error instead of swallowing it like the OAuth-callback fast path does.
+  async subscribeWebhook(tenantId: string, id: string) {
+    const conn = await this.prisma.platformConnection.findFirst({
+      where: { id, tenantId },
+    });
+    if (!conn) {
+      throw new NotFoundException('القناة غير موجودة');
+    }
+    if (conn.platform !== 'FACEBOOK_PAGE') {
+      throw new BadRequestException(
+        'الاشتراك بالويبهوك متاح لصفحات فيسبوك فقط حالياً',
+      );
+    }
+    if (!conn.accessToken) {
+      throw new BadRequestException(
+        'لا يوجد توكن وصول لهذه القناة. أعد ربط القناة عبر فيسبوك أولاً.',
+      );
+    }
+    const token = this.getDecryptedAccessToken(conn.accessToken);
+    const response = await fetch(
+      `${GRAPH_API_BASE}/${conn.platformId}/subscribed_apps`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          subscribed_fields:
+            'messages,messaging_postbacks,feed,message_reactions',
+          access_token: token,
+        }).toString(),
+      },
+    );
+    const data: any = await response.json().catch(() => ({}));
+    if (!response.ok || data?.success !== true) {
+      throw new BadRequestException(
+        data?.error?.message ||
+          'رفض فيسبوك طلب الاشتراك. تأكد من منح صلاحية pages_manage_metadata عند الربط.',
+      );
+    }
+    return { success: true };
   }
 
   async getChannelPosts(
