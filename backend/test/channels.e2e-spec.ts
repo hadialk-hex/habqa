@@ -262,7 +262,9 @@ const mockPrismaService = {
     }),
     findFirst: jest.fn().mockImplementation(async (args) => {
       const { userId, tenantId } = args?.where || {};
-      const member = mockMembers.find((m) => m.userId === userId && m.tenantId === tenantId);
+      const member = mockMembers.find(
+        (m) => m.userId === userId && m.tenantId === tenantId,
+      );
       if (!member) return null;
       if (!member.tenant) {
         member.tenant = mockTenants.find((t) => t.id === member.tenantId) || {
@@ -467,7 +469,7 @@ describe('Channel Connections (e2e)', () => {
     it('should retrieve channel details (Tier 1)', async () => {
       const mockFetch = jest
         .spyOn(global, 'fetch')
-        .mockImplementation((url: any) => {
+        .mockImplementation((_url: any) => {
           return Promise.resolve({
             ok: true,
             json: () =>
@@ -528,7 +530,7 @@ describe('Channel Connections (e2e)', () => {
     it('should retrieve page details with malformed token handling error gracefully (Tier 2)', async () => {
       const mockFetch = jest
         .spyOn(global, 'fetch')
-        .mockImplementation((url: any) => {
+        .mockImplementation((_url: any) => {
           return Promise.resolve({
             ok: false,
             json: () =>

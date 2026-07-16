@@ -63,7 +63,7 @@ export async function seedDefaultTenant(prisma: PrismaClient) {
     if (existing) {
       return existing;
     }
-  } catch (e) {
+  } catch {
     // Ignore and try creating
   }
 

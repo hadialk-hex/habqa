@@ -182,7 +182,9 @@ export class TeamService {
       requesterRole !== TenantRole.OWNER &&
       requesterRole !== TenantRole.ADMIN
     ) {
-      throw new ForbiddenException('Only OWNER or ADMIN can cancel invitations');
+      throw new ForbiddenException(
+        'Only OWNER or ADMIN can cancel invitations',
+      );
     }
     const invitation = await this.prisma.teamInvitation.findFirst({
       where: { id: invitationId, tenantId },

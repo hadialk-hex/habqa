@@ -20,11 +20,22 @@ export class PrismaService
 
   async onModuleInit() {
     await this.$connect();
+
+    const databaseUrl = process.env.DATABASE_URL ?? '';
+    const isSqlite =
+      databaseUrl.startsWith('file:') ||
+      databaseUrl.startsWith('sqlite:') ||
+      databaseUrl.includes('mode=memory');
+
+    if (!isSqlite) {
+      return;
+    }
+
     try {
       await this.$executeRawUnsafe('PRAGMA journal_mode = WAL;');
       await this.$executeRawUnsafe('PRAGMA busy_timeout = 10000;');
-    } catch (e) {
-      // ignore if database URL is not sqlite or provider doesn't support it
+    } catch {
+      // Ignore SQLite-specific tuning failures when the DB is not SQLite.
     }
   }
 

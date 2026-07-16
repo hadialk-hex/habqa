@@ -68,7 +68,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     if (member.tenant?.isSuspended && !user.isSuperAdmin) {
-      throw new UnauthorizedException('تم إيقاف هذا الحساب من قبل إدارة المنصة');
+      throw new UnauthorizedException(
+        'تم إيقاف هذا الحساب من قبل إدارة المنصة',
+      );
     }
 
     return {

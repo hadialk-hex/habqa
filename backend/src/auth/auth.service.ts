@@ -185,7 +185,9 @@ export class AuthService {
 
     // Security: always return success to prevent user enumeration
     if (!user) {
-      return { message: 'إذا كان البريد مسجلاً، سيتم إرسال رابط إعادة التعيين' };
+      return {
+        message: 'إذا كان البريد مسجلاً، سيتم إرسال رابط إعادة التعيين',
+      };
     }
 
     const token = 'reset_' + crypto.randomBytes(32).toString('hex');
@@ -283,7 +285,9 @@ export class AuthService {
         where: { id: userId },
       });
       if (!user || !user.password) {
-        throw new BadRequestException('المستخدم غير موجود أو لا يملك كلمة مرور');
+        throw new BadRequestException(
+          'المستخدم غير موجود أو لا يملك كلمة مرور',
+        );
       }
       if (!currentPassword) {
         throw new BadRequestException('يجب إدخال كلمة المرور الحالية للتحقق');

@@ -30,7 +30,12 @@ export class WebhooksService {
   ) {
     if (!this.notifications) return;
     try {
-      await this.notifications.createNotification(tenantId, title, message, type);
+      await this.notifications.createNotification(
+        tenantId,
+        title,
+        message,
+        type,
+      );
     } catch (error: any) {
       this.logger.warn(`Failed to create notification: ${error.message}`);
     }
@@ -181,8 +186,9 @@ export class WebhooksService {
       const tenant = await this.prisma.tenant.findUnique({
         where: { id: connection.tenantId },
       });
-      const subscriberLimit = getPlanLimits(tenant?.plan || 'STARTER')
-        .maxSubscribers;
+      const subscriberLimit = getPlanLimits(
+        tenant?.plan || 'STARTER',
+      ).maxSubscribers;
       const subscriberCount =
         subscriberLimit === -1
           ? 0
@@ -546,17 +552,14 @@ export class WebhooksService {
     );
 
     try {
-      const response = await fetch(
-        `${GRAPH_API_BASE}/${commentId}/comments`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({ message: reply }),
+      const response = await fetch(`${GRAPH_API_BASE}/${commentId}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify({ message: reply }),
+      });
       if (!response.ok) {
         this.logger.error(
           `Failed to send AI comment reply: ${response.statusText}`,
@@ -640,21 +643,18 @@ export class WebhooksService {
       connection.accessToken,
     );
     try {
-      const response = await fetch(
-        `${GRAPH_API_BASE}/me/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            messaging_type: 'RESPONSE',
-            recipient: { id: senderId },
-            message: { text: replyText },
-          }),
+      const response = await fetch(`${GRAPH_API_BASE}/me/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify({
+          messaging_type: 'RESPONSE',
+          recipient: { id: senderId },
+          message: { text: replyText },
+        }),
+      });
       if (!response.ok) {
         this.logger.error(
           `Failed to send story ${triggerType} reply: ${response.statusText}`,
@@ -796,7 +796,11 @@ export class WebhooksService {
         direction: 'INBOUND',
         content:
           messageText ||
-          (isStoryMention ? 'أشارك حسابك في ستوري 📢' : isStoryReply ? 'رد على ستوري' : ''),
+          (isStoryMention
+            ? 'أشارك حسابك في ستوري 📢'
+            : isStoryReply
+              ? 'رد على ستوري'
+              : ''),
         messageType: 'TEXT',
         metaData: JSON.stringify(value),
       },
@@ -940,7 +944,7 @@ export class WebhooksService {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
+                Authorization: `Bearer ${token}`,
               },
               body: JSON.stringify(payload),
             },
@@ -957,7 +961,10 @@ export class WebhooksService {
             });
           }
         } catch (error) {
-          this.logger.error('Failed to send public comment reply for sequence', error);
+          this.logger.error(
+            'Failed to send public comment reply for sequence',
+            error,
+          );
         }
       }
 
@@ -970,17 +977,14 @@ export class WebhooksService {
       const sendDm = async (message: any): Promise<boolean> => {
         const recipient = psid ? { id: psid } : { comment_id: commentId };
         try {
-          const response = await fetch(
-            `${GRAPH_API_BASE}/me/messages`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-              },
-              body: JSON.stringify({ recipient, message }),
+          const response = await fetch(`${GRAPH_API_BASE}/me/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
             },
-          );
+            body: JSON.stringify({ recipient, message }),
+          });
           if (!response.ok) {
             this.logger.error(
               `Failed to send sequential DM: ${response.statusText}`,
@@ -1129,7 +1133,7 @@ export class WebhooksService {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
+                Authorization: `Bearer ${token}`,
               },
               body: JSON.stringify(payload),
             },
@@ -1206,17 +1210,14 @@ export class WebhooksService {
 
         let isSuccess = false;
         try {
-          const response = await fetch(
-            `${GRAPH_API_BASE}/me/messages`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-              },
-              body: JSON.stringify(dmPayload),
+          const response = await fetch(`${GRAPH_API_BASE}/me/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
             },
-          );
+            body: JSON.stringify(dmPayload),
+          });
           if (response.ok) {
             isSuccess = true;
           } else {
@@ -1262,4 +1263,3 @@ export class WebhooksService {
     });
   }
 }
-

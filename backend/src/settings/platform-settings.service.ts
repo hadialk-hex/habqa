@@ -16,23 +16,102 @@ export interface SettingDefinition {
 
 export const SETTING_DEFINITIONS: SettingDefinition[] = [
   // ===== البريد (SMTP) =====
-  { key: 'SMTP_HOST', label: 'خادم SMTP', group: 'mail', secret: false, placeholder: 'smtp.resend.com' },
-  { key: 'SMTP_PORT', label: 'منفذ SMTP', group: 'mail', secret: false, placeholder: '587' },
-  { key: 'SMTP_USER', label: 'اسم المستخدم', group: 'mail', secret: false, placeholder: 'resend' },
-  { key: 'SMTP_PASS', label: 'كلمة المرور / مفتاح API', group: 'mail', secret: true },
-  { key: 'SMTP_FROM', label: 'عنوان المرسل', group: 'mail', secret: false, placeholder: 'حبقة Hubqa <no-reply@yourdomain.com>' },
-  { key: 'SMTP_REPLY_TO', label: 'عنوان الرد (Reply-To) — اختياري', group: 'mail', secret: false, placeholder: 'support@yourdomain.com' },
+  {
+    key: 'SMTP_HOST',
+    label: 'خادم SMTP',
+    group: 'mail',
+    secret: false,
+    placeholder: 'smtp.resend.com',
+  },
+  {
+    key: 'SMTP_PORT',
+    label: 'منفذ SMTP',
+    group: 'mail',
+    secret: false,
+    placeholder: '587',
+  },
+  {
+    key: 'SMTP_USER',
+    label: 'اسم المستخدم',
+    group: 'mail',
+    secret: false,
+    placeholder: 'resend',
+  },
+  {
+    key: 'SMTP_PASS',
+    label: 'كلمة المرور / مفتاح API',
+    group: 'mail',
+    secret: true,
+  },
+  {
+    key: 'SMTP_FROM',
+    label: 'عنوان المرسل',
+    group: 'mail',
+    secret: false,
+    placeholder: 'حبقة Hubqa <no-reply@yourdomain.com>',
+  },
+  {
+    key: 'SMTP_REPLY_TO',
+    label: 'عنوان الرد (Reply-To) — اختياري',
+    group: 'mail',
+    secret: false,
+    placeholder: 'support@yourdomain.com',
+  },
   // ===== تطبيق ميتا =====
-  { key: 'FACEBOOK_APP_ID', label: 'App ID', group: 'meta', secret: false, placeholder: '1234567890' },
-  { key: 'FACEBOOK_APP_SECRET', label: 'App Secret', group: 'meta', secret: true },
-  { key: 'FACEBOOK_REDIRECT_URI', label: 'رابط إعادة التوجيه (OAuth)', group: 'meta', secret: false, placeholder: 'https://yourdomain.com/channels/facebook/callback' },
-  { key: 'WEBHOOK_VERIFY_TOKEN', label: 'رمز تحقق الويبهوك', group: 'meta', secret: true },
+  {
+    key: 'FACEBOOK_APP_ID',
+    label: 'App ID',
+    group: 'meta',
+    secret: false,
+    placeholder: '1234567890',
+  },
+  {
+    key: 'FACEBOOK_APP_SECRET',
+    label: 'App Secret',
+    group: 'meta',
+    secret: true,
+  },
+  {
+    key: 'FACEBOOK_REDIRECT_URI',
+    label: 'رابط إعادة التوجيه (OAuth)',
+    group: 'meta',
+    secret: false,
+    placeholder: 'https://yourdomain.com/channels/facebook/callback',
+  },
+  {
+    key: 'WEBHOOK_VERIFY_TOKEN',
+    label: 'رمز تحقق الويبهوك',
+    group: 'meta',
+    secret: true,
+  },
   // ===== انستغرام (تسجيل دخول انستغرام المستقل — لا يتطلب حساب فيسبوك) =====
-  { key: 'INSTAGRAM_APP_ID', label: 'Instagram App ID', group: 'meta', secret: false, placeholder: '1234567890' },
-  { key: 'INSTAGRAM_APP_SECRET', label: 'Instagram App Secret', group: 'meta', secret: true },
-  { key: 'INSTAGRAM_REDIRECT_URI', label: 'رابط إعادة توجيه انستغرام', group: 'meta', secret: false, placeholder: 'https://yourdomain.com/channels/instagram/callback' },
+  {
+    key: 'INSTAGRAM_APP_ID',
+    label: 'Instagram App ID',
+    group: 'meta',
+    secret: false,
+    placeholder: '1234567890',
+  },
+  {
+    key: 'INSTAGRAM_APP_SECRET',
+    label: 'Instagram App Secret',
+    group: 'meta',
+    secret: true,
+  },
+  {
+    key: 'INSTAGRAM_REDIRECT_URI',
+    label: 'رابط إعادة توجيه انستغرام',
+    group: 'meta',
+    secret: false,
+    placeholder: 'https://yourdomain.com/channels/instagram/callback',
+  },
   // ===== الذكاء الاصطناعي =====
-  { key: 'ANTHROPIC_API_KEY', label: 'مفتاح Anthropic API', group: 'ai', secret: true },
+  {
+    key: 'ANTHROPIC_API_KEY',
+    label: 'مفتاح Anthropic API',
+    group: 'ai',
+    secret: true,
+  },
 ];
 
 const VALID_KEYS = new Set(SETTING_DEFINITIONS.map((d) => d.key));

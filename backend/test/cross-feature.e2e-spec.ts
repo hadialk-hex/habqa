@@ -5,7 +5,6 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { cleanDatabase, seedDefaultTenant } from './db-cleanup';
 import * as crypto from 'crypto';
-import { ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 
 jest.setTimeout(45000);

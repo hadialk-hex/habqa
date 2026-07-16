@@ -79,7 +79,7 @@ describe('Broadcasts (e2e)', () => {
   });
 
   describe('Broadcast Life Cycle (Tier 1 - Expected/Mocked)', () => {
-    let broadcastId = 'mocked-broadcast-id-123';
+    const broadcastId = 'mocked-broadcast-id-123';
 
     it('should create a broadcast draft (Tier 1)', async () => {
       const res = await request(app.getHttpServer())

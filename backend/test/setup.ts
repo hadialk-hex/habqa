@@ -35,11 +35,17 @@ const workerId = process.env.JEST_WORKER_ID || '1';
 if (provider === 'postgresql') {
   let resolvedUrl = databaseUrl;
   if (!resolvedUrl || resolvedUrl.startsWith('file:')) {
-    resolvedUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL || 'postgresql://postgres:password@127.0.0.1:5433/hubqa_test?schema=public';
+    resolvedUrl =
+      process.env.TEST_DATABASE_URL ||
+      process.env.DATABASE_URL ||
+      'postgresql://postgres:password@127.0.0.1:5433/hubqa_test?schema=public';
   }
   // Inject schema parameter for worker isolation
   if (resolvedUrl.includes('schema=')) {
-    resolvedUrl = resolvedUrl.replace(/schema=[^&]+/g, `schema=worker_${workerId}`);
+    resolvedUrl = resolvedUrl.replace(
+      /schema=[^&]+/g,
+      `schema=worker_${workerId}`,
+    );
   } else {
     const separator = resolvedUrl.includes('?') ? '&' : '?';
     resolvedUrl = `${resolvedUrl}${separator}schema=worker_${workerId}`;

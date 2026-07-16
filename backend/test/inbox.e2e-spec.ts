@@ -318,7 +318,7 @@ describe('Inbox & Subscribers (e2e)', () => {
 
     it('should assign a conversation to a team member (Task 4)', async () => {
       const user = await prisma.user.findFirst({
-        where: { email: { startsWith: 'inboxowner_' } }
+        where: { email: { startsWith: 'inboxowner_' } },
       });
 
       const conv = await prisma.conversation.create({

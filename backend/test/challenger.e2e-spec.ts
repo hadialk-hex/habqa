@@ -21,7 +21,7 @@ describe('Challenger 2 Verification Tests (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let token: string;
-  let tenantId: string;
+  let _tenantId: string;
 
   beforeAll(async () => {
     // Set allowed origins and encryption keys for verification
@@ -65,7 +65,7 @@ describe('Challenger 2 Verification Tests (e2e)', () => {
       .expect(201);
 
     token = res.body.access_token;
-    tenantId = res.body.user.tenantId;
+    _tenantId = res.body.user.tenantId;
   });
 
   afterAll(async () => {

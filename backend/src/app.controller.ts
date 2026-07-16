@@ -8,7 +8,6 @@ import {
   Request,
   ForbiddenException,
   BadRequestException,
-  HttpCode,
   HttpStatus,
   Query,
   HttpException,
@@ -85,7 +84,7 @@ export class AppController {
   }
 
   @Get('system/config-limits')
-  async getConfigLimits() {
+  getConfigLimits() {
     return {
       maxRulesPerTenant: 100,
       maxConnectionsPerTenant: 10,
@@ -93,7 +92,7 @@ export class AppController {
   }
 
   @Get('system/rate-limits')
-  async getRateLimits() {
+  getRateLimits() {
     return {
       limit: 15,
       ttl: 10000,

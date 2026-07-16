@@ -66,7 +66,8 @@ ${businessContext}
       }
 
       const textBlock = response.content.find((b) => b.type === 'text');
-      const reply = textBlock && 'text' in textBlock ? textBlock.text.trim() : '';
+      const reply =
+        textBlock && 'text' in textBlock ? textBlock.text.trim() : '';
 
       if (!reply || reply === 'SKIP' || reply.startsWith('SKIP')) {
         return null;

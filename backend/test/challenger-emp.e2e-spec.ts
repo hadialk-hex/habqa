@@ -111,14 +111,14 @@ describe('Empirical Verification: Credentials & State Signature', () => {
     it('successfully rejects raw UUID state parameter', async () => {
       const rawUUID = '12345678-1234-1234-1234-1234567890ab';
       await expect(
-        channelsController.facebookCallback('auth_code', rawUUID),
+        channelsController.facebookCallback({} as any, 'auth_code', rawUUID),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('successfully rejects demo-tenant-id state parameter', async () => {
       const demoState = 'demo-tenant-id';
       await expect(
-        channelsController.facebookCallback('auth_code', demoState),
+        channelsController.facebookCallback({} as any, 'auth_code', demoState),
       ).rejects.toThrow(BadRequestException);
     });
   });

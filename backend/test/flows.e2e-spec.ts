@@ -72,14 +72,20 @@ describe('Flows Engine (e2e)', () => {
           triggers: [
             {
               type: 'KEYWORD',
-              configuration: { keywords: 'price, pricing, cost', nextStepId: stepId1 },
+              configuration: {
+                keywords: 'price, pricing, cost',
+                nextStepId: stepId1,
+              },
             },
           ],
           steps: [
             {
               id: stepId1,
               type: 'SEND_MESSAGE',
-              configuration: { text: 'Thanks for reaching out! ||| Hello there!', mediaUrl: '' },
+              configuration: {
+                text: 'Thanks for reaching out! ||| Hello there!',
+                mediaUrl: '',
+              },
               metadata: { x: 100, y: 150, name: 'Welcome Message' },
               branches: [
                 {
@@ -118,11 +124,11 @@ describe('Flows Engine (e2e)', () => {
       });
 
       expect(flowInDb).toBeDefined();
-      expect(flowInDb.name).toBe('Sales Flow');
-      expect(flowInDb.triggers[0].type).toBe('KEYWORD');
-      expect(flowInDb.steps[0].type).toBe('SEND_MESSAGE');
-      expect(flowInDb.steps[0].id).toBe(stepId1); // preserved step UUID!
-      expect(flowInDb.steps[0].branches[0].nextStepId).toBe(stepId2);
+      expect(flowInDb!.name).toBe('Sales Flow');
+      expect(flowInDb!.triggers[0].type).toBe('KEYWORD');
+      expect(flowInDb!.steps[0].type).toBe('SEND_MESSAGE');
+      expect(flowInDb!.steps[0].id).toBe(stepId1); // preserved step UUID!
+      expect(flowInDb!.steps[0].branches[0].nextStepId).toBe(stepId2);
     });
 
     it('should retrieve all flows for a tenant', async () => {
@@ -228,9 +234,15 @@ describe('Flows Engine (e2e)', () => {
       expect(res.body.steps[0].id).toBe(newStepId);
 
       // Verify database cleaned up old values
-      const triggerCount = await prisma.flowTrigger.count({ where: { flowId: flow.id } });
-      const stepCount = await prisma.flowStep.count({ where: { flowId: flow.id } });
-      const branchCount = await prisma.flowBranch.count({ where: { step: { flowId: flow.id } } });
+      const triggerCount = await prisma.flowTrigger.count({
+        where: { flowId: flow.id },
+      });
+      const stepCount = await prisma.flowStep.count({
+        where: { flowId: flow.id },
+      });
+      const branchCount = await prisma.flowBranch.count({
+        where: { step: { flowId: flow.id } },
+      });
 
       expect(triggerCount).toBe(1);
       expect(stepCount).toBe(1);
@@ -255,7 +267,7 @@ describe('Flows Engine (e2e)', () => {
       expect(res.body.isActive).toBe(true);
 
       const flowInDb = await prisma.flow.findUnique({ where: { id: flow.id } });
-      expect(flowInDb.isActive).toBe(true);
+      expect(flowInDb!.isActive).toBe(true);
     });
 
     it('should delete a flow and all related elements', async () => {
@@ -281,7 +293,9 @@ describe('Flows Engine (e2e)', () => {
       const flowInDb = await prisma.flow.findUnique({ where: { id: flow.id } });
       expect(flowInDb).toBeNull();
 
-      const triggersCount = await prisma.flowTrigger.count({ where: { flowId: flow.id } });
+      const triggersCount = await prisma.flowTrigger.count({
+        where: { flowId: flow.id },
+      });
       expect(triggersCount).toBe(0);
     });
   });

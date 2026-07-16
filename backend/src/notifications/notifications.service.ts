@@ -34,7 +34,12 @@ export class NotificationsService {
   }
 
   // Helper for internal use (other modules can inject this service to create notifications)
-  async createNotification(tenantId: string, title: string, message: string, type: 'message' | 'subscriber' | 'rule' | 'system') {
+  async createNotification(
+    tenantId: string,
+    title: string,
+    message: string,
+    type: 'message' | 'subscriber' | 'rule' | 'system',
+  ) {
     return this.prisma.notification.create({
       data: {
         tenantId,

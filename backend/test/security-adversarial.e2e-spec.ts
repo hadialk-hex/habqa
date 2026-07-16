@@ -22,12 +22,12 @@ describe('Security & Privilege Escalation Adversarial Tests (e2e)', () => {
 
   // Tenant A / Owner A
   let tokenOwnerA: string;
-  let userOwnerAId: string;
+  let _userOwnerAId: string;
   let tenantAId: string;
 
   // Tenant B / Owner B
   let tokenOwnerB: string;
-  let tenantBId: string;
+  let _tenantBId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -54,7 +54,7 @@ describe('Security & Privilege Escalation Adversarial Tests (e2e)', () => {
       })
       .expect(HttpStatus.CREATED);
     tokenOwnerA = resA.body.access_token;
-    userOwnerAId = resA.body.user.id;
+    _userOwnerAId = resA.body.user.id;
     tenantAId = resA.body.user.tenantId;
 
     // Register Owner B
@@ -68,7 +68,7 @@ describe('Security & Privilege Escalation Adversarial Tests (e2e)', () => {
       })
       .expect(HttpStatus.CREATED);
     tokenOwnerB = resB.body.access_token;
-    tenantBId = resB.body.user.tenantId;
+    _tenantBId = resB.body.user.tenantId;
   });
 
   afterAll(async () => {
@@ -112,7 +112,7 @@ describe('Security & Privilege Escalation Adversarial Tests (e2e)', () => {
       const userBId = loginRes.body.user.id;
 
       // Verify that User B can initially invite someone
-      const testInviteRes = await request(app.getHttpServer())
+      await request(app.getHttpServer())
         .post('/team/invitations')
         .set('Authorization', `Bearer ${tokenUserB}`)
         .send({

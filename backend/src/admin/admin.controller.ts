@@ -45,7 +45,10 @@ export class AdminController {
           'فشل الإرسال. تحقق من إعدادات SMTP (الخادم، المنفذ، بيانات الدخول).',
       };
     }
-    return { sent: true, message: `تم إرسال رسالة اختبار إلى ${req.user.email}` };
+    return {
+      sent: true,
+      message: `تم إرسال رسالة اختبار إلى ${req.user.email}`,
+    };
   }
 
   @Get('stats')
@@ -130,9 +133,7 @@ export class AdminController {
   }
 
   @Post('announcements')
-  async sendAnnouncement(
-    @Body() body: { subject: string; body: string },
-  ) {
+  async sendAnnouncement(@Body() body: { subject: string; body: string }) {
     return this.adminService.sendAnnouncement(body.subject, body.body);
   }
 

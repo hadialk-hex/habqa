@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, HttpStatus } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -89,16 +89,44 @@ describe('Milestone 4 Subscribers & Inbox Upgrade Adversarial Verification (e2e)
       // Seed some subscribers for Tenant A
       await prisma.subscriber.createMany({
         data: [
-          { tenantId: tenantAId, name: 'Alice Smith', email: 'alice@example.com', phone: '+1234567890', tags: ['vip', 'lead'], platform: 'FACEBOOK_PAGE' },
-          { tenantId: tenantAId, name: 'Bob Johnson', email: 'bob@example.com', phone: '+1987654321', tags: ['lead'], platform: 'WHATSAPP' },
-          { tenantId: tenantAId, name: 'Charlie Brown', email: 'charlie@example.com', phone: '+1555555555', tags: ['promo'], platform: 'INSTAGRAM' },
+          {
+            tenantId: tenantAId,
+            name: 'Alice Smith',
+            email: 'alice@example.com',
+            phone: '+1234567890',
+            tags: ['vip', 'lead'],
+            platform: 'FACEBOOK_PAGE',
+          },
+          {
+            tenantId: tenantAId,
+            name: 'Bob Johnson',
+            email: 'bob@example.com',
+            phone: '+1987654321',
+            tags: ['lead'],
+            platform: 'WHATSAPP',
+          },
+          {
+            tenantId: tenantAId,
+            name: 'Charlie Brown',
+            email: 'charlie@example.com',
+            phone: '+1555555555',
+            tags: ['promo'],
+            platform: 'INSTAGRAM',
+          },
         ],
       });
 
       // Seed subscribers for Tenant B
       await prisma.subscriber.createMany({
         data: [
-          { tenantId: tenantBId, name: 'David Miller', email: 'david@example.com', phone: '+1222222222', tags: ['vip'], platform: 'WHATSAPP' },
+          {
+            tenantId: tenantBId,
+            name: 'David Miller',
+            email: 'david@example.com',
+            phone: '+1222222222',
+            tags: ['vip'],
+            platform: 'WHATSAPP',
+          },
         ],
       });
     });
@@ -142,14 +170,14 @@ describe('Milestone 4 Subscribers & Inbox Upgrade Adversarial Verification (e2e)
 
     it('should handle SQL/regex search characters safely without crashing or breaking searches', async () => {
       // SQLite/Postgres wildcards or special search tokens
-      const specialQueries = ['%', '_', '\\', '\'', '"', '.*', '[a-z]'];
+      const specialQueries = ['%', '_', '\\', "'", '"', '.*', '[a-z]'];
       for (const query of specialQueries) {
         const res = await request(app.getHttpServer())
           .get('/subscribers')
           .set('Authorization', `Bearer ${tokenA}`)
           .query({ search: query })
           .expect(200);
-        
+
         expect(res.body).toBeInstanceOf(Array);
       }
     });
@@ -221,8 +249,19 @@ describe('Milestone 4 Subscribers & Inbox Upgrade Adversarial Verification (e2e)
       // Create some messages
       await prisma.message.createMany({
         data: [
-          { conversationId: conv.id, direction: 'INBOUND', content: 'Hello page!', messageType: 'TEXT' },
-          { conversationId: conv.id, direction: 'OUTBOUND', content: 'Hi Alice!', messageType: 'TEXT', sentByName: 'User A' },
+          {
+            conversationId: conv.id,
+            direction: 'INBOUND',
+            content: 'Hello page!',
+            messageType: 'TEXT',
+          },
+          {
+            conversationId: conv.id,
+            direction: 'OUTBOUND',
+            content: 'Hi Alice!',
+            messageType: 'TEXT',
+            sentByName: 'User A',
+          },
         ],
       });
     });
@@ -416,9 +455,7 @@ describe('Milestone 4 Subscribers & Inbox Upgrade Adversarial Verification (e2e)
 
       // Seed Tenant B subscribers
       await prisma.subscriber.createMany({
-        data: [
-          { tenantId: tenantBId, name: 'David', platform: 'WHATSAPP' },
-        ],
+        data: [{ tenantId: tenantBId, name: 'David', platform: 'WHATSAPP' }],
       });
 
       const res = await request(app.getHttpServer())

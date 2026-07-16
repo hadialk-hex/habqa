@@ -128,9 +128,7 @@ export class MailService {
       this.logger.log(`Mail sent to ${opts.to}: ${opts.subject}`);
       return { sent: true };
     } catch (error) {
-      this.logger.error(
-        `Failed to send mail to ${opts.to}: ${error.message}`,
-      );
+      this.logger.error(`Failed to send mail to ${opts.to}: ${error.message}`);
       return { sent: false };
     }
   }
@@ -232,11 +230,7 @@ export class MailService {
   }
 
   async sendAnnouncement(to: string, subject: string, bodyHtml: string) {
-    const html = this.wrapTemplate(
-      subject,
-      bodyHtml,
-      subject,
-    );
+    const html = this.wrapTemplate(subject, bodyHtml, subject);
     // Plain-text fallback derived from the HTML body.
     const text = [
       subject,

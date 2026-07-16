@@ -170,26 +170,40 @@ describe('Challenger 1 Milestone 3 E2E/Unit Verification Tests', () => {
   describe('2. Campaign Scheduling, Cron, and Concurrency Verification', () => {
     it('should verify minutely cron executing multiple campaigns sequentially rather than concurrently', async () => {
       const scheduledCampaigns = [
-        { id: 'c1', tenantId: 'tenant-1', name: 'C1', status: 'SCHEDULED', scheduledAt: new Date() },
-        { id: 'c2', tenantId: 'tenant-1', name: 'C2', status: 'SCHEDULED', scheduledAt: new Date() },
+        {
+          id: 'c1',
+          tenantId: 'tenant-1',
+          name: 'C1',
+          status: 'SCHEDULED',
+          scheduledAt: new Date(),
+        },
+        {
+          id: 'c2',
+          tenantId: 'tenant-1',
+          name: 'C2',
+          status: 'SCHEDULED',
+          scheduledAt: new Date(),
+        },
       ];
 
       mockPrisma.broadcast.findMany.mockResolvedValue(scheduledCampaigns);
 
       // Spy/Mock execute to delay execution
       const executionTimes: { id: string; start: number; end: number }[] = [];
-      const executeSpy = jest.spyOn(broadcastsService, 'execute').mockImplementation(async (tenantId, id) => {
-        const start = Date.now();
-        await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async work
-        const end = Date.now();
-        executionTimes.push({ id, start, end });
-        return { id, status: 'SENT' } as any;
-      });
+      const executeSpy = jest
+        .spyOn(broadcastsService, 'execute')
+        .mockImplementation(async (tenantId, id) => {
+          const start = Date.now();
+          await new Promise((resolve) => setTimeout(resolve, 100)); // Simulate async work
+          const end = Date.now();
+          executionTimes.push({ id, start, end });
+          return { id, status: 'SENT' } as any;
+        });
 
       await broadcastsService.handleScheduledBroadcasts();
 
       expect(executeSpy).toHaveBeenCalledTimes(2);
-      
+
       // If execution was concurrent, C2 should have started before C1 finished.
       // If execution was sequential, C2 must start after C1 ends.
       const c1Time = executionTimes.find((t) => t.id === 'c1')!;
@@ -199,7 +213,8 @@ describe('Challenger 1 Milestone 3 E2E/Unit Verification Tests', () => {
       expect(c2Time).toBeDefined();
 
       // Sequential execution check: B2 starts after B1 ends
-      const wasSequential = c2Time.start >= c1Time.end || c1Time.start >= c2Time.end;
+      const wasSequential =
+        c2Time.start >= c1Time.end || c1Time.start >= c2Time.end;
       expect(wasSequential).toBe(true); // Verification that execution is sequential, not concurrent!
     });
 
@@ -219,12 +234,14 @@ describe('Challenger 1 Milestone 3 E2E/Unit Verification Tests', () => {
 
       // Mock execute to simulate long execution (takes 500ms)
       const executeCount = { start: 0, finish: 0 };
-      const executeSpy = jest.spyOn(broadcastsService, 'execute').mockImplementation(async (tenantId, id) => {
-        executeCount.start++;
-        await new Promise((resolve) => setTimeout(resolve, 200)); // takes 200ms
-        executeCount.finish++;
-        return { id, status: 'SENT' } as any;
-      });
+      const executeSpy = jest
+        .spyOn(broadcastsService, 'execute')
+        .mockImplementation(async (tenantId, id) => {
+          executeCount.start++;
+          await new Promise((resolve) => setTimeout(resolve, 200)); // takes 200ms
+          executeCount.finish++;
+          return { id, status: 'SENT' } as any;
+        });
 
       // Start the first cron execution (simulate first minute)
       const firstCronRun = broadcastsService.handleScheduledBroadcasts();

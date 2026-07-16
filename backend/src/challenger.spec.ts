@@ -139,11 +139,11 @@ describe('Empirical Challenger M3 Test Suite', () => {
     });
 
     it('GET /health?simulateDbFailure=true - should immediately throw 503', async () => {
-      await expect(appController.getHealth('true')).rejects.toThrow(
-        HttpException,
-      );
+      await expect(
+        appController.getHealth({ simulateDbFailure: true }),
+      ).rejects.toThrow(HttpException);
       try {
-        await appController.getHealth('true');
+        await appController.getHealth({ simulateDbFailure: true });
       } catch (err: any) {
         expect(err.getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
         expect(err.getResponse().status).toBe('error');

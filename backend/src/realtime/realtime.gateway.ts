@@ -28,7 +28,7 @@ export class RealtimeGateway implements OnGatewayConnection {
 
   constructor(private readonly jwt: JwtService) {}
 
-  async handleConnection(client: Socket) {
+  handleConnection(client: Socket) {
     try {
       const token =
         client.handshake.auth?.token ||
@@ -45,7 +45,7 @@ export class RealtimeGateway implements OnGatewayConnection {
       }
       client.data.tenantId = tenantId;
       client.data.userId = payload.sub;
-      client.join(`tenant:${tenantId}`);
+      void client.join(`tenant:${tenantId}`);
     } catch {
       client.disconnect();
     }

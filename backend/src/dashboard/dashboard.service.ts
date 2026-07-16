@@ -160,14 +160,19 @@ export class DashboardService {
       getAutoRepliesCount(currentStart || undefined, currentEnd || undefined),
       getAutoRepliesCount(previousStart || undefined, previousEnd || undefined),
       getConversationsCount(currentStart || undefined, currentEnd || undefined),
-      getConversationsCount(previousStart || undefined, previousEnd || undefined),
+      getConversationsCount(
+        previousStart || undefined,
+        previousEnd || undefined,
+      ),
       getRulesCount(currentStart || undefined, currentEnd || undefined),
       getRulesCount(previousStart || undefined, previousEnd || undefined),
 
       this.prisma.conversation.findMany({
         where: {
           tenantId,
-          ...(currentStart && currentEnd ? { createdAt: { gte: currentStart, lte: currentEnd } } : {}),
+          ...(currentStart && currentEnd
+            ? { createdAt: { gte: currentStart, lte: currentEnd } }
+            : {}),
         },
         include: {
           connection: {
@@ -186,7 +191,9 @@ export class DashboardService {
         where: {
           tenantId,
           isActive: true,
-          ...(currentStart && currentEnd ? { createdAt: { gte: currentStart, lte: currentEnd } } : {}),
+          ...(currentStart && currentEnd
+            ? { createdAt: { gte: currentStart, lte: currentEnd } }
+            : {}),
         },
         select: { platform: true },
       }),
@@ -194,7 +201,10 @@ export class DashboardService {
 
     const subscribersTrend = calcTrend(totalSubscribers, prevSubscribers);
     const autoRepliesTrend = calcTrend(totalAutoReplies, prevAutoReplies);
-    const conversationsTrend = calcTrend(activeConversations, prevConversations);
+    const conversationsTrend = calcTrend(
+      activeConversations,
+      prevConversations,
+    );
     const rulesTrend = calcTrend(totalRules, prevRules);
 
     const platformStats: Record<string, number> = {};
@@ -221,7 +231,11 @@ export class DashboardService {
     });
 
     const timeline: { date: string; sent: number; received: number }[] = [];
-    const daysDiff = Math.ceil(Math.abs(timelineEnd.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const daysDiff =
+      Math.ceil(
+        Math.abs(timelineEnd.getTime() - timelineStart.getTime()) /
+          (1000 * 60 * 60 * 24),
+      ) + 1;
     const limitDays = Math.min(daysDiff, 100);
 
     for (let i = 0; i < limitDays; i++) {

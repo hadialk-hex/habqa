@@ -20,7 +20,7 @@ describe('Security Backdoor & Cross-Tenant Hijacking E2E Tests', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let tenantAToken: string;
-  let tenantAId: string;
+  let _tenantAId: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -66,7 +66,7 @@ describe('Security Backdoor & Cross-Tenant Hijacking E2E Tests', () => {
       .expect(HttpStatus.CREATED);
 
     tenantAToken = resA.body.access_token;
-    tenantAId = resA.body.user.tenantId;
+    _tenantAId = resA.body.user.tenantId;
   });
 
   afterAll(async () => {

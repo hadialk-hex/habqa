@@ -94,7 +94,7 @@ describe('Security, CORS & Rate Limiting (e2e)', () => {
     });
 
     it('should reject CORS origin not in allowed list (Tier 2)', async () => {
-      const res = await request(app.getHttpServer())
+      await request(app.getHttpServer())
         .get('/')
         .set('Origin', 'https://attacker.com')
         .expect((res) => {

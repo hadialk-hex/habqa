@@ -22,14 +22,14 @@ describe('Adversarial & Boundary Challenger Tests (e2e)', () => {
 
   // User/Tenant A credentials
   let tokenA: string;
-  let userAId: string;
-  let tenantAId: string;
+  let _userAId: string;
+  let _tenantAId: string;
   let emailA: string;
 
   // User/Tenant B credentials
   let tokenB: string;
-  let userBId: string;
-  let tenantBId: string;
+  let _userBId: string;
+  let _tenantBId: string;
   let emailB: string;
 
   let testCounter = 0;
@@ -62,8 +62,8 @@ describe('Adversarial & Boundary Challenger Tests (e2e)', () => {
       })
       .expect(HttpStatus.CREATED);
     tokenA = resA.body.access_token;
-    userAId = resA.body.user.id;
-    tenantAId = resA.body.user.tenantId;
+    _userAId = resA.body.user.id;
+    _tenantAId = resA.body.user.tenantId;
 
     // Register User B
     const resB = await request(app.getHttpServer())
@@ -76,8 +76,8 @@ describe('Adversarial & Boundary Challenger Tests (e2e)', () => {
       })
       .expect(HttpStatus.CREATED);
     tokenB = resB.body.access_token;
-    userBId = resB.body.user.id;
-    tenantBId = resB.body.user.tenantId;
+    _userBId = resB.body.user.id;
+    _tenantBId = resB.body.user.tenantId;
   });
 
   afterAll(async () => {
@@ -132,7 +132,10 @@ describe('Adversarial & Boundary Challenger Tests (e2e)', () => {
         })
         .expect(HttpStatus.CREATED);
 
-      const tags = typeof res.body.tags === 'string' ? JSON.parse(res.body.tags) : res.body.tags;
+      const tags =
+        typeof res.body.tags === 'string'
+          ? JSON.parse(res.body.tags)
+          : res.body.tags;
       expect(tags).toBeInstanceOf(Array);
       expect(tags).toHaveLength(3);
       expect(tags.sort()).toEqual(['new', 'promo', 'vip'].sort());

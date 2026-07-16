@@ -196,7 +196,7 @@ describe('Team Management (e2e)', () => {
       expect(ownerMember).toBeDefined();
 
       await request(app.getHttpServer())
-        .patch(`/team/members/${ownerMember.id}`)
+        .patch(`/team/members/${ownerMember!.id}`)
         .set('Authorization', `Bearer ${ownerToken}`)
         .send({
           role: 'MEMBER',

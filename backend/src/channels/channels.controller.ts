@@ -30,7 +30,7 @@ export class ChannelsController {
 
   @UseGuards(JwtAuthGuard)
   @Get('facebook/state')
-  async getFacebookState(@Request() req: any) {
+  getFacebookState(@Request() req: any) {
     const state = this.channelsService.generateOAuthState(req.user.tenantId);
     return { state };
   }

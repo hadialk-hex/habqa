@@ -33,7 +33,9 @@ export class DashboardController {
     @Body() body: { aiEnabled?: boolean; aiContext?: string },
   ) {
     if (req.user.role !== 'OWNER' && req.user.role !== 'ADMIN') {
-      throw new ForbiddenException('فقط مالك أو مدير مساحة العمل يمكنه تعديل إعدادات الذكاء الاصطناعي');
+      throw new ForbiddenException(
+        'فقط مالك أو مدير مساحة العمل يمكنه تعديل إعدادات الذكاء الاصطناعي',
+      );
     }
     return this.dashboardService.updateAiSettings(req.user.tenantId, body);
   }

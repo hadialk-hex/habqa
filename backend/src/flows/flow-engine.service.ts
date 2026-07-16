@@ -97,7 +97,7 @@ export class FlowEngineService {
   }
 
   private async startExecution(flow: any, trigger: any, ctx: FlowEventContext) {
-    const firstStepId = (trigger.configuration as any)?.nextStepId || null;
+    const firstStepId = trigger.configuration?.nextStepId || null;
 
     const execution = await this.prisma.flowExecution.create({
       data: {

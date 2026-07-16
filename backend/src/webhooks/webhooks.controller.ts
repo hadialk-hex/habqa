@@ -42,7 +42,7 @@ export class WebhooksController {
         challenge,
       );
       return res.status(HttpStatus.OK).send(verifiedChallenge);
-    } catch (error) {
+    } catch {
       return res.status(HttpStatus.FORBIDDEN).send('Verification Failed');
     }
   }

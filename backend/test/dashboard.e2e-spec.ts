@@ -128,7 +128,7 @@ describe('Dashboard Analytics (e2e)', () => {
         .get('/dashboard/stats')
         .set('Authorization', `Bearer ${token}`)
         .query({
-          range: '7days'
+          range: '7days',
         })
         .expect(200);
 
@@ -145,7 +145,7 @@ describe('Dashboard Analytics (e2e)', () => {
         .query({
           range: 'custom',
           startDate: '2026-07-01',
-          endDate: '2026-07-09'
+          endDate: '2026-07-09',
         })
         .expect(200);
     });

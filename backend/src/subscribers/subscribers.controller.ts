@@ -38,8 +38,10 @@ export class SubscribersController {
   ) {
     const pageNum = page ? parseInt(page, 10) : undefined;
     const limitNum = limit ? parseInt(limit, 10) : undefined;
-    const parsedPage = (pageNum && !isNaN(pageNum) && pageNum > 0) ? pageNum : undefined;
-    const parsedLimit = (limitNum && !isNaN(limitNum) && limitNum > 0) ? limitNum : undefined;
+    const parsedPage =
+      pageNum && !isNaN(pageNum) && pageNum > 0 ? pageNum : undefined;
+    const parsedLimit =
+      limitNum && !isNaN(limitNum) && limitNum > 0 ? limitNum : undefined;
 
     return this.subscribersService.findAll(
       req.user.tenantId,
@@ -63,7 +65,10 @@ export class SubscribersController {
 
   @Get(':id/conversation')
   async getConversationHistory(@Request() req: any, @Param('id') id: string) {
-    return this.subscribersService.getConversationHistory(req.user.tenantId, id);
+    return this.subscribersService.getConversationHistory(
+      req.user.tenantId,
+      id,
+    );
   }
 
   @Get(':id')

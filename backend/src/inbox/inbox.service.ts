@@ -140,21 +140,18 @@ export class InboxService {
       }
     } else {
       // Facebook Messenger & Instagram DM — use Send API
-      const response = await fetch(
-        `${GRAPH_API_BASE}/me/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            messaging_type: 'RESPONSE',
-            recipient: { id: customerId },
-            message: { text: content },
-          }),
+      const response = await fetch(`${GRAPH_API_BASE}/me/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify({
+          messaging_type: 'RESPONSE',
+          recipient: { id: customerId },
+          message: { text: content },
+        }),
+      });
       if (!response.ok) {
         const err: any = await response.json().catch(() => ({}));
         throw new Error(

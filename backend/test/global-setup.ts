@@ -113,7 +113,7 @@ export default async () => {
         );
         // execSync('docker rm -f hubqa_postgres', { stdio: 'ignore' });
         // execSync('docker rm -f hubqa-postgres', { stdio: 'ignore' });
-      } catch (e) {
+      } catch {
         // Ignore removal errors
       }
       try {
@@ -122,7 +122,7 @@ export default async () => {
         );
         // execSync('docker rm -f hubqa_redis', { stdio: 'ignore' });
         // execSync('docker rm -f hubqa-redis', { stdio: 'ignore' });
-      } catch (e) {
+      } catch {
         // Ignore removal errors
       }
       try {
@@ -134,20 +134,21 @@ export default async () => {
           try {
             const status = execSync(
               'docker exec hubqa-postgres pg_isready -U postgres',
-              { encoding: 'utf8' }
+              { encoding: 'utf8' },
             );
             if (status.includes('accepting connections')) {
-              console.log('PostgreSQL container is ready and accepting connections!');
+              console.log(
+                'PostgreSQL container is ready and accepting connections!',
+              );
               isHealthy = true;
               break;
             }
-          } catch (e) {
+          } catch {
             // Ignore exec errors
           }
-          {
-            const start = Date.now();
-            while (Date.now() - start < 2000) {}
-          }
+          // Synchronous 2s sleep without burning CPU (globalSetup runs sync
+          // code here; Atomics.wait blocks the thread instead of spinning).
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2000);
           retries--;
         }
         if (!isHealthy) {
@@ -170,7 +171,9 @@ export default async () => {
       }
     }
 
-    console.log('Skipping Prisma Client generation in E2E setup (pre-generated)...');
+    console.log(
+      'Skipping Prisma Client generation in E2E setup (pre-generated)...',
+    );
     try {
       /*
       execSync('npx prisma generate', {
@@ -179,10 +182,12 @@ export default async () => {
       });
       */
       if (provider === 'sqlite') {
-        console.log('[E2E Setup] Injecting JS enums into Prisma client for SQLite compatibility...');
+        console.log(
+          '[E2E Setup] Injecting JS enums into Prisma client for SQLite compatibility...',
+        );
         const clientIndexPaths = [
           path.resolve(__dirname, '../node_modules/@prisma/client/index.js'),
-          path.resolve(__dirname, '../node_modules/.prisma/client/index.js')
+          path.resolve(__dirname, '../node_modules/.prisma/client/index.js'),
         ];
         const enumInjections = `
 Object.assign(module.exports, {

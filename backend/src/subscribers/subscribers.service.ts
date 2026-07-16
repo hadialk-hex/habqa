@@ -73,7 +73,10 @@ export class SubscribersService {
     }
 
     if (tags && tags !== 'ALL') {
-      const tagList = tags.split(',').map((t) => t.trim()).filter(Boolean);
+      const tagList = tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
       if (tagList.length > 0) {
         where.tags = { hasSome: tagList };
       }
@@ -191,9 +194,7 @@ export class SubscribersService {
 
   async getConversationHistory(tenantId: string, id: string) {
     const subscriber = await this.findOne(tenantId, id);
-    const conditions: any[] = [
-      { customerId: id }
-    ];
+    const conditions: any[] = [{ customerId: id }];
     if (subscriber.phone) {
       conditions.push({ customerId: subscriber.phone });
       conditions.push({ customerId: { contains: subscriber.phone } });
@@ -232,4 +233,3 @@ export class SubscribersService {
     };
   }
 }
-

@@ -44,7 +44,7 @@ describe('Credentials Encryption/Decryption Robustness', () => {
       const originalToken = 'secret-fb-access-token-xyz-123';
 
       // Simulate adding a connection
-      const result = await channelsService.addConnection('tenant-1', {
+      await channelsService.addConnection('tenant-1', {
         platform: 'FACEBOOK_PAGE',
         platformId: 'page-123',
         name: 'Test Page',

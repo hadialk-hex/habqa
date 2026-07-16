@@ -291,11 +291,12 @@ export class ChannelsService {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: new URLSearchParams({
-                subscribed_fields: 'messages,messaging_postbacks,feed,message_reactions',
+                subscribed_fields:
+                  'messages,messaging_postbacks,feed,message_reactions',
                 access_token: page.access_token,
               }).toString(),
             });
-          } catch (_) {
+          } catch {
             // non-fatal: webhook subscription failure shouldn't block page connection
           }
 
@@ -419,7 +420,7 @@ export class ChannelsService {
         let errorData: any = {};
         try {
           errorData = await response.json();
-        } catch (e) {
+        } catch {
           // ignore
         }
         const message =
@@ -477,8 +478,7 @@ export class ChannelsService {
       const response = await fetch(url);
       data = await response.json();
       if (!response.ok) {
-        const message =
-          data?.error?.message || 'فشل جلب المنشورات من فيسبوك';
+        const message = data?.error?.message || 'فشل جلب المنشورات من فيسبوك';
         throw new BadRequestException(message);
       }
     } catch (error) {
@@ -569,7 +569,7 @@ export class ChannelsService {
       ) {
         return tenantId;
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
     return null;
@@ -612,11 +612,15 @@ export class ChannelsService {
               where: { id: conn.id },
               data: { accessToken: encrypt(data.access_token) },
             });
-            this.logger.log(`Refreshed token for ${conn.platform} connection ${conn.id}`);
+            this.logger.log(
+              `Refreshed token for ${conn.platform} connection ${conn.id}`,
+            );
           }
         }
       } catch (err) {
-        this.logger.warn(`Failed to refresh token for connection ${conn.id}: ${err}`);
+        this.logger.warn(
+          `Failed to refresh token for connection ${conn.id}: ${err}`,
+        );
       }
     }
   }

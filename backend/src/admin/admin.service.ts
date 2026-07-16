@@ -224,9 +224,12 @@ export class AdminService {
       d.setDate(d.getDate() - i);
       const dayStr = d.toISOString().split('T')[0];
       // Format as "Aug 15" for frontend
-      const formatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+      });
       const displayDay = formatter.format(d);
-      
+
       result.push({
         day: displayDay,
         replies: countsByDay[dayStr] || 0,
@@ -408,9 +411,7 @@ export class AdminService {
       throw new NotFoundException('المستخدم غير موجود');
     }
     if (id === currentAdminId && data.isSuperAdmin === false) {
-      throw new BadRequestException(
-        'لا يمكنك إزالة صلاحية الأدمن عن نفسك',
-      );
+      throw new BadRequestException('لا يمكنك إزالة صلاحية الأدمن عن نفسك');
     }
     if (data.isSuperAdmin === undefined) {
       throw new BadRequestException('لا يوجد شيء لتعديله');
@@ -480,7 +481,11 @@ export class AdminService {
 
     const token = crypto.randomBytes(32).toString('hex');
     await this.prisma.passwordResetToken.create({
-      data: { token, userId: user.id, expiresAt: new Date(Date.now() + 3600000) },
+      data: {
+        token,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 3600000),
+      },
     });
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const result = await mail.sendPasswordReset(
@@ -490,7 +495,10 @@ export class AdminService {
     if (!result.sent) {
       throw new BadRequestException('فشل إرسال البريد. تحقق من إعدادات SMTP.');
     }
-    return { success: true, message: `تم إرسال رابط إعادة التعيين إلى ${user.email}` };
+    return {
+      success: true,
+      message: `تم إرسال رابط إعادة التعيين إلى ${user.email}`,
+    };
   }
 
   // Send a one-off email to a tenant's owner from the admin panel
@@ -524,7 +532,10 @@ export class AdminService {
     if (!result.sent) {
       throw new BadRequestException('فشل إرسال البريد. تحقق من إعدادات SMTP.');
     }
-    return { success: true, message: `تم إرسال الرسالة إلى ${owner.user.email}` };
+    return {
+      success: true,
+      message: `تم إرسال الرسالة إلى ${owner.user.email}`,
+    };
   }
 
   async getAuditLogs(page = 1, pageSize = 50, tenantId?: string) {
