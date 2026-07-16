@@ -131,8 +131,7 @@ export function classifyError(error: GraphApiError): ClassifiedError {
     case 131047: // Outside 24h window — need template
       return {
         action: ErrorAction.SKIP,
-        userMessage:
-          'تجاوزت نافذة 24 ساعة. يلزم إرسال Template Message.',
+        userMessage: 'تجاوزت نافذة 24 ساعة. يلزم إرسال Template Message.',
       };
     case 131021: // Recipient not on WhatsApp
       return { action: ErrorAction.SKIP };

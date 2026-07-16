@@ -756,7 +756,7 @@ export class ChannelsService {
     }
 
     const res = await publishInstagramMedia(
-      conn.platformId as string,
+      conn.platformId,
       imageUrl,
       caption,
       token,

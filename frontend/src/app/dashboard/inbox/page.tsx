@@ -340,7 +340,9 @@ export default function InboxPage() {
         content: newMessage.trim(),
         ...(replyingAsComment ? { mode: "comment" } : {}),
       })
-      setMessages(prev => [...prev, res.data])
+      // The realtime socket may broadcast this same message before the HTTP
+      // response resolves — dedupe by id or the bubble renders twice.
+      setMessages(prev => prev.some(m => m.id === res.data.id) ? prev : [...prev, res.data])
       setNewMessage("")
       isNearBottomRef.current = true // force scroll on send
       setConversations(prev => prev.map(c => {

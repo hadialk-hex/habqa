@@ -629,9 +629,10 @@ export class WebhooksService {
       connection.accessToken,
     );
 
-    const replyPath = connection.platform === 'INSTAGRAM'
-      ? `/${commentId}/replies`
-      : `/${commentId}/comments`;
+    const replyPath =
+      connection.platform === 'INSTAGRAM'
+        ? `/${commentId}/replies`
+        : `/${commentId}/comments`;
     const result = await graphApiRequest(replyPath, {
       token,
       body: { message: reply },
@@ -757,6 +758,42 @@ export class WebhooksService {
     return true;
   }
 
+  // Messenger/Instagram webhooks carry only the sender's PSID/IGSID — the
+  // real name must be fetched from Graph (User Profile API). Best-effort:
+  // returns null on any failure so ingestion is never blocked.
+  private async fetchCustomerProfileName(
+    senderId: string,
+    platform: string,
+    connection: any,
+  ): Promise<string | null> {
+    try {
+      if (!connection.accessToken) return null;
+      const token = this.channelsService.getDecryptedAccessToken(
+        connection.accessToken,
+      );
+      if (!token) return null;
+      const fields =
+        platform === 'instagram'
+          ? 'name,username'
+          : 'first_name,last_name,name';
+      const res = await graphApiRequest(`/${senderId}?fields=${fields}`, {
+        method: 'GET',
+        token,
+        context: 'fetchCustomerProfile',
+        maxRetries: 0,
+      });
+      if (!res.ok || !res.data) return null;
+      const p: any = res.data;
+      const name =
+        p.name ||
+        [p.first_name, p.last_name].filter(Boolean).join(' ') ||
+        p.username;
+      return typeof name === 'string' && name.trim() ? name.trim() : null;
+    } catch {
+      return null;
+    }
+  }
+
   async processPrivateDM(value: any, platform: string, entryId?: string) {
     const senderId = value.sender?.id;
     const recipientId = value.recipient?.id;
@@ -838,12 +875,15 @@ export class WebhooksService {
     });
 
     if (!conversation) {
+      const customerName =
+        (await this.fetchCustomerProfileName(senderId, platform, connection)) ||
+        'Customer';
       conversation = await this.prisma.conversation.create({
         data: {
           tenantId: connection.tenantId,
           connectionId: connection.id,
           customerId: senderId,
-          customerName: 'Customer',
+          customerName,
           status: 'OPEN',
           lastMessageAt: new Date(),
         },
@@ -851,14 +891,28 @@ export class WebhooksService {
       await this.notify(
         connection.tenantId,
         'محادثة جديدة',
-        `رسالة خاصة جديدة وصلت إلى صندوق الوارد`,
+        `رسالة خاصة جديدة من ${customerName}`,
         'message',
       );
     } else {
+      // Backfill the real name for conversations created before the profile
+      // lookup existed (they show as the "Customer" placeholder).
+      let refreshedName: string | null = null;
+      if (
+        !conversation.customerName ||
+        conversation.customerName === 'Customer'
+      ) {
+        refreshedName = await this.fetchCustomerProfileName(
+          senderId,
+          platform,
+          connection,
+        );
+      }
       conversation = await this.prisma.conversation.update({
         where: { id: conversation.id },
         data: {
           lastMessageAt: new Date(),
+          ...(refreshedName ? { customerName: refreshedName } : {}),
         },
       });
     }
@@ -1015,9 +1069,10 @@ export class WebhooksService {
       // Send public reply first if replyText is configured
       const replyVariant = this.pickVariant(rule.replyText);
       if (replyVariant) {
-        const replyPath = connection.platform === 'INSTAGRAM'
-          ? `/${commentId}/replies`
-          : `/${commentId}/comments`;
+        const replyPath =
+          connection.platform === 'INSTAGRAM'
+            ? `/${commentId}/replies`
+            : `/${commentId}/comments`;
         const pubResult = await graphApiRequest(replyPath, {
           token,
           body: { message: replyVariant },
@@ -1205,9 +1260,10 @@ export class WebhooksService {
           payload.attachment_url = replyMedia[0];
         }
 
-        const replyPath = connection.platform === 'INSTAGRAM'
-          ? `/${commentId}/replies`
-          : `/${commentId}/comments`;
+        const replyPath =
+          connection.platform === 'INSTAGRAM'
+            ? `/${commentId}/replies`
+            : `/${commentId}/comments`;
         const pubResult = await graphApiRequest(replyPath, {
           token,
           body: payload,

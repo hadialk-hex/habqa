@@ -114,7 +114,11 @@ export async function graphApiRequest<T = any>(
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+        body: body
+          ? typeof body === 'string'
+            ? body
+            : JSON.stringify(body)
+          : undefined,
       };
 
       const response = await fetch(url, fetchOptions);
@@ -281,9 +285,7 @@ export interface WhatsAppTemplateMessage {
 }
 
 export type WhatsAppOutboundMessage =
-  | WhatsAppTextMessage
-  | WhatsAppImageMessage
-  | WhatsAppTemplateMessage;
+  WhatsAppTextMessage | WhatsAppImageMessage | WhatsAppTemplateMessage;
 
 /**
  * Sends a message via WhatsApp Cloud API.
@@ -357,7 +359,7 @@ export async function sendWhatsAppMessage(
 /**
  * Publishes a photo or video to an Instagram Professional account.
  * This is a two-step process: create container, then publish.
- * 
+ *
  * @param igUserId The Instagram User ID (not the Page ID).
  * @param imageUrl The public URL of the media.
  * @param caption Optional caption for the post.
@@ -422,15 +424,27 @@ export async function uploadWhatsAppMedia(
     let data = null;
     try {
       data = await response.json();
-    } catch {}
-    
+    } catch {
+      // Non-JSON body — leave data null and rely on the HTTP status
+    }
+
     if (response.ok) {
       return { ok: true, data, error: null, status: response.status };
     } else {
-      return { ok: false, data: null, error: data?.error, status: response.status };
+      return {
+        ok: false,
+        data: null,
+        error: data?.error,
+        status: response.status,
+      };
     }
   } catch (err: any) {
-    return { ok: false, data: null, error: { message: err.message } as any, status: 500 };
+    return {
+      ok: false,
+      data: null,
+      error: { message: err.message } as any,
+      status: 500,
+    };
   }
 }
 

@@ -1,12 +1,12 @@
-import { 
-  Controller, 
-  Post, 
-  UseInterceptors, 
-  UploadedFile, 
-  UseGuards, 
+import {
+  Controller,
+  Post,
+  UseInterceptors,
+  UploadedFile,
+  UseGuards,
   BadRequestException,
   Body,
-  Request
+  Request,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -18,7 +18,10 @@ export class MediaController {
 
   @UseGuards(JwtAuthGuard)
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
+  // 16MB cap = WhatsApp's most permissive media limit; prevents disk abuse
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 16 * 1024 * 1024 } }),
+  )
   async uploadFile(
     @Request() req: any,
     @UploadedFile() file: any,
@@ -27,10 +30,14 @@ export class MediaController {
     if (!file) {
       throw new BadRequestException('يرجى إرفاق ملف');
     }
-    
+
     // If connectionId is provided, upload directly to WhatsApp
     if (connectionId) {
-      return this.mediaService.uploadToWhatsApp(req.user.tenantId, connectionId, file);
+      return this.mediaService.uploadToWhatsApp(
+        req.user.tenantId,
+        connectionId,
+        file,
+      );
     }
 
     // Otherwise, handle local/S3 upload

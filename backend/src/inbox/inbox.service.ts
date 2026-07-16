@@ -5,8 +5,10 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChannelsService } from '../channels/channels.service';
-import { GRAPH_API_BASE } from '../common/graph-api';
-import { graphApiRequest, sendWhatsAppMessage } from '../common/graph-api-client';
+import {
+  graphApiRequest,
+  sendWhatsAppMessage,
+} from '../common/graph-api-client';
 
 @Injectable()
 export class InboxService {
@@ -133,7 +135,9 @@ export class InboxService {
         token,
       );
       if (!res.ok) {
-        throw new Error(`WhatsApp API error: ${res.error?.message || res.status}`);
+        throw new Error(
+          `WhatsApp API error: ${res.error?.message || res.status}`,
+        );
       }
     } else {
       // Messenger / Instagram
