@@ -63,7 +63,18 @@ export class WebhooksService {
   async handleIncomingEvent(body: any) {
     if (body.object === 'page' || body.object === 'instagram') {
       for (const entry of body.entry) {
-        for (const change of entry.changes) {
+        // Real Messenger/Instagram DMs arrive in entry.messaging[] (the
+        // Messenger Platform format), NOT entry.changes[] — an entry carries
+        // one or the other, so both must be handled or live messages are
+        // silently dropped.
+        for (const event of entry.messaging ?? []) {
+          // is_echo = a message the page itself sent (incl. our auto-replies);
+          // processing it would create bogus inbound messages and reply loops.
+          if (event?.message && !event.message.is_echo) {
+            await this.processPrivateDM(event, body.object, entry.id);
+          }
+        }
+        for (const change of entry.changes ?? []) {
           if (change.field === 'feed' || change.field === 'comments') {
             await this.processComment(change.value, body.object, entry.id);
           } else if (change.field === 'messages') {
@@ -73,7 +84,7 @@ export class WebhooksService {
       }
     } else if (body.object === 'whatsapp_business_account') {
       for (const entry of body.entry) {
-        for (const change of entry.changes) {
+        for (const change of entry.changes ?? []) {
           if (change.field === 'messages') {
             await this.processWhatsAppMessage(change.value);
           }
