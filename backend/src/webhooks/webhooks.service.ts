@@ -7,6 +7,11 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { FlowEngineService } from '../flows/flow-engine.service';
 import { getPlanLimits, startOfCurrentMonth } from '../common/plan-limits';
 import { GRAPH_API_BASE } from '../common/graph-api';
+import {
+  graphApiRequest,
+  sendTypingIndicator,
+  sendWhatsAppMessage as sendWhatsAppMsg,
+} from '../common/graph-api-client';
 
 @Injectable()
 export class WebhooksService {
@@ -624,28 +629,15 @@ export class WebhooksService {
       connection.accessToken,
     );
 
-    try {
-      const response = await fetch(
-        this.commentReplyUrl(connection, commentId),
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ message: reply }),
-        },
-      );
-      if (!response.ok) {
-        this.logger.error(
-          `Failed to send AI comment reply: ${response.statusText}`,
-        );
-        return;
-      }
-    } catch (error) {
-      this.logger.error('Failed to send AI reply due to network error', error);
-      return;
-    }
+    const replyPath = connection.platform === 'INSTAGRAM'
+      ? `/${commentId}/replies`
+      : `/${commentId}/comments`;
+    const result = await graphApiRequest(replyPath, {
+      token,
+      body: { message: reply },
+      context: 'maybeAiReply',
+    });
+    if (!result.ok) return;
 
     await this.prisma.message.create({
       data: {
@@ -718,29 +710,21 @@ export class WebhooksService {
     const token = this.channelsService.getDecryptedAccessToken(
       connection.accessToken,
     );
-    try {
-      const response = await fetch(`${GRAPH_API_BASE}/me/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          messaging_type: 'RESPONSE',
-          recipient: { id: senderId },
-          message: { text: replyText },
-        }),
-      });
-      if (!response.ok) {
-        this.logger.error(
-          `Failed to send story ${triggerType} reply: ${response.statusText}`,
-        );
-        return false;
-      }
-    } catch (error) {
-      this.logger.error('Failed to send story reply (network)', error);
-      return false;
-    }
+
+    // Show typing indicator before auto-reply for a natural feel
+    await sendTypingIndicator(senderId, token);
+    await new Promise((r) => setTimeout(r, 1_000));
+
+    const result = await graphApiRequest('/me/messages', {
+      token,
+      body: {
+        messaging_type: 'RESPONSE',
+        recipient: { id: senderId },
+        message: { text: replyText },
+      },
+      context: `handleStoryEvent:${triggerType}`,
+    });
+    if (!result.ok) return false;
 
     await this.prisma.message.create({
       data: {
@@ -1031,35 +1015,24 @@ export class WebhooksService {
       // Send public reply first if replyText is configured
       const replyVariant = this.pickVariant(rule.replyText);
       if (replyVariant) {
-        const payload: any = { message: replyVariant };
-        try {
-          const response = await fetch(
-            this.commentReplyUrl(connection, commentId),
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify(payload),
+        const replyPath = connection.platform === 'INSTAGRAM'
+          ? `/${commentId}/replies`
+          : `/${commentId}/comments`;
+        const pubResult = await graphApiRequest(replyPath, {
+          token,
+          body: { message: replyVariant },
+          context: 'executeRule:publicReply',
+        });
+        if (pubResult.ok) {
+          await this.prisma.message.create({
+            data: {
+              conversationId: conversation.id,
+              direction: 'OUTBOUND',
+              content: replyVariant,
+              messageType: 'COMMENT',
+              sentByName: 'الرد الآلي',
             },
-          );
-          if (response.ok) {
-            await this.prisma.message.create({
-              data: {
-                conversationId: conversation.id,
-                direction: 'OUTBOUND',
-                content: replyVariant,
-                messageType: 'COMMENT',
-                sentByName: 'الرد الآلي',
-              },
-            });
-          }
-        } catch (error) {
-          this.logger.error(
-            'Failed to send public comment reply for sequence',
-            error,
-          );
+          });
         }
       }
 
@@ -1069,36 +1042,45 @@ export class WebhooksService {
       // (recipient_id) which must be used for every following message —
       // the comment sender id (ASID) is NOT a valid Messenger recipient.
       let psid: string | null = null;
-      const sendDm = async (message: any): Promise<boolean> => {
-        const recipient = psid ? { id: psid } : { comment_id: commentId };
-        try {
-          const response = await fetch(`${GRAPH_API_BASE}/me/messages`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ recipient, message }),
-          });
-          if (!response.ok) {
-            this.logger.error(
-              `Failed to send sequential DM: ${response.statusText}`,
-            );
-            return false;
-          }
-          try {
-            const data: any = await response.json();
-            if (data?.recipient_id) {
-              psid = data.recipient_id;
-            }
-          } catch {
-            // body parsing is best-effort; the send itself succeeded
-          }
-          return true;
-        } catch (error) {
-          this.logger.error('Failed to send sequential DM (network)', error);
-          return false;
+
+      // Show typing indicator before the first DM for a natural feel
+      // (only when we already have a PSID — first-contact uses comment_id)
+      const showTypingOnce = async () => {
+        if (psid) {
+          await sendTypingIndicator(psid, token);
+          await new Promise((r) => setTimeout(r, 800));
         }
+      };
+
+      const sendDm = async (message: any): Promise<boolean> => {
+        // WhatsApp uses a different API shape
+        if (connection.platform === 'WHATSAPP') {
+          const waText =
+            message.text ||
+            message?.attachment?.payload?.url ||
+            JSON.stringify(message);
+          const waResult = await sendWhatsAppMsg(
+            connection.platformId,
+            senderId,
+            { type: 'text', text: waText },
+            token,
+          );
+          return waResult.ok;
+        }
+
+        const recipient = psid ? { id: psid } : { comment_id: commentId };
+        const result = await graphApiRequest('/me/messages', {
+          token,
+          body: {
+            messaging_type: 'RESPONSE',
+            recipient,
+            message,
+          },
+          context: 'executeRule:sendDm',
+        });
+        if (!result.ok) return false;
+        if (result.recipientId) psid = result.recipientId;
+        return true;
       };
       const logOutbound = async (content: string, messageType: string) => {
         await this.prisma.message.create({
@@ -1111,6 +1093,9 @@ export class WebhooksService {
           },
         });
       };
+
+      // Send typing indicator before the first sequential message
+      await showTypingOnce();
 
       for (let i = 0; i < replyMessages.length; i++) {
         const msg = replyMessages[i];
@@ -1220,34 +1205,16 @@ export class WebhooksService {
           payload.attachment_url = replyMedia[0];
         }
 
-        let isSuccess = false;
-        try {
-          const response = await fetch(
-            this.commentReplyUrl(connection, commentId),
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify(payload),
-            },
-          );
-          if (response.ok) {
-            isSuccess = true;
-          } else {
-            this.logger.error(
-              `Failed to send public comment reply: ${response.statusText}`,
-            );
-          }
-        } catch (error) {
-          this.logger.error(
-            'Failed to send public comment reply due to network error',
-            error,
-          );
-        }
+        const replyPath = connection.platform === 'INSTAGRAM'
+          ? `/${commentId}/replies`
+          : `/${commentId}/comments`;
+        const pubResult = await graphApiRequest(replyPath, {
+          token,
+          body: payload,
+          context: 'executeRule:legacyPublicReply',
+        });
 
-        if (isSuccess) {
+        if (pubResult.ok) {
           await this.prisma.message.create({
             data: {
               conversationId: conversation.id,
@@ -1303,28 +1270,37 @@ export class WebhooksService {
           };
         }
 
+        // Show typing before legacy private DM
+        if (connection.platform !== 'WHATSAPP') {
+          await sendTypingIndicator(senderId, token);
+          await new Promise((r) => setTimeout(r, 800));
+        }
+
         let isSuccess = false;
-        try {
-          const response = await fetch(`${GRAPH_API_BASE}/me/messages`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(dmPayload),
-          });
-          if (response.ok) {
-            isSuccess = true;
-          } else {
-            this.logger.error(
-              `Failed to send private DM: ${response.statusText}`,
-            );
-          }
-        } catch (error) {
-          this.logger.error(
-            'Failed to send private DM due to network error',
-            error,
+        if (connection.platform === 'WHATSAPP') {
+          // WhatsApp outbound — extract text and send
+          const waText =
+            dmPayload.message?.text ||
+            dmPayload.message?.attachment?.payload?.url ||
+            'رسالة';
+          const waResult = await sendWhatsAppMsg(
+            connection.platformId,
+            senderId,
+            { type: 'text', text: waText },
+            token,
           );
+          isSuccess = waResult.ok;
+        } else {
+          // Messenger / Instagram — add messaging_type
+          const result = await graphApiRequest('/me/messages', {
+            token,
+            body: {
+              messaging_type: 'RESPONSE',
+              ...dmPayload,
+            },
+            context: 'executeRule:legacyDM',
+          });
+          isSuccess = result.ok;
         }
 
         if (isSuccess) {

@@ -52,14 +52,14 @@ export default function LoginPage() {
       {/* ===== Grid Pattern Overlay ===== */}
       <div className="absolute inset-0 bg-[linear-gradient(oklch(0.541_0.24_275_/_0.03)_1px,_transparent_1px),_linear-gradient(90deg,_oklch(0.541_0.24_275_/_0.03)_1px,_transparent_1px)] bg-[size:60px_60px]" />
 
-      {/* ===== Language Switcher ===== */}
-      <div className="absolute top-6 left-6 z-50">
-        <LanguageSwitcher />
-      </div>
-
       {/* ===== Login Card ===== */}
       <div className="relative z-10 w-full max-w-md mx-4 animate-fade-in-up">
-        <div className="glass-strong rounded-3xl p-8 shadow-2xl shadow-primary/10">
+        <div className="glass-strong rounded-3xl p-8 shadow-2xl shadow-primary/10 relative">
+          
+          {/* ===== Language Switcher ===== */}
+          <div className="absolute top-6 left-6">
+            <LanguageSwitcher />
+          </div>
           {/* Logo & Header */}
           <div className="flex flex-col items-center mb-8">
             <div className="relative mb-4">

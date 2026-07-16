@@ -1,0 +1,338 @@
+// ─────────────────────────────────────────────────────────────────
+// Meta Graph API — Centralized HTTP Client
+// Wraps every outbound Graph API call with:
+//   • Automatic retry + exponential backoff for transient errors
+//   • Rate-limit header monitoring (X-App-Usage, X-Page-Usage)
+//   • Structured error classification (→ graph-api-errors.ts)
+//   • Sender actions (typing_on) helper
+//
+// Reference: docs/meta-api/09-rate-limits.md, 10-error-codes.md
+// ─────────────────────────────────────────────────────────────────
+import { Logger } from '@nestjs/common';
+import { GRAPH_API_BASE } from './graph-api';
+import {
+  classifyError,
+  extractGraphError,
+  logGraphError,
+  ErrorAction,
+  type GraphApiError,
+} from './graph-api-errors';
+
+const logger = new Logger('GraphApiClient');
+
+// ── Rate-limit monitoring ───────────────────────────────────────
+
+interface UsageMetrics {
+  call_count: number;
+  total_cputime: number;
+  total_time: number;
+}
+
+/**
+ * Reads X-App-Usage / X-Page-Usage headers and logs warnings when
+ * approaching limits.  The thresholds follow Meta's recommendation:
+ *   80% → WARN   95% → ERROR
+ */
+function checkRateLimitHeaders(headers: Headers, context: string): void {
+  for (const headerName of ['x-app-usage', 'x-page-usage']) {
+    const raw = headers.get(headerName);
+    if (!raw) continue;
+    try {
+      const usage: UsageMetrics = JSON.parse(raw);
+      const maxVal = Math.max(
+        usage.call_count ?? 0,
+        usage.total_cputime ?? 0,
+        usage.total_time ?? 0,
+      );
+      if (maxVal >= 95) {
+        logger.error(
+          `🛑 [${headerName}] ${context} — usage at ${maxVal}%! Throttling required.`,
+        );
+      } else if (maxVal >= 80) {
+        logger.warn(
+          `⚠️ [${headerName}] ${context} — usage at ${maxVal}%. Approaching limit.`,
+        );
+      }
+    } catch {
+      // Malformed header — ignore silently
+    }
+  }
+}
+
+// ── Main request wrapper ────────────────────────────────────────
+
+export interface GraphRequestOptions {
+  method?: 'GET' | 'POST' | 'DELETE';
+  body?: Record<string, unknown> | string;
+  token: string;
+  /** Human-readable label for logs, e.g. "sendDM" or "commentReply". */
+  context?: string;
+  /** Max retry attempts for transient errors (default 2). */
+  maxRetries?: number;
+}
+
+export interface GraphResponse<T = any> {
+  ok: boolean;
+  data: T | null;
+  /** Set when Meta returns a structured error. */
+  error: GraphApiError | null;
+  /** The raw HTTP status code. */
+  status: number;
+  /** PSID / recipient_id returned by the Send API (if present). */
+  recipientId?: string;
+}
+
+/**
+ * Central Graph API request wrapper.
+ *
+ * Every outbound call to `graph.facebook.com` should go through this
+ * function so we get uniform retry, error classification, and rate-
+ * limit monitoring across the entire backend.
+ *
+ * @param path  Relative path after `GRAPH_API_BASE`, e.g. `/me/messages`
+ *              or an absolute URL for Instagram-specific endpoints.
+ */
+export async function graphApiRequest<T = any>(
+  path: string,
+  options: GraphRequestOptions,
+): Promise<GraphResponse<T>> {
+  const {
+    method = 'POST',
+    body,
+    token,
+    context = 'graphApiRequest',
+    maxRetries = 2,
+  } = options;
+
+  const url = path.startsWith('http') ? path : `${GRAPH_API_BASE}${path}`;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const fetchOptions: RequestInit = {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: body ? (typeof body === 'string' ? body : JSON.stringify(body)) : undefined,
+      };
+
+      const response = await fetch(url, fetchOptions);
+
+      // ── Rate-limit monitoring ──
+      checkRateLimitHeaders(response.headers, context);
+
+      // ── Success ──
+      if (response.ok) {
+        let data: T | null = null;
+        try {
+          data = (await response.json()) as T;
+        } catch {
+          // Some endpoints return empty 200 — that's fine
+        }
+        return {
+          ok: true,
+          data,
+          error: null,
+          status: response.status,
+          recipientId: (data as any)?.recipient_id,
+        };
+      }
+
+      // ── Error ──
+      const graphError = await extractGraphError(response);
+      if (graphError) {
+        const classified = classifyError(graphError);
+        logGraphError(context, graphError, classified);
+
+        switch (classified.action) {
+          case ErrorAction.RETRY:
+            if (attempt < maxRetries) {
+              await delay(classified.delayMs ?? 2_000);
+              continue;
+            }
+            break;
+
+          case ErrorAction.RETRY_AFTER_DELAY:
+            if (attempt < maxRetries && classified.delayMs) {
+              // Cap the wait at 30 seconds in webhook context to avoid
+              // Meta's 20-second webhook response timeout.
+              const waitMs = Math.min(classified.delayMs, 30_000);
+              await delay(waitMs);
+              continue;
+            }
+            break;
+
+          // Non-retryable — fall through to return
+          case ErrorAction.REAUTH:
+          case ErrorAction.FIX_REQUEST:
+          case ErrorAction.SKIP:
+          case ErrorAction.ALERT:
+            break;
+        }
+
+        return {
+          ok: false,
+          data: null,
+          error: graphError,
+          status: response.status,
+        };
+      }
+
+      // Non-Graph error (e.g. 502 from proxy)
+      logger.error(
+        `[${context}] HTTP ${response.status} ${response.statusText} (no Graph error body)`,
+      );
+      if (attempt < maxRetries) {
+        await delay(Math.pow(2, attempt) * 1_000);
+        continue;
+      }
+
+      return { ok: false, data: null, error: null, status: response.status };
+    } catch (networkError: any) {
+      logger.error(
+        `[${context}] Network error (attempt ${attempt + 1}/${maxRetries + 1}): ${networkError.message}`,
+      );
+      if (attempt < maxRetries) {
+        await delay(Math.pow(2, attempt) * 1_000);
+        continue;
+      }
+      return { ok: false, data: null, error: null, status: 0 };
+    }
+  }
+
+  // Should never reach here, but TypeScript needs it
+  return { ok: false, data: null, error: null, status: 0 };
+}
+
+// ── Sender Actions ──────────────────────────────────────────────
+
+/**
+ * Sends a `typing_on` indicator before an auto-reply so the
+ * conversation feels natural.  Best-effort — never throws.
+ *
+ * Supported on: Messenger, Instagram.
+ * NOT supported on: WhatsApp (use a different read-receipt API).
+ */
+export async function sendTypingIndicator(
+  recipientId: string,
+  token: string,
+): Promise<void> {
+  try {
+    await fetch(`${GRAPH_API_BASE}/me/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        recipient: { id: recipientId },
+        sender_action: 'typing_on',
+      }),
+    });
+  } catch {
+    // Best-effort — typing indicators must never block message delivery
+  }
+}
+
+/**
+ * Sends `mark_seen` to show the blue read-receipt indicator.
+ * Best-effort — never throws.
+ */
+export async function sendMarkSeen(
+  recipientId: string,
+  token: string,
+): Promise<void> {
+  try {
+    await fetch(`${GRAPH_API_BASE}/me/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        recipient: { id: recipientId },
+        sender_action: 'mark_seen',
+      }),
+    });
+  } catch {
+    // Best-effort
+  }
+}
+
+// ── WhatsApp Messaging ──────────────────────────────────────────
+
+export interface WhatsAppTextMessage {
+  type: 'text';
+  text: string;
+}
+
+export interface WhatsAppImageMessage {
+  type: 'image';
+  imageUrl: string;
+  caption?: string;
+}
+
+export type WhatsAppOutboundMessage =
+  | WhatsAppTextMessage
+  | WhatsAppImageMessage;
+
+/**
+ * Sends a message via WhatsApp Cloud API.
+ *
+ * @param phoneNumberId  The Page's WhatsApp phone_number_id (platformId).
+ * @param to             The recipient's phone number in international format.
+ * @param msg            The message payload.
+ * @param token          Decrypted access token.
+ */
+export async function sendWhatsAppMessage(
+  phoneNumberId: string,
+  to: string,
+  msg: WhatsAppOutboundMessage,
+  token: string,
+): Promise<GraphResponse> {
+  let body: Record<string, unknown>;
+
+  switch (msg.type) {
+    case 'text':
+      body = {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'text',
+        text: { body: msg.text },
+      };
+      break;
+
+    case 'image':
+      body = {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'image',
+        image: {
+          link: msg.imageUrl,
+          ...(msg.caption ? { caption: msg.caption } : {}),
+        },
+      };
+      break;
+
+    default:
+      body = {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'text',
+        text: { body: String((msg as any).text ?? '') },
+      };
+  }
+
+  return graphApiRequest(`/${phoneNumberId}/messages`, {
+    token,
+    body,
+    context: 'sendWhatsAppMessage',
+  });
+}
+
+// ── Utility ─────────────────────────────────────────────────────
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

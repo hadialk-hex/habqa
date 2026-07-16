@@ -769,26 +769,28 @@ export default function AdminPage() {
 
       {/* ─── Tabs ─── */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="flex overflow-x-auto no-scrollbar md:grid md:grid-cols-6 w-full rounded-2xl h-auto md:h-13 p-1.5 bg-muted/70 backdrop-blur-sm gap-2 border border-border/40 mb-6">
-          <TabsTrigger value="overview" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
-            <BarChart3 className="w-4 h-4" /> {t("adminPage.tabOverview")}
-          </TabsTrigger>
-          <TabsTrigger value="tenants" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
-            <Building2 className="w-4 h-4" /> {t("adminPage.tabTenants")}
-          </TabsTrigger>
-          <TabsTrigger value="users" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
-            <Users className="w-4 h-4" /> {t("adminPage.tabUsers")}
-          </TabsTrigger>
-          <TabsTrigger value="announcements" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
-            <Megaphone className="w-4 h-4" /> {t("adminPage.tabAnnouncements")}
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
-            <ShieldCheck className="w-4 h-4" /> {t("adminPage.tabSettings")}
-          </TabsTrigger>
-          <TabsTrigger value="logs" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0">
-            <ScrollText className="w-4 h-4" /> {t("adminPage.tabLogs")}
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex justify-center w-full mb-8">
+          <TabsList className="inline-flex overflow-x-auto no-scrollbar rounded-2xl h-auto md:h-13 p-1.5 bg-muted/70 backdrop-blur-sm gap-2 border border-border/40 max-w-full">
+            <TabsTrigger value="overview" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0 px-4">
+              <BarChart3 className="w-4 h-4" /> {t("adminPage.tabOverview")}
+            </TabsTrigger>
+            <TabsTrigger value="tenants" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0 px-4">
+              <Building2 className="w-4 h-4" /> {t("adminPage.tabTenants")}
+            </TabsTrigger>
+            <TabsTrigger value="users" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0 px-4">
+              <Users className="w-4 h-4" /> {t("adminPage.tabUsers")}
+            </TabsTrigger>
+            <TabsTrigger value="announcements" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0 px-4">
+              <Megaphone className="w-4 h-4" /> {t("adminPage.tabAnnouncements")}
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0 px-4">
+              <ShieldCheck className="w-4 h-4" /> {t("adminPage.tabSettings")}
+            </TabsTrigger>
+            <TabsTrigger value="logs" className="rounded-xl font-bold gap-1.5 justify-center data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200 shrink-0 px-4">
+              <ScrollText className="w-4 h-4" /> {t("adminPage.tabLogs")}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ==================== Overview ==================== */}
         <TabsContent value="overview" className="pt-6 space-y-8">

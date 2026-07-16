@@ -4,6 +4,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ChannelsService } from '../channels/channels.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { getPlanLimits, startOfCurrentMonth } from '../common/plan-limits';
+import {
+  graphApiRequest,
+  sendTypingIndicator,
+  sendWhatsAppMessage as sendWhatsAppMsg,
+} from '../common/graph-api-client';
 
 // Runtime for the visual flow builder. Webhooks call processEvent() when a
 // message / comment / new subscriber arrives; the engine matches the event
@@ -174,59 +179,46 @@ export class FlowEngineService {
 
     const sendDm = async (text: string): Promise<boolean> => {
       if (!token) return false;
-      try {
-        if (ctx.connection.platform === 'WHATSAPP') {
-          const response = await fetch(
-            `https://graph.facebook.com/v19.0/${ctx.connection.platformId}/messages`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                messaging_product: 'whatsapp',
-                to: ctx.customerId,
-                text: { body: text },
-              }),
-            },
-          );
-          return response.ok;
-        }
 
-        // Messenger / Instagram: the FIRST private reply to a comment must
-        // use recipient {comment_id}; the response's recipient_id (PSID) is
-        // the only valid recipient for every message after that.
-        const recipient = psid
-          ? { id: psid }
-          : ctx.commentId && !usedCommentId
-            ? { comment_id: ctx.commentId }
-            : { id: ctx.customerId };
-        if ((recipient as any).comment_id) usedCommentId = true;
-
-        const response = await fetch(
-          `https://graph.facebook.com/v19.0/me/messages`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ recipient, message: { text } }),
-          },
+      if (ctx.connection.platform === 'WHATSAPP') {
+        const result = await sendWhatsAppMsg(
+          ctx.connection.platformId,
+          ctx.customerId,
+          { type: 'text', text },
+          token,
         );
-        if (!response.ok) return false;
-        try {
-          const data: any = await response.json();
-          if (data?.recipient_id) psid = data.recipient_id;
-        } catch {
-          // best-effort body parse; the send succeeded
-        }
-        return true;
-      } catch (error: any) {
-        this.logger.error(`Flow DM send failed: ${error.message}`);
-        return false;
+        return result.ok;
       }
+
+      // Show typing indicator for a natural feel (Messenger / Instagram)
+      const recipientIdForTyping = psid || ctx.customerId;
+      if (recipientIdForTyping) {
+        await sendTypingIndicator(recipientIdForTyping, token);
+        await new Promise((r) => setTimeout(r, 800));
+      }
+
+      // Messenger / Instagram: the FIRST private reply to a comment must
+      // use recipient {comment_id}; the response's recipient_id (PSID) is
+      // the only valid recipient for every message after that.
+      const recipient = psid
+        ? { id: psid }
+        : ctx.commentId && !usedCommentId
+          ? { comment_id: ctx.commentId }
+          : { id: ctx.customerId };
+      if ((recipient as any).comment_id) usedCommentId = true;
+
+      const result = await graphApiRequest('/me/messages', {
+        token,
+        body: {
+          messaging_type: 'RESPONSE',
+          recipient,
+          message: { text },
+        },
+        context: 'flowEngine:sendDm',
+      });
+      if (!result.ok) return false;
+      if (result.recipientId) psid = result.recipientId;
+      return true;
     };
 
     while (currentId && hops < MAX_STEPS_PER_RUN) {
