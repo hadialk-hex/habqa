@@ -176,17 +176,15 @@ export function AppSidebar() {
       {/* ─── Footer: User Profile & Logout ─────────────────────────── */}
       <SidebarFooter className="border-t border-border/40 p-3">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent/60 transition-colors duration-200 cursor-pointer group w-full text-right border-none bg-transparent outline-none">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/15 shrink-0 group-hover:border-primary/30 transition-colors duration-200">
-                <span className="text-primary font-bold text-sm">{userInitials}</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold truncate">{user?.name || t('nav.user')}</p>
-                <p className="text-[11px] text-muted-foreground truncate">{user?.email || ""}</p>
-              </div>
-              <ChevronUp className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors duration-200 shrink-0" />
-            </button>
+          <DropdownMenuTrigger className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent/60 transition-colors duration-200 cursor-pointer group w-full text-right border-none bg-transparent outline-none">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/15 shrink-0 group-hover:border-primary/30 transition-colors duration-200">
+              <span className="text-primary font-bold text-sm">{userInitials}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold truncate">{user?.name || t('nav.user')}</p>
+              <p className="text-[11px] text-muted-foreground truncate">{user?.email || ""}</p>
+            </div>
+            <ChevronUp className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors duration-200 shrink-0" />
           </DropdownMenuTrigger>
           <DropdownMenuContent side="top" align="center" sideOffset={8} className="w-[220px] rounded-xl p-1">
             <DropdownMenuItem onClick={() => router.push('/dashboard')} className="gap-2 cursor-pointer rounded-lg">
