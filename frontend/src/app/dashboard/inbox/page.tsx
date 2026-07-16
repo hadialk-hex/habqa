@@ -12,7 +12,8 @@ import {
 import {
   Search, Filter, MoreVertical, Paperclip, Send, Smile, User, Globe,
   MessageCircle, Camera, Phone, Video, ChevronDown, Check, CheckCheck,
-  Zap, ArrowRight, X, Tag, Clock, CalendarDays, StickyNote, Plus, Hash
+  Zap, ArrowRight, X, Tag, Clock, CalendarDays, StickyNote, Plus, Hash,
+  MessageSquare
 } from "lucide-react"
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useToast } from "@/components/ui/toast"
@@ -132,6 +133,9 @@ export default function InboxPage() {
   const [filterPlatform, setFilterPlatform] = useState<string>("ALL")
   const [filterAssignment, setFilterAssignment] = useState<string>("ALL")
 
+  // Business-Suite-style inbox tabs: all activity / DMs only / comments only
+  const [view, setView] = useState<"all" | "messages" | "comments">("all")
+
   // ─── New state: customer profile sheet ────────────────────────────────
   const [profileSheetOpen, setProfileSheetOpen] = useState(false)
   const [customerTags, setCustomerTags] = useState<string[]>([t("inboxPage.defaultVipTag")])
@@ -237,7 +241,9 @@ export default function InboxPage() {
 
   const fetchConversations = async () => {
     try {
-      const res = await api.get('/inbox/conversations')
+      const res = await api.get(
+        view === "all" ? '/inbox/conversations' : `/inbox/conversations?view=${view}`
+      )
       setConversations(res.data)
     } catch (err) {
       console.error(err)
@@ -260,7 +266,7 @@ export default function InboxPage() {
     fetchConversations()
     fetchTeamMembers()
     fetchCannedResponses()
-  }, [searchQuery, filterStatus])
+  }, [searchQuery, filterStatus, view])
 
   useEffect(() => {
     scrollToBottom()
@@ -319,13 +325,20 @@ export default function InboxPage() {
     setTimeout(() => setIsTyping(false), 2500)
   }
 
+  // When the customer's latest inbound activity is a comment, the agent's
+  // reply is posted back as a public comment (Business-Suite behavior);
+  // otherwise it goes out as a normal DM.
+  const lastInboundMsg = [...messages].reverse().find(m => m.direction === 'INBOUND')
+  const replyingAsComment = lastInboundMsg?.messageType === 'COMMENT'
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newMessage.trim() || !activeChat) return
 
     try {
       const res = await api.post(`/inbox/conversations/${activeChat.id}/messages`, {
-        content: newMessage.trim()
+        content: newMessage.trim(),
+        ...(replyingAsComment ? { mode: "comment" } : {}),
       })
       setMessages(prev => [...prev, res.data])
       setNewMessage("")
@@ -541,6 +554,28 @@ export default function InboxPage() {
               className="w-full h-10 pl-4 pr-10 rounded-xl bg-muted/50 border border-border/50 focus:ring-2 focus:ring-primary/30 focus:border-primary/50 text-sm outline-none transition-all"
             />
           </div>
+
+          {/* Messages / Comments tabs — Business-Suite style */}
+          <div className="flex gap-1 p-1 mt-3 rounded-xl bg-muted/40 border border-border/40">
+            {([
+              ["all", t("inboxPage.tabAll")],
+              ["messages", t("inboxPage.tabMessages")],
+              ["comments", t("inboxPage.tabComments")],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setView(key)}
+                className={`flex-1 h-8 rounded-lg text-xs font-bold transition-all ${
+                  view === key
+                    ? "bg-[#4d9fff]/15 text-[#4d9fff] shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -589,6 +624,9 @@ export default function InboxPage() {
                     </div>
                     <div className="flex items-center justify-between mt-1">
                       <p className="text-xs truncate text-muted-foreground">
+                        {chat.messages?.[0]?.messageType === 'COMMENT' && (
+                          <span className="text-amber-500 font-bold">💬 </span>
+                        )}
                         {chat.messages?.[0]?.content || t("inboxPage.clickToViewConversation")}
                       </p>
                       {hasUnread && (
@@ -757,6 +795,12 @@ export default function InboxPage() {
                                 {msg.sentByName}
                               </p>
                             )}
+                            {msg.messageType === 'COMMENT' && (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/25 rounded-md px-1.5 py-0.5 mb-1.5">
+                                <MessageSquare className="w-2.5 h-2.5" />
+                                {t("inboxPage.commentBadge")}
+                              </span>
+                            )}
                             {isImage(msg.content) ? (
                               <div className="space-y-1.5">
                                 <img src={msg.content} alt={t("inboxPage.sentImageAlt")} className="max-w-[240px] max-h-[180px] object-cover rounded-xl border border-border/30 hover:scale-105 transition-transform duration-200" />
@@ -799,6 +843,12 @@ export default function InboxPage() {
             </div>
 
             {/* ─── Chat Input ──────────────────────────────────────────── */}
+            {replyingAsComment && (
+              <div className="px-4 py-1.5 text-[11px] font-bold text-amber-500 bg-amber-500/10 border-t border-amber-500/20 flex items-center gap-1.5 shrink-0">
+                <MessageSquare className="w-3 h-3 shrink-0" />
+                {t("inboxPage.replyAsCommentHint")}
+              </div>
+            )}
             <form onSubmit={handleSendMessage} className="border-t border-border/50 px-4 py-3 flex items-center gap-3 glass-strong z-10 shrink-0">
               {/* Emoji Picker (real) */}
               <div className="relative" ref={emojiPickerRef}>

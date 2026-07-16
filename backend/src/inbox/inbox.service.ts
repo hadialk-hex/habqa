@@ -19,10 +19,19 @@ export class InboxService {
     connectionId?: string,
     page?: number,
     limit?: number,
+    view?: string,
   ) {
     const where: any = { tenantId };
     if (connectionId) {
       where.connectionId = connectionId;
+    }
+    // Business-Suite-style tabs: "comments" lists conversations with comment
+    // activity, "messages" lists DM conversations. A conversation holding
+    // both (comment → private reply flows) rightfully appears in both tabs.
+    if (view === 'comments') {
+      where.messages = { some: { messageType: 'COMMENT' } };
+    } else if (view === 'messages') {
+      where.messages = { some: { messageType: { not: 'COMMENT' } } };
     }
 
     const skip = page && limit ? (page - 1) * limit : undefined;
@@ -161,11 +170,67 @@ export class InboxService {
     }
   }
 
+  // Replies publicly to the conversation's latest inbound comment (Facebook
+  // /{comment-id}/comments, Instagram /{ig-comment-id}/replies) — the
+  // Business-Suite behavior when an agent answers from the comments tab.
+  private async sendPlatformComment(
+    connection: any,
+    conversationId: string,
+    content: string,
+  ) {
+    const lastComment = await this.prisma.message.findFirst({
+      where: {
+        conversationId,
+        direction: 'INBOUND',
+        messageType: 'COMMENT',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!lastComment?.metaData) {
+      throw new BadRequestException('لا يوجد تعليق للرد عليه في هذه المحادثة');
+    }
+    let commentId: string | null = null;
+    try {
+      const raw = lastComment.metaData;
+      const meta: any = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      commentId = meta?.comment_id || meta?.id || null;
+    } catch {
+      commentId = null;
+    }
+    if (!commentId) {
+      throw new BadRequestException('تعذر تحديد معرف التعليق للرد عليه');
+    }
+
+    const token = this.channelsService.getDecryptedAccessToken(
+      connection.accessToken,
+    );
+    const url =
+      connection.platform === 'INSTAGRAM'
+        ? `${GRAPH_API_BASE}/${commentId}/replies`
+        : `${GRAPH_API_BASE}/${commentId}/comments`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ message: content }),
+    });
+    if (!response.ok) {
+      const err: any = await response.json().catch(() => ({}));
+      throw new BadRequestException(
+        err?.error?.message ||
+          `فشل إرسال الرد على التعليق (${response.status})`,
+      );
+    }
+  }
+
   async sendMessage(
     tenantId: string,
     conversationId: string,
     content: string,
     senderUserId?: string,
+    mode?: string,
   ) {
     if (!content || content.trim() === '') {
       throw new BadRequestException('محتوى الرسالة لا يمكن أن يكون فارغاً');
@@ -195,7 +260,19 @@ export class InboxService {
     }
 
     try {
-      await this.sendPlatformMessage(conv.connection, conv.customerId, content);
+      if (mode === 'comment') {
+        await this.sendPlatformComment(
+          conv.connection,
+          conversationId,
+          content,
+        );
+      } else {
+        await this.sendPlatformMessage(
+          conv.connection,
+          conv.customerId,
+          content,
+        );
+      }
     } catch (error: any) {
       if (error.message === 'Revoked token') {
         await this.prisma.platformConnection.update({
@@ -212,7 +289,7 @@ export class InboxService {
         conversationId,
         direction: 'OUTBOUND',
         content,
-        messageType: 'TEXT',
+        messageType: mode === 'comment' ? 'COMMENT' : 'TEXT',
         sentByName,
       },
     });
@@ -234,10 +311,12 @@ export class InboxService {
       throw new NotFoundException('المحادثة غير موجودة');
     }
 
+    // The frontend marks a conversation read with a body-less PATCH — body
+    // arrives undefined, so guard every access or the request 500s.
     const updateData: any = {};
-    if (body.status) {
+    if (body?.status) {
       updateData.status = body.status;
-    } else if (body.read === true) {
+    } else if (body?.read === true) {
       updateData.status = 'RESOLVED';
     }
 

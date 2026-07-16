@@ -23,6 +23,7 @@ export class InboxController {
     @Query('connectionId') connectionId?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('view') view?: string,
   ) {
     const pageNum = page ? parseInt(page, 10) : undefined;
     const limitNum = limit ? parseInt(limit, 10) : undefined;
@@ -31,6 +32,7 @@ export class InboxController {
       connectionId,
       pageNum,
       limitNum,
+      view,
     );
   }
 
@@ -43,13 +45,14 @@ export class InboxController {
   async sendMessage(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { content: string },
+    @Body() body: { content: string; mode?: string },
   ) {
     return this.inboxService.sendMessage(
       req.user.tenantId,
       id,
       body.content,
       req.user.id,
+      body.mode,
     );
   }
 

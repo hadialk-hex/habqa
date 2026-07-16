@@ -72,6 +72,22 @@ export class WebhooksService {
           // processing it would create bogus inbound messages and reply loops.
           if (event?.message && !event.message.is_echo) {
             await this.processPrivateDM(event, body.object, entry.id);
+          } else if (event?.postback) {
+            // messaging_postbacks (button presses) carry no message object —
+            // synthesize one so the press lands in the inbox and its payload
+            // can trigger keyword rules/flows like typed text would.
+            await this.processPrivateDM(
+              {
+                sender: event.sender,
+                recipient: event.recipient,
+                message: {
+                  mid: `postback_${event.sender?.id}_${event.timestamp}`,
+                  text: event.postback.payload || event.postback.title || '',
+                },
+              },
+              body.object,
+              entry.id,
+            );
           }
         }
         for (const change of entry.changes ?? []) {
@@ -129,10 +145,43 @@ export class WebhooksService {
     const senderId = message.from;
     const senderName = contact?.profile?.name || 'WhatsApp Customer';
 
-    // Parse text and handle media/caption fallback
+    // Parse text per WhatsApp Cloud API message type (docs: text, media with
+    // optional caption, interactive/button replies carry their own title).
     let messageText = message.text?.body || '';
-    if (!messageText && message.type === 'image') {
-      messageText = message.image?.caption || 'Image Message';
+    if (!messageText) {
+      switch (message.type) {
+        case 'image':
+          messageText = message.image?.caption || '📷 صورة';
+          break;
+        case 'video':
+          messageText = message.video?.caption || '🎥 فيديو';
+          break;
+        case 'audio':
+        case 'voice':
+          messageText = '🎤 رسالة صوتية';
+          break;
+        case 'document':
+          messageText = `📎 ${message.document?.filename || 'مستند'}`;
+          break;
+        case 'sticker':
+          messageText = '😊 ملصق';
+          break;
+        case 'location':
+          messageText = '📍 موقع';
+          break;
+        case 'contacts':
+          messageText = '👤 جهة اتصال';
+          break;
+        case 'button':
+          messageText = message.button?.text || '';
+          break;
+        case 'interactive':
+          messageText =
+            message.interactive?.button_reply?.title ||
+            message.interactive?.list_reply?.title ||
+            '';
+          break;
+      }
     }
 
     const messageId = message.id;
@@ -301,6 +350,10 @@ export class WebhooksService {
     const senderId = value.from?.id;
     if (!senderId) return;
     if (platform === 'page' && value.item !== 'comment') return;
+    // Facebook feed webhooks fire with verb add/edited/hide/remove — only a
+    // newly added comment should be ingested; replying to a removed or
+    // hidden comment fails at Graph and pollutes the inbox.
+    if (platform === 'page' && value.verb && value.verb !== 'add') return;
 
     const commentId = value.comment_id || value.id;
     if (commentId) {
@@ -528,6 +581,15 @@ export class WebhooksService {
     }
   }
 
+  // Public comment replies use different Graph endpoints per platform:
+  // Facebook → POST /{comment-id}/comments, Instagram → POST
+  // /{ig-comment-id}/replies (per the Instagram Platform docs).
+  private commentReplyUrl(connection: any, commentId: string): string {
+    return connection.platform === 'INSTAGRAM'
+      ? `${GRAPH_API_BASE}/${commentId}/replies`
+      : `${GRAPH_API_BASE}/${commentId}/comments`;
+  }
+
   // Sends an AI-generated public reply when the tenant enabled AI replies,
   // no rule matched, and quota allows. Counts toward the reply quota.
   private async maybeAiReply(
@@ -563,14 +625,17 @@ export class WebhooksService {
     );
 
     try {
-      const response = await fetch(`${GRAPH_API_BASE}/${commentId}/comments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        this.commentReplyUrl(connection, commentId),
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ message: reply }),
         },
-        body: JSON.stringify({ message: reply }),
-      });
+      );
       if (!response.ok) {
         this.logger.error(
           `Failed to send AI comment reply: ${response.statusText}`,
@@ -741,7 +806,26 @@ export class WebhooksService {
       }
     }
 
-    const messageText = value.message?.text || '';
+    // Attachment-only DMs (photo, video, voice note…) have no text — show a
+    // readable placeholder in the inbox instead of an empty bubble.
+    // story_mention is excluded: it gets its own labels further down.
+    let messageText = value.message?.text || '';
+    if (!messageText && Array.isArray(value.message?.attachments)) {
+      const attachmentLabels: Record<string, string> = {
+        image: '📷 صورة',
+        video: '🎥 فيديو',
+        audio: '🎤 رسالة صوتية',
+        file: '📎 ملف مرفق',
+        location: '📍 موقع',
+        fallback: '🔗 مشاركة رابط',
+        template: '📋 قالب',
+        share: '🔗 منشور تمت مشاركته',
+      };
+      const attType = value.message.attachments[0]?.type;
+      if (attType && attType !== 'story_mention') {
+        messageText = attachmentLabels[attType] || '📎 مرفق';
+      }
+    }
     const connectionPlatform =
       platform === 'page' ? 'FACEBOOK_PAGE' : 'INSTAGRAM';
     const targetPlatformId = entryId || recipientId;
@@ -950,7 +1034,7 @@ export class WebhooksService {
         const payload: any = { message: replyVariant };
         try {
           const response = await fetch(
-            `https://graph.facebook.com/v19.0/${commentId}/comments`,
+            this.commentReplyUrl(connection, commentId),
             {
               method: 'POST',
               headers: {
@@ -1139,7 +1223,7 @@ export class WebhooksService {
         let isSuccess = false;
         try {
           const response = await fetch(
-            `https://graph.facebook.com/v19.0/${commentId}/comments`,
+            this.commentReplyUrl(connection, commentId),
             {
               method: 'POST',
               headers: {
