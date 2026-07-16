@@ -15,6 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import { getPlanLimits } from '../common/plan-limits';
 import { PlatformSettingsService } from '../settings/platform-settings.service';
 import { GRAPH_API_BASE } from '../common/graph-api';
+import { publishInstagramMedia } from '../common/graph-api-client';
 
 const ALGORITHM = 'aes-256-cbc';
 const IV_LENGTH = 16;
@@ -725,5 +726,47 @@ export class ChannelsService {
         );
       }
     }
+  }
+
+  async publishInstagramContent(
+    tenantId: string,
+    connectionId: string,
+    imageUrl: string,
+    caption: string,
+  ) {
+    const conn = await this.prisma.platformConnection.findFirst({
+      where: { id: connectionId, tenantId },
+    });
+    if (!conn) {
+      throw new NotFoundException('القناة غير موجودة');
+    }
+    if (conn.platform !== 'INSTAGRAM') {
+      throw new BadRequestException('هذه القناة ليست حساب إنستغرام');
+    }
+    if (!conn.accessToken) {
+      throw new BadRequestException('تحتاج إلى تسجيل الدخول مجدداً');
+    }
+    const token = this.getDecryptedAccessToken(conn.accessToken);
+    if (!token) {
+      throw new BadRequestException('تحتاج إلى تسجيل الدخول مجدداً');
+    }
+
+    if (!conn.platformId) {
+      throw new BadRequestException('معرف المنصة غير موجود');
+    }
+
+    const res = await publishInstagramMedia(
+      conn.platformId as string,
+      imageUrl,
+      caption,
+      token,
+    );
+
+    if (!res.ok) {
+      throw new BadRequestException(
+        res.error?.message || `فشل النشر على إنستغرام (${res.status})`,
+      );
+    }
+    return { success: true, creationId: res.data?.id };
   }
 }

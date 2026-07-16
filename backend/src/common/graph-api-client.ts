@@ -273,9 +273,17 @@ export interface WhatsAppImageMessage {
   caption?: string;
 }
 
+export interface WhatsAppTemplateMessage {
+  type: 'template';
+  templateName: string;
+  languageCode: string;
+  components?: any[]; // The template components (header, body, buttons variables)
+}
+
 export type WhatsAppOutboundMessage =
   | WhatsAppTextMessage
-  | WhatsAppImageMessage;
+  | WhatsAppImageMessage
+  | WhatsAppTemplateMessage;
 
 /**
  * Sends a message via WhatsApp Cloud API.
@@ -315,6 +323,19 @@ export async function sendWhatsAppMessage(
       };
       break;
 
+    case 'template':
+      body = {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'template',
+        template: {
+          name: msg.templateName,
+          language: { code: msg.languageCode },
+          ...(msg.components ? { components: msg.components } : {}),
+        },
+      };
+      break;
+
     default:
       body = {
         messaging_product: 'whatsapp',
@@ -329,6 +350,88 @@ export async function sendWhatsAppMessage(
     body,
     context: 'sendWhatsAppMessage',
   });
+}
+
+// ── Instagram Content Publishing ────────────────────────────────
+
+/**
+ * Publishes a photo or video to an Instagram Professional account.
+ * This is a two-step process: create container, then publish.
+ * 
+ * @param igUserId The Instagram User ID (not the Page ID).
+ * @param imageUrl The public URL of the media.
+ * @param caption Optional caption for the post.
+ * @param token The decrypted page access token.
+ */
+export async function publishInstagramMedia(
+  igUserId: string,
+  imageUrl: string,
+  caption: string,
+  token: string,
+): Promise<GraphResponse> {
+  // Step 1: Create media container
+  const containerRes = await graphApiRequest(`/${igUserId}/media`, {
+    method: 'POST',
+    token,
+    body: {
+      image_url: imageUrl,
+      caption: caption || '',
+    },
+    context: 'publishInstagramMedia_Container',
+  });
+
+  if (!containerRes.ok || !containerRes.data?.id) {
+    return containerRes; // Return the error
+  }
+
+  const creationId = containerRes.data.id;
+
+  // Step 2: Publish the container
+  return graphApiRequest(`/${igUserId}/media_publish`, {
+    method: 'POST',
+    token,
+    body: {
+      creation_id: creationId,
+    },
+    context: 'publishInstagramMedia_Publish',
+  });
+}
+
+// ── Media Upload (WhatsApp) ─────────────────────────────────────
+
+/**
+ * Uploads media to WhatsApp to get an ID for templates/messages.
+ * Note: Body should be a FormData object containing messaging_product and file.
+ */
+export async function uploadWhatsAppMedia(
+  phoneNumberId: string,
+  formData: any,
+  token: string,
+): Promise<GraphResponse> {
+  // Use raw fetch because FormData changes Content-Type headers automatically
+  // (We cannot set application/json on multipart/form-data)
+  const url = `${GRAPH_API_BASE}/${phoneNumberId}/media`;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    let data = null;
+    try {
+      data = await response.json();
+    } catch {}
+    
+    if (response.ok) {
+      return { ok: true, data, error: null, status: response.status };
+    } else {
+      return { ok: false, data: null, error: data?.error, status: response.status };
+    }
+  } catch (err: any) {
+    return { ok: false, data: null, error: { message: err.message } as any, status: 500 };
+  }
 }
 
 // ── Utility ─────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { ChannelsService } from '../channels/channels.service';
 import { GRAPH_API_BASE } from '../common/graph-api';
+import { graphApiRequest, sendWhatsAppMessage } from '../common/graph-api-client';
 
 @Injectable()
 export class InboxService {
@@ -111,6 +112,7 @@ export class InboxService {
     connection: any,
     customerId: string,
     content: string,
+    conversationId: string,
   ) {
     if (!connection.accessToken) {
       throw new Error('Revoked token');
@@ -124,55 +126,60 @@ export class InboxService {
     }
 
     if (connection.platform === 'WHATSAPP') {
-      // WhatsApp Cloud API
-      const response = await fetch(
-        `${GRAPH_API_BASE}/${connection.platformId}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            to: customerId,
-            type: 'text',
-            text: { body: content },
-          }),
-        },
+      const res = await sendWhatsAppMessage(
+        connection.platformId,
+        customerId,
+        { type: 'text', text: content },
+        token,
       );
-      if (!response.ok) {
-        const err: any = await response.json().catch(() => ({}));
-        throw new Error(
-          err?.error?.message || `WhatsApp API error: ${response.status}`,
-        );
+      if (!res.ok) {
+        throw new Error(`WhatsApp API error: ${res.error?.message || res.status}`);
       }
     } else {
-      // Facebook Messenger & Instagram DM — use Send API
-      const response = await fetch(`${GRAPH_API_BASE}/me/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          messaging_type: 'RESPONSE',
-          recipient: { id: customerId },
-          message: { text: content },
-        }),
+      // Messenger / Instagram
+      // Check if past 24 hours
+      let isPast24Hours = false;
+      const lastInbound = await this.prisma.message.findFirst({
+        where: { conversationId, direction: 'INBOUND' },
+        orderBy: { createdAt: 'desc' },
       });
-      if (!response.ok) {
-        const err: any = await response.json().catch(() => ({}));
-        throw new Error(
-          err?.error?.message || `Graph API error: ${response.status}`,
-        );
+
+      if (lastInbound) {
+        const diff = Date.now() - lastInbound.createdAt.getTime();
+        if (diff > 24 * 60 * 60 * 1000) {
+          isPast24Hours = true;
+        }
+      } else {
+        // No inbound message at all (e.g. proactive outbound) -> must use HUMAN_AGENT for Messenger
+        isPast24Hours = true;
+      }
+
+      const body: any = {
+        recipient: { id: customerId },
+        message: { text: content },
+      };
+
+      if (isPast24Hours && connection.platform !== 'INSTAGRAM') {
+        body.messaging_type = 'MESSAGE_TAG';
+        body.tag = 'HUMAN_AGENT';
+      } else {
+        body.messaging_type = 'RESPONSE';
+      }
+
+      const res = await graphApiRequest('/me/messages', {
+        method: 'POST',
+        token,
+        body,
+        context: 'inboxSendPlatformMessage',
+      });
+
+      if (!res.ok) {
+        throw new Error(`Graph API error: ${res.error?.message || res.status}`);
       }
     }
   }
 
-  // Replies publicly to the conversation's latest inbound comment (Facebook
-  // /{comment-id}/comments, Instagram /{ig-comment-id}/replies) — the
-  // Business-Suite behavior when an agent answers from the comments tab.
+  // Replies publicly to the conversation's latest inbound comment
   private async sendPlatformComment(
     connection: any,
     conversationId: string,
@@ -204,23 +211,21 @@ export class InboxService {
     const token = this.channelsService.getDecryptedAccessToken(
       connection.accessToken,
     );
-    const url =
+    const path =
       connection.platform === 'INSTAGRAM'
-        ? `${GRAPH_API_BASE}/${commentId}/replies`
-        : `${GRAPH_API_BASE}/${commentId}/comments`;
-    const response = await fetch(url, {
+        ? `/${commentId}/replies`
+        : `/${commentId}/comments`;
+
+    const res = await graphApiRequest(path, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ message: content }),
+      token,
+      body: { message: content },
+      context: 'inboxSendPlatformComment',
     });
-    if (!response.ok) {
-      const err: any = await response.json().catch(() => ({}));
+
+    if (!res.ok) {
       throw new BadRequestException(
-        err?.error?.message ||
-          `فشل إرسال الرد على التعليق (${response.status})`,
+        res.error?.message || `فشل إرسال الرد على التعليق (${res.status})`,
       );
     }
   }
@@ -271,6 +276,7 @@ export class InboxService {
           conv.connection,
           conv.customerId,
           content,
+          conversationId,
         );
       }
     } catch (error: any) {

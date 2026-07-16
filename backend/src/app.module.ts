@@ -31,6 +31,7 @@ import { AiModule } from './ai/ai.module';
 import { FlowsModule } from './flows/flows.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RealtimeModule } from './realtime/realtime.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -104,6 +105,7 @@ import { RealtimeModule } from './realtime/realtime.module';
     FlowsModule,
     NotificationsModule,
     RealtimeModule,
+    MediaModule,
   ],
   controllers: [AppController],
   providers: [

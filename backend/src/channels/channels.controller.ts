@@ -287,4 +287,21 @@ export class ChannelsController {
     }
     return this.channelsService.removeConnection(req.user.tenantId, id);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('instagram/publish')
+  async publishInstagramMedia(
+    @Request() req: any,
+    @Body() dto: { connectionId: string; imageUrl: string; caption: string },
+  ) {
+    if (!dto.connectionId || !dto.imageUrl) {
+      throw new BadRequestException('connectionId and imageUrl are required');
+    }
+    return this.channelsService.publishInstagramContent(
+      req.user.tenantId,
+      dto.connectionId,
+      dto.imageUrl,
+      dto.caption || '',
+    );
+  }
 }
