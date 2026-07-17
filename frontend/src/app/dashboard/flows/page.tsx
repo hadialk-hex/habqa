@@ -9,14 +9,15 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { 
-  Bot, Plus, Trash2, Save, RefreshCw, Zap, Sparkles, X, 
-  ArrowLeft, ZoomIn, ZoomOut, Maximize2, Move, Clock, Tag, 
+import {
+  Bot, Plus, Trash2, Save, RefreshCw, Zap, Sparkles, X,
+  ArrowLeft, ZoomIn, ZoomOut, Maximize2, Move, Clock, Tag,
   Smartphone, HelpCircle, AlertCircle, Edit, CheckCircle2,
-  ChevronRight, Laptop, Settings
+  ChevronRight, Laptop, Settings, BarChart3
 } from "lucide-react"
 import api from "@/lib/api"
 import { useConfirm } from "@/components/ui/confirm-dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useLanguage } from "@/lib/i18n/language-context"
 
 // --- TYPES & DEFINITIONS ---
@@ -115,6 +116,30 @@ export default function FlowsPage() {
   const [flowDescription, setFlowDescription] = useState("");
   const [flowIsActive, setFlowIsActive] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // ─── Flow execution analytics (per-flow dialog) ────────────────────────
+  interface FlowAnalytics {
+    total: number; completed: number; failed: number; running: number
+    paused: number; completionRate: number
+    steps: { stepId: string; type: string; configuration: any; success: number; failed: number }[]
+  }
+  const [analyticsFlow, setAnalyticsFlow] = useState<Flow | null>(null)
+  const [analytics, setAnalytics] = useState<FlowAnalytics | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
+
+  const openAnalytics = async (flow: Flow) => {
+    setAnalyticsFlow(flow)
+    setAnalytics(null)
+    setAnalyticsLoading(true)
+    try {
+      const res = await api.get(`/flows/${flow.id}/analytics`)
+      setAnalytics(res.data)
+    } catch {
+      setAnalytics(null)
+    } finally {
+      setAnalyticsLoading(false)
+    }
+  }
 
   // Canvas Graph State
   const [nodes, setNodes] = useState<VisualNode[]>([]);
@@ -810,16 +835,24 @@ export default function FlowsPage() {
                       </div>
                     </div>
                     <div className="flex gap-2 mt-5">
-                      <Button 
-                        variant="outline" 
+                      <Button
+                        variant="outline"
                         onClick={() => handleEditFlow(flow)}
                         className="flex-1 rounded-xl font-bold h-10 border-primary/25 text-primary hover:bg-primary/5 cursor-pointer"
                       >
                         <Edit className="w-4 h-4 ml-1.5" />
                         {t("flowsPage.editFlowBtn")}
                       </Button>
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
+                        onClick={() => openAnalytics(flow)}
+                        className="rounded-xl h-10 w-10 text-[#4d9fff] hover:bg-[#4d9fff]/10 cursor-pointer"
+                        title={t("flowsPage.analyticsBtn")}
+                      >
+                        <BarChart3 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
                         onClick={() => handleDeleteFlow(flow)}
                         className="rounded-xl h-10 w-10 text-destructive hover:bg-destructive/10 cursor-pointer"
                       >
@@ -833,6 +866,73 @@ export default function FlowsPage() {
           )}
         </div>
       )}
+
+      {/* --- FLOW ANALYTICS DIALOG --- */}
+      <Dialog open={!!analyticsFlow} onOpenChange={(open) => !open && setAnalyticsFlow(null)}>
+        <DialogContent className="sm:max-w-[480px]" dir={dir}>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black flex items-center gap-3">
+              <div className="p-2 bg-[#4d9fff]/10 rounded-xl">
+                <BarChart3 className="w-5 h-5 text-[#4d9fff]" />
+              </div>
+              {t("flowsPage.analyticsTitle", { name: analyticsFlow?.name || "" })}
+            </DialogTitle>
+            <DialogDescription>{t("flowsPage.analyticsDesc")}</DialogDescription>
+          </DialogHeader>
+
+          {analyticsLoading ? (
+            <div className="flex justify-center py-10"><RefreshCw className="w-6 h-6 animate-spin text-primary" /></div>
+          ) : !analytics ? (
+            <p className="text-sm text-destructive py-6 text-center">{t("flowsPage.analyticsFailed")}</p>
+          ) : (
+            <div className="flex flex-col gap-4 py-1">
+              <div className="grid grid-cols-4 gap-2 text-center">
+                {[
+                  { label: t("flowsPage.analyticsTotal"), value: analytics.total, color: "text-foreground" },
+                  { label: t("flowsPage.analyticsCompleted"), value: analytics.completed, color: "text-emerald-500" },
+                  { label: t("flowsPage.analyticsRunning"), value: analytics.running + analytics.paused, color: "text-amber-500" },
+                  { label: t("flowsPage.analyticsFailed2"), value: analytics.failed, color: "text-red-500" },
+                ].map(s => (
+                  <div key={s.label} className="rounded-xl bg-muted/40 border border-border/40 p-3">
+                    <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+                    <p className="text-[10px] text-muted-foreground font-bold mt-1">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-xl bg-muted/40 border border-border/40 p-3 flex items-center justify-between">
+                <span className="text-xs font-bold">{t("flowsPage.analyticsCompletionRate")}</span>
+                <span className="text-lg font-black text-[#4d9fff]">{analytics.completionRate}%</span>
+              </div>
+
+              {analytics.steps.length > 0 && analytics.total > 0 && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs font-black text-muted-foreground">{t("flowsPage.analyticsFunnel")}</p>
+                  {analytics.steps.map((s) => {
+                    const max = Math.max(...analytics.steps.map(x => x.success + x.failed), 1)
+                    const width = Math.round(((s.success + s.failed) / max) * 100)
+                    return (
+                      <div key={s.stepId} className="flex items-center gap-2 text-[11px]">
+                        <span className="w-28 truncate font-bold shrink-0">{String((s.configuration as any)?.text || (s.configuration as any)?.tag || s.type).slice(0, 22)}</span>
+                        <div className="flex-1 h-4 rounded-md bg-muted/40 overflow-hidden">
+                          <div className="h-full bg-gradient-to-l from-[#4d9fff] to-[#4d9fff]/60" style={{ width: `${width}%` }} />
+                        </div>
+                        <span className="w-14 text-left shrink-0 text-muted-foreground" dir="ltr">
+                          {s.success}✓{s.failed > 0 ? ` ${s.failed}✗` : ""}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {analytics.total === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-2">{t("flowsPage.analyticsEmpty")}</p>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* --- CANVAS EDITOR VIEW --- */}
       {isEditing && (

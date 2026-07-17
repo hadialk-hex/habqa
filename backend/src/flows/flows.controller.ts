@@ -28,6 +28,13 @@ export class FlowsController {
     return this.flowsService.getFlow(id, req.user.tenantId);
   }
 
+  // Execution analytics: run totals by status + a per-step success/failure
+  // funnel — powers the "التحليلات" dialog on the flows page.
+  @Get(':id/analytics')
+  async getFlowAnalytics(@Param('id') id: string, @Request() req: any) {
+    return this.flowsService.getFlowAnalytics(id, req.user.tenantId);
+  }
+
   @Post()
   async createFlow(@Request() req: any, @Body() dto: SaveFlowDto) {
     return this.flowsService.saveFlow(undefined, req.user.tenantId, dto);

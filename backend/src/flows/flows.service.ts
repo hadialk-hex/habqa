@@ -39,6 +39,55 @@ export class FlowsService {
     return flow;
   }
 
+  // Aggregates FlowExecution statuses + per-step SUCCESS/FAILED counts from
+  // FlowExecutionLog into a funnel the dashboard can render directly.
+  async getFlowAnalytics(id: string, tenantId: string) {
+    const flow = await this.prisma.flow.findFirst({
+      where: { id, tenantId },
+      include: { steps: true },
+    });
+    if (!flow) {
+      throw new NotFoundException('Flow not found');
+    }
+
+    const byStatus = await this.prisma.flowExecution.groupBy({
+      by: ['status'],
+      where: { flowId: id, tenantId },
+      _count: { _all: true },
+    });
+    const statusCounts: Record<string, number> = {};
+    for (const row of byStatus) statusCounts[row.status] = row._count._all;
+    const total = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+
+    const stepLogs = await this.prisma.flowExecutionLog.groupBy({
+      by: ['stepId', 'status'],
+      where: { execution: { flowId: id, tenantId } },
+      _count: { _all: true },
+    });
+    const steps = flow.steps.map((s) => ({
+      stepId: s.id,
+      type: s.type,
+      configuration: s.configuration,
+      success:
+        stepLogs.find((l) => l.stepId === s.id && l.status === 'SUCCESS')
+          ?._count._all || 0,
+      failed:
+        stepLogs.find((l) => l.stepId === s.id && l.status === 'FAILED')?._count
+          ._all || 0,
+    }));
+
+    const completed = statusCounts['COMPLETED'] || 0;
+    return {
+      total,
+      completed,
+      failed: statusCounts['FAILED'] || 0,
+      running: statusCounts['RUNNING'] || 0,
+      paused: statusCounts['PAUSED'] || 0,
+      completionRate: total ? Math.round((completed / total) * 100) : 0,
+      steps,
+    };
+  }
+
   async saveFlow(id: string | undefined, tenantId: string, dto: SaveFlowDto) {
     return this.prisma.$transaction(async (tx) => {
       let flow;
