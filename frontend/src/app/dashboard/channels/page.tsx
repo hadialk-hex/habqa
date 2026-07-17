@@ -11,8 +11,9 @@ import {
   Trash2, ShieldCheck, RefreshCw, MessageCircle, Share2, WifiOff,
   CheckCircle2, AlertTriangle, X, ExternalLink, Zap, ArrowLeft,
   MessageSquare, Radio, Users, BookOpen, Heart, Film, UserPlus, Send, Info,
-  Webhook, Wrench
+  Webhook, Wrench, QrCode, Copy, Download
 } from "lucide-react"
+import QRCode from "qrcode"
 import api from "@/lib/api"
 import { useLanguage } from "@/lib/i18n/language-context"
 
@@ -150,6 +151,29 @@ function ChannelsContent() {
     error?: string
   }
   const [webhookStatus, setWebhookStatus] = useState<Record<string, WebhookState>>({})
+
+  // Growth tool: m.me deep link + QR code per Facebook page (ManyChat-style
+  // "ref URL" entry point customers can scan/click to start a conversation).
+  const [growthTarget, setGrowthTarget] = useState<Channel | null>(null)
+  const [qrDataUrl, setQrDataUrl] = useState<string>("")
+  const [copied, setCopied] = useState(false)
+  const growthLink = growthTarget ? `https://m.me/${growthTarget.platformId}` : ""
+
+  useEffect(() => {
+    if (!growthTarget) { setQrDataUrl(""); return }
+    QRCode.toDataURL(`https://m.me/${growthTarget.platformId}`, {
+      width: 480, margin: 2,
+      color: { dark: "#0a0a0f", light: "#ffffff" },
+    }).then(setQrDataUrl).catch(() => setQrDataUrl(""))
+  }, [growthTarget])
+
+  const copyGrowthLink = async () => {
+    try {
+      await navigator.clipboard.writeText(growthLink)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { /* clipboard unavailable */ }
+  }
 
   const checkWebhook = async (channelId: string) => {
     setWebhookStatus(prev => ({ ...prev, [channelId]: { loading: true } }))
@@ -571,6 +595,17 @@ function ChannelsContent() {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                className="rounded-lg h-8 px-2.5 text-xs gap-1.5"
+                                onClick={() => setGrowthTarget(channel)}
+                              >
+                                <QrCode className="w-3.5 h-3.5" />
+                                {t("channelsPage.growthBtn")}
+                              </Button>
+                            )}
+                            {channel.platform === "FACEBOOK_PAGE" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 className="rounded-lg h-8 px-3 text-xs gap-1.5"
                                 disabled={webhookStatus[channel.id]?.loading}
                                 onClick={() => checkWebhook(channel.id)}
@@ -663,6 +698,43 @@ function ChannelsContent() {
           )}
         </>
       )}
+
+      {/* Growth tool: m.me link + QR */}
+      <Dialog open={!!growthTarget} onOpenChange={(open) => !open && setGrowthTarget(null)}>
+        <DialogContent className="sm:max-w-[420px]" dir={dir}>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-xl">
+                <QrCode className="w-5 h-5 text-primary" />
+              </div>
+              {t("channelsPage.growthTitle")}
+            </DialogTitle>
+            <DialogDescription className="leading-relaxed pt-1">
+              {t("channelsPage.growthDesc", { name: growthTarget?.name || "" })}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-2">
+            {qrDataUrl && (
+              <img src={qrDataUrl} alt="QR" className="w-56 h-56 rounded-2xl border border-border/50 bg-white p-2" />
+            )}
+            <div className="flex items-center gap-2 w-full">
+              <code className="flex-1 text-xs bg-muted/50 border border-border/50 rounded-xl px-3 py-2.5 truncate" dir="ltr">{growthLink}</code>
+              <Button variant="outline" size="sm" className="rounded-xl h-9 gap-1.5 shrink-0" onClick={copyGrowthLink}>
+                {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                {copied ? t("channelsPage.growthCopied") : t("channelsPage.growthCopy")}
+              </Button>
+            </div>
+            <a
+              href={qrDataUrl}
+              download={`hubqa-messenger-qr-${growthTarget?.platformId}.png`}
+              className="inline-flex items-center justify-center gap-2 w-full h-10 rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+            >
+              <Download className="w-4 h-4" />
+              {t("channelsPage.growthDownload")}
+            </a>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
