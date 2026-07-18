@@ -151,6 +151,9 @@ export default function InboxPage() {
   // ─── New state: typing indicator ──────────────────────────────────────
   const [isTyping, setIsTyping] = useState(false)
 
+  // ─── New state: sending guard (prevents double-send) ──────────────────
+  const [isSending, setIsSending] = useState(false)
+
   // ─── Smart auto-scroll refs ───────────────────────────────────────────
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -333,18 +336,39 @@ export default function InboxPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMessage.trim() || !activeChat) return
+    const text = newMessage.trim()
+    if (!text || !activeChat || isSending) return
+
+    // ── Optimistic UI: show the message immediately with a temp ID ──
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`
+    const optimisticMsg = {
+      id: tempId,
+      conversationId: activeChat.id,
+      direction: 'OUTBOUND',
+      content: text,
+      messageType: replyingAsComment ? 'COMMENT' : 'TEXT',
+      createdAt: new Date().toISOString(),
+      _sending: true, // UI flag for send indicator
+    }
+
+    setIsSending(true)
+    setNewMessage("")
+    setMessages(prev => [...prev, optimisticMsg])
+    isNearBottomRef.current = true // force scroll on send
 
     try {
       const res = await api.post(`/inbox/conversations/${activeChat.id}/messages`, {
-        content: newMessage.trim(),
+        content: text,
         ...(replyingAsComment ? { mode: "comment" } : {}),
       })
-      // The realtime socket may broadcast this same message before the HTTP
-      // response resolves — dedupe by id or the bubble renders twice.
-      setMessages(prev => prev.some(m => m.id === res.data.id) ? prev : [...prev, res.data])
-      setNewMessage("")
-      isNearBottomRef.current = true // force scroll on send
+      // Replace the optimistic message with the real one from the server.
+      // Also dedupe against socket broadcasts that may have arrived first.
+      setMessages(prev => {
+        const withoutTemp = prev.filter(m => m.id !== tempId)
+        return withoutTemp.some(m => m.id === res.data.id)
+          ? withoutTemp
+          : [...withoutTemp, res.data]
+      })
       setConversations(prev => prev.map(c => {
         if (c.id === activeChat.id) {
           return { ...c, lastMessageAt: new Date().toISOString() }
@@ -353,7 +377,12 @@ export default function InboxPage() {
       }))
     } catch (err: any) {
       console.error(err)
-      showToast(err.response?.data?.message || t("inboxPage.sendMessageFailed"), "error")
+      // Remove the optimistic message on failure
+      setMessages(prev => prev.filter(m => m.id !== tempId))
+      const errorDetail = err.response?.data?.message || t("inboxPage.sendMessageFailed")
+      showToast(errorDetail, "error")
+    } finally {
+      setIsSending(false)
     }
   }
 
@@ -830,7 +859,13 @@ export default function InboxPage() {
                               <span className="text-[9px] text-muted-foreground">
                                 {new Date(msg.createdAt).toLocaleTimeString(localeCode, { hour: 'numeric', minute: '2-digit' })}
                               </span>
-                              {isOutbound && <CheckCheck className="w-3 h-3 text-[#4d9fff]/70" />}
+                              {isOutbound && (
+                                msg._sending ? (
+                                  <Clock className="w-3 h-3 text-muted-foreground animate-pulse" />
+                                ) : (
+                                  <CheckCheck className="w-3 h-3 text-[#4d9fff]/70" />
+                                )
+                              )}
                             </div>
                           </div>
                         </div>
@@ -979,8 +1014,16 @@ export default function InboxPage() {
                 onChange={(e) => setNewMessage(e.target.value)}
                 className="flex-1 bg-muted/50 h-11 px-5 rounded-2xl border border-border/50 focus:ring-2 focus:ring-primary/30 focus:border-primary/50 outline-none text-sm transition-all"
               />
-              <button type="submit" className="bg-gradient-to-br from-[#4d9fff] to-[#0cc0a0] text-[#0a0a0f] p-3 rounded-xl hover:shadow-lg hover:shadow-[#4d9fff]/30 transition-all hover:scale-105 active:scale-95 font-bold">
-                <Send className="w-4 h-4 rtl:rotate-180" />
+              <button
+                type="submit"
+                disabled={isSending || !newMessage.trim()}
+                className="bg-gradient-to-br from-[#4d9fff] to-[#0cc0a0] text-[#0a0a0f] p-3 rounded-xl hover:shadow-lg hover:shadow-[#4d9fff]/30 transition-all hover:scale-105 active:scale-95 font-bold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none"
+              >
+                {isSending ? (
+                  <div className="w-4 h-4 border-2 border-[#0a0a0f] border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 rtl:rotate-180" />
+                )}
               </button>
             </form>
           </>

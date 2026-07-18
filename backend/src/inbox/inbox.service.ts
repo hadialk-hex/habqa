@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChannelsService } from '../channels/channels.service';
@@ -13,6 +14,8 @@ import { telegramRequest } from '../common/telegram-api';
 
 @Injectable()
 export class InboxService {
+  private readonly logger = new Logger(InboxService.name);
+
   constructor(
     private prisma: PrismaService,
     private channelsService: ChannelsService,
@@ -149,35 +152,53 @@ export class InboxService {
         );
       }
     } else {
-      // Messenger / Instagram
-      // Check if past 24 hours
-      let isPast24Hours = false;
-      const lastInbound = await this.prisma.message.findFirst({
-        where: { conversationId, direction: 'INBOUND' },
-        orderBy: { createdAt: 'desc' },
-      });
+      // ── Messenger / Instagram DM ──
+      // Determine the correct messaging_type:
+      //   • RESPONSE — default, works within the 24-hour standard messaging window.
+      //   • MESSAGE_TAG + HUMAN_AGENT — only valid for Messenger when the customer
+      //     HAS messaged us before AND the last inbound is older than 24 hours.
+      //   • Instagram does NOT support MESSAGE_TAG at all — always use RESPONSE.
+      let messagingType = 'RESPONSE';
+      let tag: string | undefined;
 
-      if (lastInbound) {
-        const diff = Date.now() - lastInbound.createdAt.getTime();
-        if (diff > 24 * 60 * 60 * 1000) {
-          isPast24Hours = true;
+      if (connection.platform !== 'INSTAGRAM') {
+        const lastInbound = await this.prisma.message.findFirst({
+          where: { conversationId, direction: 'INBOUND' },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (lastInbound) {
+          const hoursSinceLastInbound =
+            (Date.now() - lastInbound.createdAt.getTime()) / (1000 * 60 * 60);
+
+          if (hoursSinceLastInbound > 24) {
+            // Customer messaged us, but it was more than 24h ago.
+            // Use HUMAN_AGENT tag to extend the window (Messenger only).
+            messagingType = 'MESSAGE_TAG';
+            tag = 'HUMAN_AGENT';
+            this.logger.log(
+              `[sendPlatformMessage] Using HUMAN_AGENT tag (last inbound ${Math.round(hoursSinceLastInbound)}h ago) for conversation ${conversationId}`,
+            );
+          }
         }
-      } else {
-        // No inbound message at all (e.g. proactive outbound) -> must use HUMAN_AGENT for Messenger
-        isPast24Hours = true;
+        // If no inbound message exists at all, we're doing a proactive outreach.
+        // We still try RESPONSE — Facebook will reject it if the user never
+        // messaged us, but that's the correct behavior (no HUMAN_AGENT without
+        // prior conversation).
       }
 
       const body: any = {
+        messaging_type: messagingType,
         recipient: { id: customerId },
         message: { text: content },
       };
-
-      if (isPast24Hours && connection.platform !== 'INSTAGRAM') {
-        body.messaging_type = 'MESSAGE_TAG';
-        body.tag = 'HUMAN_AGENT';
-      } else {
-        body.messaging_type = 'RESPONSE';
+      if (tag) {
+        body.tag = tag;
       }
+
+      this.logger.log(
+        `[sendPlatformMessage] Sending to ${connection.platform} | customerId=${customerId} | messaging_type=${messagingType}${tag ? ` | tag=${tag}` : ''}`,
+      );
 
       const res = await graphApiRequest('/me/messages', {
         method: 'POST',
@@ -187,8 +208,16 @@ export class InboxService {
       });
 
       if (!res.ok) {
-        throw new Error(`Graph API error: ${res.error?.message || res.status}`);
+        const errMsg = res.error?.message || `HTTP ${res.status}`;
+        this.logger.error(
+          `[sendPlatformMessage] FAILED for conversation ${conversationId}: ${errMsg}`,
+        );
+        throw new Error(`Graph API error: ${errMsg}`);
       }
+
+      this.logger.log(
+        `[sendPlatformMessage] SUCCESS for conversation ${conversationId}`,
+      );
     }
   }
 
@@ -300,7 +329,14 @@ export class InboxService {
         });
         throw new BadRequestException('تم إلغاء صلاحية الاتصال بالمنصة');
       }
-      throw error;
+      // Surface the Graph API error message to the frontend
+      this.logger.error(
+        `[sendMessage] Failed for conversation ${conversationId}: ${error.message}`,
+      );
+      const userMsg = error.message?.includes('Graph API error')
+        ? `فشل إرسال الرسالة: ${error.message.replace('Graph API error: ', '')}`
+        : `فشل إرسال الرسالة: ${error.message || 'خطأ غير معروف'}`;
+      throw new BadRequestException(userMsg);
     }
 
     const message = await this.prisma.message.create({
