@@ -114,6 +114,110 @@ export class WebhooksService {
     }
   }
 
+  // Telegram Bot API update (https://core.telegram.org/bots/api#update).
+  // Only `message` updates are subscribed; chat.id doubles as the customer
+  // id AND the sendMessage target, so the inbox reply path needs no lookup.
+  async processTelegramUpdate(connectionId: string, update: any) {
+    const msg = update?.message;
+    const chatId = msg?.chat?.id;
+    if (!msg || !chatId) return;
+    // Groups/channels are out of scope — auto-reply is a 1:1 support tool
+    if (msg.chat.type && msg.chat.type !== 'private') return;
+    if (msg.from?.is_bot) return;
+
+    const connection = await this.prisma.platformConnection.findFirst({
+      where: { id: connectionId, platform: 'TELEGRAM' },
+    });
+    if (!connection) {
+      this.logger.error(`No TELEGRAM connection for webhook ${connectionId}`);
+      return;
+    }
+
+    const eventId = `tg_${connectionId}_${msg.message_id}`;
+    const duplicate = await this.prisma.webhookDeduplication.findUnique({
+      where: { eventId },
+    });
+    if (duplicate) return;
+    try {
+      await this.prisma.webhookDeduplication.create({
+        data: {
+          eventId,
+          platform: 'TELEGRAM',
+          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        },
+      });
+    } catch (error: any) {
+      if (error.code === 'P2002') return;
+      throw error;
+    }
+
+    let messageText = msg.text || msg.caption || '';
+    if (!messageText) {
+      if (msg.photo) messageText = '📷 صورة';
+      else if (msg.video) messageText = '🎥 فيديو';
+      else if (msg.voice || msg.audio) messageText = '🎤 رسالة صوتية';
+      else if (msg.document)
+        messageText = `📎 ${msg.document.file_name || 'مستند'}`;
+      else if (msg.sticker) messageText = '😊 ملصق';
+      else if (msg.location) messageText = '📍 موقع';
+      else if (msg.contact) messageText = '👤 جهة اتصال';
+      else return; // unsupported update (e.g. service message) — ignore
+    }
+
+    const customerId = String(chatId);
+    const customerName =
+      [msg.from?.first_name, msg.from?.last_name].filter(Boolean).join(' ') ||
+      (msg.from?.username ? `@${msg.from.username}` : 'Telegram Customer');
+
+    let conversation = await this.prisma.conversation.findUnique({
+      where: {
+        connectionId_customerId: { connectionId: connection.id, customerId },
+      },
+    });
+    if (!conversation) {
+      conversation = await this.prisma.conversation.create({
+        data: {
+          tenantId: connection.tenantId,
+          connectionId: connection.id,
+          customerId,
+          customerName,
+          status: 'OPEN',
+          lastMessageAt: new Date(),
+        },
+      });
+      await this.notify(
+        connection.tenantId,
+        'محادثة جديدة',
+        `رسالة تيليغرام جديدة من ${customerName}`,
+        'message',
+      );
+    } else {
+      conversation = await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { lastMessageAt: new Date() },
+      });
+    }
+
+    await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        direction: 'INBOUND',
+        content: messageText,
+        messageType: 'TEXT',
+        metaData: JSON.stringify(msg),
+      },
+    });
+
+    await this.flowEngine?.processEvent({
+      tenantId: connection.tenantId,
+      connection,
+      conversationId: conversation.id,
+      customerId,
+      text: messageText,
+      eventType: 'MESSAGE',
+    });
+  }
+
   async processWhatsAppMessage(value: any) {
     // If it's a status update, handle/skip appropriately
     if (value.statuses && value.statuses.length > 0) {

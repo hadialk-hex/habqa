@@ -9,6 +9,7 @@ import {
   sendTypingIndicator,
   sendWhatsAppMessage as sendWhatsAppMsg,
 } from '../common/graph-api-client';
+import { telegramRequest } from '../common/telegram-api';
 
 // Runtime for the visual flow builder. Webhooks call processEvent() when a
 // message / comment / new subscriber arrives; the engine matches the event
@@ -179,6 +180,14 @@ export class FlowEngineService {
 
     const sendDm = async (text: string): Promise<boolean> => {
       if (!token) return false;
+
+      if (ctx.connection.platform === 'TELEGRAM') {
+        const result = await telegramRequest(token, 'sendMessage', {
+          chat_id: ctx.customerId,
+          text,
+        });
+        return result.ok;
+      }
 
       if (ctx.connection.platform === 'WHATSAPP') {
         const result = await sendWhatsAppMsg(

@@ -16,6 +16,7 @@ import { getPlanLimits } from '../common/plan-limits';
 import { PlatformSettingsService } from '../settings/platform-settings.service';
 import { GRAPH_API_BASE } from '../common/graph-api';
 import { publishInstagramMedia } from '../common/graph-api-client';
+import { telegramRequest, telegramWebhookSecret } from '../common/telegram-api';
 
 const ALGORITHM = 'aes-256-cbc';
 const IV_LENGTH = 16;
@@ -451,6 +452,58 @@ export class ChannelsService {
         error.message || 'Facebook Graph API request failed',
       );
     }
+  }
+
+  // Connects a tenant's own Telegram bot: validates the token via getMe,
+  // stores the connection (token encrypted like every channel), and points
+  // the bot's webhook at our per-connection endpoint with a derived secret.
+  async connectTelegram(tenantId: string, botToken: string) {
+    const token = (botToken || '').trim();
+    if (!/^\d+:[A-Za-z0-9_-]{30,}$/.test(token)) {
+      throw new BadRequestException(
+        'صيغة توكن البوت غير صحيحة. انسخه كما هو من @BotFather.',
+      );
+    }
+
+    const me = await telegramRequest<{
+      id: number;
+      username: string;
+      first_name: string;
+    }>(token, 'getMe');
+    if (!me.ok || !me.result) {
+      throw new BadRequestException(
+        `تيليغرام رفض التوكن: ${me.description || 'غير صالح'}`,
+      );
+    }
+
+    const conn = await this.upsertConnection(tenantId, {
+      platform: 'TELEGRAM',
+      platformId: String(me.result.id),
+      name: `@${me.result.username || me.result.first_name}`,
+      accessToken: token,
+    });
+
+    // Point the bot's webhook at us. FRONTEND_URL is the public app origin;
+    // the Next proxy forwards /webhooks/* to this backend.
+    const publicBase = process.env.PUBLIC_URL || process.env.FRONTEND_URL;
+    if (publicBase) {
+      const hook = await telegramRequest(token, 'setWebhook', {
+        url: `${publicBase}/webhooks/telegram/${conn.id}`,
+        secret_token: telegramWebhookSecret(conn.id),
+        allowed_updates: ['message'],
+      });
+      if (!hook.ok) {
+        this.logger.warn(
+          `Telegram setWebhook failed for ${conn.id}: ${hook.description}`,
+        );
+      }
+    } else {
+      this.logger.warn(
+        'FRONTEND_URL/PUBLIC_URL not set — Telegram webhook not registered.',
+      );
+    }
+
+    return { connected: true, username: `@${me.result.username}` };
   }
 
   // Diagnostic: is our app actually subscribed to this page's webhook events?

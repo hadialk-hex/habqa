@@ -14,6 +14,7 @@ import {
 import { WebhooksService } from './webhooks.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PlatformSettingsService } from '../settings/platform-settings.service';
+import { telegramWebhookSecret } from '../common/telegram-api';
 import type { Response } from 'express';
 import * as crypto from 'crypto';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -45,6 +46,29 @@ export class WebhooksController {
     } catch {
       return res.status(HttpStatus.FORBIDDEN).send('Verification Failed');
     }
+  }
+
+  // Telegram pushes updates here (one endpoint per connection). Auth: the
+  // secret_token we registered with setWebhook is echoed back by Telegram
+  // in this header on every request.
+  @Post('telegram/:connectionId')
+  async handleTelegramUpdate(
+    @Headers('x-telegram-bot-api-secret-token') secret: string,
+    @Body() update: any,
+    @Res() res: Response,
+    @Req() req: any,
+  ) {
+    const connectionId = req.params.connectionId as string;
+    if (!secret || secret !== telegramWebhookSecret(connectionId)) {
+      throw new UnauthorizedException('Invalid Telegram webhook secret');
+    }
+    try {
+      await this.webhooksService.processTelegramUpdate(connectionId, update);
+    } catch (error) {
+      console.error('Error processing Telegram update:', error);
+    }
+    // Always 200 so Telegram doesn't endlessly retry a poison update
+    return res.status(HttpStatus.OK).send('OK');
   }
 
   @Post()

@@ -111,6 +111,14 @@ function ChannelsContent() {
       gradientBg: "from-[#25D366]/20 via-[#25D366]/5 to-transparent",
       label: t("channelsPage.whatsappLabel"),
     },
+    TELEGRAM: {
+      icon: Send,
+      color: "text-[#229ED9]",
+      bg: "bg-[#229ED9]/10",
+      gradient: "from-[#229ED9] to-[#1b7fb0]",
+      gradientBg: "from-[#229ED9]/20 via-[#229ED9]/5 to-transparent",
+      label: t("channelsPage.telegramLabel"),
+    },
   }
 
   const fbFeatures: FeatureBadge[] = [
@@ -173,6 +181,30 @@ function ChannelsContent() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch { /* clipboard unavailable */ }
+  }
+
+  // Telegram: connect the tenant's own bot by pasting its @BotFather token
+  const [tgDialog, setTgDialog] = useState(false)
+  const [tgToken, setTgToken] = useState("")
+  const [tgConnecting, setTgConnecting] = useState(false)
+  const [tgError, setTgError] = useState<string | null>(null)
+
+  const handleConnectTelegram = async () => {
+    if (!tgToken.trim()) return
+    setTgConnecting(true)
+    setTgError(null)
+    try {
+      const res = await api.post("/channels/telegram/connect", { botToken: tgToken.trim() })
+      setTgDialog(false)
+      setTgToken("")
+      setBanner({ type: "success", text: t("channelsPage.telegramConnectSuccess", { username: res.data.username || "" }) })
+      fetchChannels()
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } }
+      setTgError(axiosErr.response?.data?.message || t("channelsPage.telegramConnectFailed"))
+    } finally {
+      setTgConnecting(false)
+    }
   }
 
   const checkWebhook = async (channelId: string) => {
@@ -330,6 +362,7 @@ function ChannelsContent() {
   const fbChannels = channels.filter(c => c.platform === "FACEBOOK_PAGE")
   const igChannels = channels.filter(c => c.platform === "INSTAGRAM")
   const waChannels = channels.filter(c => c.platform === "WHATSAPP")
+  const tgChannels = channels.filter(c => c.platform === "TELEGRAM")
 
   return (
     <div className="flex flex-col gap-8 animate-fade-in">
@@ -549,6 +582,55 @@ function ChannelsContent() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* ───────── Telegram Connect Card ───────── */}
+            <Card className="relative overflow-hidden border-none shadow-lg hover:shadow-xl transition-all duration-300 group">
+              <div className={`absolute inset-0 bg-gradient-to-br ${platformConfig.TELEGRAM.gradientBg} opacity-50`} />
+              <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-l ${platformConfig.TELEGRAM.gradient}`} />
+              <CardContent className="relative p-5 sm:p-6 flex flex-col h-full">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-14 h-14 rounded-2xl bg-[#229ED9]/10 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shrink-0">
+                    <Send className="w-7 h-7 text-[#229ED9]" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-lg">{t("channelsPage.telegramCardTitle")}</h3>
+                    <p className="text-sm text-muted-foreground truncate">{t("channelsPage.telegramCardSubtitle")}</p>
+                  </div>
+                </div>
+
+                <FeatureBadgeList
+                  features={[
+                    { icon: MessageCircle, label: t("channelsPage.featureAutoReply") },
+                    { icon: Zap, label: t("channelsPage.featureFlows") },
+                  ]}
+                  accentColor="bg-[#229ED9]/5 text-[#229ED9] border-[#229ED9]/20"
+                />
+
+                <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+                  {t("channelsPage.telegramCardDesc")}
+                </p>
+
+                <div className="mt-auto">
+                  {tgChannels.length > 0 && (
+                    <div className="mb-4 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
+                      <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 font-bold">
+                        <CheckCircle2 className="w-4 h-4" />
+                        {t("channelsPage.botsConnected", { count: tgChannels.length })}
+                      </div>
+                    </div>
+                  )}
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2 rounded-xl h-12 font-bold border-[#229ED9]/30 text-[#229ED9] hover:bg-[#229ED9]/10 transition-all hover:shadow-lg hover:shadow-[#229ED9]/10"
+                    onClick={() => { setTgDialog(true); setTgError(null) }}
+                  >
+                    <Send className="w-5 h-5" />
+                    {tgChannels.length > 0 ? t("channelsPage.connectAnotherBot") : t("channelsPage.connectTelegramBot")}
+                    <ArrowLeft className="w-4 h-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Connected Channels List */}
@@ -698,6 +780,46 @@ function ChannelsContent() {
           )}
         </>
       )}
+
+      {/* Telegram bot connect */}
+      <Dialog open={tgDialog} onOpenChange={(open) => { if (!open) { setTgDialog(false); setTgError(null) } }}>
+        <DialogContent className="sm:max-w-[460px]" dir={dir}>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black flex items-center gap-3">
+              <div className="p-2 bg-[#229ED9]/10 rounded-xl">
+                <Send className="w-5 h-5 text-[#229ED9]" />
+              </div>
+              {t("channelsPage.telegramDialogTitle")}
+            </DialogTitle>
+            <DialogDescription className="leading-relaxed pt-1">
+              {t("channelsPage.telegramDialogDesc")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-1">
+            <ol className="text-sm text-muted-foreground leading-relaxed list-decimal pr-5 space-y-1.5">
+              <li>{t("channelsPage.telegramStep1")}</li>
+              <li>{t("channelsPage.telegramStep2")}</li>
+              <li>{t("channelsPage.telegramStep3")}</li>
+            </ol>
+            <Input
+              value={tgToken}
+              onChange={e => setTgToken(e.target.value)}
+              placeholder="123456789:AAH6k9dEXAMPLEtoken_from_BotFather"
+              className="rounded-xl h-11 font-mono text-sm"
+              dir="ltr"
+            />
+            {tgError && <p className="text-xs font-bold text-destructive">{tgError}</p>}
+            <Button
+              className="rounded-xl gap-2 h-11 font-bold bg-[#229ED9] hover:bg-[#1b7fb0] text-white shadow-lg shadow-[#229ED9]/20"
+              disabled={tgConnecting || !tgToken.trim()}
+              onClick={handleConnectTelegram}
+            >
+              {tgConnecting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {t("channelsPage.telegramConnectBtn")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Growth tool: m.me link + QR */}
       <Dialog open={!!growthTarget} onOpenChange={(open) => !open && setGrowthTarget(null)}>

@@ -33,6 +33,7 @@ enum PlatformType {
   FACEBOOK_PAGE
   INSTAGRAM
   WHATSAPP
+  TELEGRAM
 }
 
 enum TriggerType {

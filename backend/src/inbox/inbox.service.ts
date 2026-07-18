@@ -9,6 +9,7 @@ import {
   graphApiRequest,
   sendWhatsAppMessage,
 } from '../common/graph-api-client';
+import { telegramRequest } from '../common/telegram-api';
 
 @Injectable()
 export class InboxService {
@@ -127,7 +128,15 @@ export class InboxService {
       throw new Error('Revoked token');
     }
 
-    if (connection.platform === 'WHATSAPP') {
+    if (connection.platform === 'TELEGRAM') {
+      const res = await telegramRequest(token, 'sendMessage', {
+        chat_id: customerId,
+        text: content,
+      });
+      if (!res.ok) {
+        throw new Error(`Telegram API error: ${res.description}`);
+      }
+    } else if (connection.platform === 'WHATSAPP') {
       const res = await sendWhatsAppMessage(
         connection.platformId,
         customerId,

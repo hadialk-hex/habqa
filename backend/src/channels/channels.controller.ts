@@ -205,6 +205,23 @@ export class ChannelsController {
     return this.channelsService.getConnection(req.user.tenantId, id);
   }
 
+  // Telegram: tenant pastes their bot token (from @BotFather); we validate,
+  // store it encrypted, and register the webhook automatically.
+  @UseGuards(JwtAuthGuard)
+  @Post('telegram/connect')
+  async connectTelegram(
+    @Request() req: any,
+    @Body() dto: { botToken: string },
+  ) {
+    if (!dto?.botToken || dto.botToken.trim() === '') {
+      throw new BadRequestException('توكن البوت مطلوب');
+    }
+    return this.channelsService.connectTelegram(
+      req.user.tenantId,
+      dto.botToken,
+    );
+  }
+
   // Webhook diagnostics: shows whether the page is actually subscribed to the
   // app (with the "messages" field) — the reason messages do/don't arrive.
   @UseGuards(JwtAuthGuard)

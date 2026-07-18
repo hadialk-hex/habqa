@@ -365,6 +365,8 @@ export default function InboxPage() {
         return { name: t("inboxPage.platformFacebook"), icon: Globe, color: "text-[#1877F2]", bg: "bg-[#1877F2]/10" }
       case 'INSTAGRAM':
         return { name: t("inboxPage.platformInstagram"), icon: Camera, color: "text-[#E1306C]", bg: "bg-[#E1306C]/10" }
+      case 'TELEGRAM':
+        return { name: t("inboxPage.platformTelegram"), icon: Send, color: "text-[#229ED9]", bg: "bg-[#229ED9]/10" }
       default:
         return { name: platform, icon: User, color: "text-primary", bg: "bg-primary/10" }
     }
