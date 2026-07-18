@@ -1,11 +1,23 @@
 import {
   CanActivate,
   ExecutionContext,
+  HttpException,
+  HttpStatus,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+
+// Per-API-key request budget, independent of the app-wide per-IP throttle.
+// Without this, the only rate limit on /public/v1 is per source IP — a
+// leaked key has no independent quota/kill-switch beyond outright revoking
+// it, and integrations sharing an egress IP (office NAT, same host) throttle
+// each other. In-memory fixed window: fine for a single backend instance;
+// move to Redis if this ever runs as more than one process.
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 60;
+const requestCounts = new Map<string, { count: number; windowStart: number }>();
 
 // Authenticates public-API requests by tenant API key (x-api-key header or
 // Authorization: Bearer hq_live_…). Only the SHA-256 hash is ever stored or
@@ -34,6 +46,20 @@ export class ApiKeyGuard implements CanActivate {
     });
     if (!apiKey || apiKey.tenant.isSuspended) {
       throw new UnauthorizedException('Invalid API key');
+    }
+
+    const now = Date.now();
+    const bucket = requestCounts.get(apiKey.id);
+    if (!bucket || now - bucket.windowStart >= RATE_LIMIT_WINDOW_MS) {
+      requestCounts.set(apiKey.id, { count: 1, windowStart: now });
+    } else {
+      bucket.count++;
+      if (bucket.count > RATE_LIMIT_MAX_REQUESTS) {
+        throw new HttpException(
+          'Rate limit exceeded for this API key',
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
     }
 
     req.apiTenantId = apiKey.tenant.id;

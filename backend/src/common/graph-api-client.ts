@@ -69,6 +69,13 @@ export interface GraphRequestOptions {
   context?: string;
   /** Max retry attempts for transient errors (default 2). */
   maxRetries?: number;
+  /**
+   * Per-attempt timeout in ms (default 15s). A stalled Graph connection
+   * (not an HTTP error — just a connection that never resolves) would
+   * otherwise hang indefinitely, which in a webhook-processing request can
+   * block past Meta's ~20s response window and delay the 200 OK back to it.
+   */
+  timeoutMs?: number;
 }
 
 export interface GraphResponse<T = any> {
@@ -102,11 +109,14 @@ export async function graphApiRequest<T = any>(
     token,
     context = 'graphApiRequest',
     maxRetries = 2,
+    timeoutMs = 15_000,
   } = options;
 
   const url = path.startsWith('http') ? path : `${GRAPH_API_BASE}${path}`;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const abortController = new AbortController();
+    const timeoutTimer = setTimeout(() => abortController.abort(), timeoutMs);
     try {
       const fetchOptions: RequestInit = {
         method,
@@ -119,6 +129,7 @@ export async function graphApiRequest<T = any>(
             ? body
             : JSON.stringify(body)
           : undefined,
+        signal: abortController.signal,
       };
 
       const response = await fetch(url, fetchOptions);
@@ -194,14 +205,17 @@ export async function graphApiRequest<T = any>(
 
       return { ok: false, data: null, error: null, status: response.status };
     } catch (networkError: any) {
+      const isTimeout = networkError.name === 'AbortError';
       logger.error(
-        `[${context}] Network error (attempt ${attempt + 1}/${maxRetries + 1}): ${networkError.message}`,
+        `[${context}] ${isTimeout ? `Timed out after ${timeoutMs}ms` : 'Network error'} (attempt ${attempt + 1}/${maxRetries + 1}): ${networkError.message}`,
       );
       if (attempt < maxRetries) {
         await delay(Math.pow(2, attempt) * 1_000);
         continue;
       }
       return { ok: false, data: null, error: null, status: 0 };
+    } finally {
+      clearTimeout(timeoutTimer);
     }
   }
 

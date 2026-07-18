@@ -8,6 +8,7 @@ import {
   Req,
   Headers,
   HttpStatus,
+  Logger,
   UnauthorizedException,
   BadRequestException,
 } from '@nestjs/common';
@@ -23,6 +24,8 @@ import { Optional } from '@nestjs/common';
 @SkipThrottle()
 @Controller('webhooks')
 export class WebhooksController {
+  private readonly logger = new Logger(WebhooksController.name);
+
   constructor(
     private readonly webhooksService: WebhooksService,
     private readonly prisma: PrismaService,
@@ -59,13 +62,22 @@ export class WebhooksController {
     @Req() req: any,
   ) {
     const connectionId = req.params.connectionId as string;
-    if (!secret || secret !== telegramWebhookSecret(connectionId)) {
+    const expected = telegramWebhookSecret(connectionId);
+    let isMatch = false;
+    try {
+      const a = Buffer.from(secret || '');
+      const b = Buffer.from(expected);
+      isMatch = a.length === b.length && crypto.timingSafeEqual(a, b);
+    } catch {
+      isMatch = false;
+    }
+    if (!isMatch) {
       throw new UnauthorizedException('Invalid Telegram webhook secret');
     }
     try {
       await this.webhooksService.processTelegramUpdate(connectionId, update);
-    } catch (error) {
-      console.error('Error processing Telegram update:', error);
+    } catch (error: any) {
+      this.logger.error(`Error processing Telegram update: ${error.message}`);
     }
     // Always 200 so Telegram doesn't endlessly retry a poison update
     return res.status(HttpStatus.OK).send('OK');
@@ -146,8 +158,8 @@ export class WebhooksController {
     // Process event synchronously to ensure DB writes commit before response
     try {
       await this.webhooksService.handleIncomingEvent(body);
-    } catch (error) {
-      console.error('Error processing webhook:', error);
+    } catch (error: any) {
+      this.logger.error(`Error processing webhook: ${error.message}`);
     }
 
     // Return 200 OK to Meta

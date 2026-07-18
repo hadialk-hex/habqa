@@ -1016,6 +1016,7 @@ export const en: Dictionary = {
     insertedTestImageToast: "Test image link inserted into the input field",
     insertTestQuickReply: "💬 Insert test quick reply",
     insertedTestQuickReplyToast: "Test quick reply template inserted",
+    testQuickReplyContent: "Yes, my pleasure!",
     attachRandomFile: "📎 Attach random file",
     attachedTestFileToast: "Test file attached successfully",
     messageInputPlaceholder: "Type a message...",

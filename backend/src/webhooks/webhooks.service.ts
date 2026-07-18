@@ -46,6 +46,65 @@ export class WebhooksService {
     }
   }
 
+  // Captures a Subscriber row for a contact on first inbound contact —
+  // previously only WhatsApp did this, so Messenger/Instagram/Telegram
+  // contacts were invisible to broadcast segmentation and tag-based flow
+  // lookups even though they were actively messaging the business. Mirrors
+  // the WhatsApp plan-limit behavior: over cap, the message still gets
+  // processed, the contact just isn't stored.
+  private async upsertContactSubscriber(
+    connection: any,
+    externalId: string,
+    name: string,
+    platformLabel: string,
+  ) {
+    const existing = await this.prisma.subscriber.findFirst({
+      where: {
+        tenantId: connection.tenantId,
+        connectionId: connection.id,
+        externalId,
+      },
+      select: { id: true },
+    });
+    if (existing) return;
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: connection.tenantId },
+    });
+    const subscriberLimit = getPlanLimits(
+      tenant?.plan || 'STARTER',
+    ).maxSubscribers;
+    const subscriberCount =
+      subscriberLimit === -1
+        ? 0
+        : await this.prisma.subscriber.count({
+            where: { tenantId: connection.tenantId },
+          });
+    if (subscriberLimit !== -1 && subscriberCount >= subscriberLimit) {
+      this.logger.warn(
+        `Tenant ${connection.tenantId} hit the subscriber limit (${subscriberLimit}) — contact not stored.`,
+      );
+      return;
+    }
+
+    await this.prisma.subscriber.create({
+      data: {
+        tenantId: connection.tenantId,
+        connectionId: connection.id,
+        externalId,
+        name,
+        tags: [],
+        platform: connection.platform,
+      },
+    });
+    await this.notify(
+      connection.tenantId,
+      'مشترك جديد',
+      `انضم ${name} عبر ${platformLabel}`,
+      'subscriber',
+    );
+  }
+
   async verifyWebhook(
     mode: string,
     token: string,
@@ -66,6 +125,11 @@ export class WebhooksService {
   }
 
   async handleIncomingEvent(body: any) {
+    // Meta batches multiple entries (and multiple messaging/changes items
+    // per entry) into a single webhook POST. Every processing call below is
+    // individually guarded so one malformed/unexpected item can't abort the
+    // rest of the batch — without this, a single bad message silently drops
+    // every other message that happened to arrive in the same POST.
     if (body.object === 'page' || body.object === 'instagram') {
       for (const entry of body.entry) {
         // Real Messenger/Instagram DMs arrive in entry.messaging[] (the
@@ -73,41 +137,59 @@ export class WebhooksService {
         // one or the other, so both must be handled or live messages are
         // silently dropped.
         for (const event of entry.messaging ?? []) {
-          // is_echo = a message the page itself sent (incl. our auto-replies);
-          // processing it would create bogus inbound messages and reply loops.
-          if (event?.message && !event.message.is_echo) {
-            await this.processPrivateDM(event, body.object, entry.id);
-          } else if (event?.postback) {
-            // messaging_postbacks (button presses) carry no message object —
-            // synthesize one so the press lands in the inbox and its payload
-            // can trigger keyword rules/flows like typed text would.
-            await this.processPrivateDM(
-              {
-                sender: event.sender,
-                recipient: event.recipient,
-                message: {
-                  mid: `postback_${event.sender?.id}_${event.timestamp}`,
-                  text: event.postback.payload || event.postback.title || '',
+          try {
+            // is_echo = a message the page itself sent (incl. our auto-replies);
+            // processing it would create bogus inbound messages and reply loops.
+            if (event?.message && !event.message.is_echo) {
+              await this.processPrivateDM(event, body.object, entry.id);
+            } else if (event?.postback) {
+              // messaging_postbacks (button presses) carry no message object —
+              // synthesize one so the press lands in the inbox and its payload
+              // can trigger keyword rules/flows like typed text would.
+              await this.processPrivateDM(
+                {
+                  sender: event.sender,
+                  recipient: event.recipient,
+                  message: {
+                    mid: `postback_${event.sender?.id}_${event.timestamp}`,
+                    text: event.postback.payload || event.postback.title || '',
+                  },
                 },
-              },
-              body.object,
-              entry.id,
+                body.object,
+                entry.id,
+              );
+            }
+          } catch (error: any) {
+            this.logger.error(
+              `Failed to process messaging event for entry ${entry.id}: ${error.message}`,
             );
           }
         }
         for (const change of entry.changes ?? []) {
-          if (change.field === 'feed' || change.field === 'comments') {
-            await this.processComment(change.value, body.object, entry.id);
-          } else if (change.field === 'messages') {
-            await this.processPrivateDM(change.value, body.object, entry.id);
+          try {
+            if (change.field === 'feed' || change.field === 'comments') {
+              await this.processComment(change.value, body.object, entry.id);
+            } else if (change.field === 'messages') {
+              await this.processPrivateDM(change.value, body.object, entry.id);
+            }
+          } catch (error: any) {
+            this.logger.error(
+              `Failed to process change (${change.field}) for entry ${entry.id}: ${error.message}`,
+            );
           }
         }
       }
     } else if (body.object === 'whatsapp_business_account') {
       for (const entry of body.entry) {
         for (const change of entry.changes ?? []) {
-          if (change.field === 'messages') {
-            await this.processWhatsAppMessage(change.value);
+          try {
+            if (change.field === 'messages') {
+              await this.processWhatsAppMessage(change.value);
+            }
+          } catch (error: any) {
+            this.logger.error(
+              `Failed to process WhatsApp change for entry ${entry.id}: ${error.message}`,
+            );
           }
         }
       }
@@ -190,6 +272,12 @@ export class WebhooksService {
         'محادثة جديدة',
         `رسالة تيليغرام جديدة من ${customerName}`,
         'message',
+      );
+      await this.upsertContactSubscriber(
+        connection,
+        customerId,
+        customerName,
+        'تيليغرام',
       );
     } else {
       conversation = await this.prisma.conversation.update({
@@ -372,6 +460,8 @@ export class WebhooksService {
         subscriber = await this.prisma.subscriber.create({
           data: {
             tenantId: connection.tenantId,
+            connectionId: connection.id,
+            externalId: senderId,
             name: senderName,
             phone: senderId,
             tags: [],
@@ -809,6 +899,20 @@ export class WebhooksService {
       return false;
     }
 
+    if (await this.hasRecentAutomatedTriggerDm(connection.id, senderId)) {
+      await this.prisma.auditLog.create({
+        data: {
+          tenantId: connection.tenantId,
+          action: 'RULE_SKIPPED_24H_DM_LIMIT',
+          entityType: 'AutoReplyRule',
+          entityId: rule.id,
+          newValues: JSON.stringify({ ruleId: rule.id, triggerType, senderId }),
+        },
+      });
+      // Treat as handled so the caller doesn't fall back to a second DM path.
+      return true;
+    }
+
     const replyText = this.pickVariant(rule.privateText || rule.replyText);
     if (!replyText) return false;
 
@@ -998,6 +1102,12 @@ export class WebhooksService {
         `رسالة خاصة جديدة من ${customerName}`,
         'message',
       );
+      await this.upsertContactSubscriber(
+        connection,
+        senderId,
+        customerName,
+        platform === 'page' ? 'ماسنجر' : 'انستغرام',
+      );
     } else {
       // Backfill the real name for conversations created before the profile
       // lookup existed (they show as the "Customer" placeholder).
@@ -1107,6 +1217,34 @@ export class WebhooksService {
     return usedThisMonth < limits.maxRepliesPerMonth;
   }
 
+  // Meta policy (Messenger Platform, effective 2026): at most one automated
+  // private message per user per rolling 24h period may originate from a
+  // comment or Story trigger. Re-sending on every new comment/story from the
+  // same person within the window risks the connection being rate-limited.
+  // Scope: comment/story-triggered DMs only — manual agent replies and
+  // direct-message-triggered flows are a different, user-initiated context
+  // and aren't covered by this rule.
+  private async hasRecentAutomatedTriggerDm(
+    connectionId: string,
+    customerId: string,
+  ): Promise<boolean> {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { connectionId_customerId: { connectionId, customerId } },
+      select: { id: true },
+    });
+    if (!conversation) return false;
+    const recent = await this.prisma.message.findFirst({
+      where: {
+        conversationId: conversation.id,
+        direction: 'OUTBOUND',
+        sentByName: 'الرد الآلي',
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+      select: { id: true },
+    });
+    return !!recent;
+  }
+
   // Rules can define several reply variants separated by "|||".
   // A random variant is picked per reply so Facebook doesn't see the
   // exact same text repeated hundreds of times (spam signal).
@@ -1142,6 +1280,23 @@ export class WebhooksService {
         },
       });
       return;
+    }
+
+    // Meta's comment/Story-triggered-DM limit doesn't apply to WhatsApp —
+    // see hasRecentAutomatedTriggerDm for the policy this enforces.
+    const canSendAutomatedDm =
+      connection.platform === 'WHATSAPP' ||
+      !(await this.hasRecentAutomatedTriggerDm(connection.id, senderId));
+    if (!canSendAutomatedDm) {
+      await this.prisma.auditLog.create({
+        data: {
+          tenantId: connection.tenantId,
+          action: 'RULE_SKIPPED_24H_DM_LIMIT',
+          entityType: 'AutoReplyRule',
+          entityId: rule.id,
+          newValues: JSON.stringify({ ruleId: rule.id, commentId, senderId }),
+        },
+      });
     }
 
     // Increment triggerCount and update lastTriggeredAt upon match.
@@ -1254,9 +1409,9 @@ export class WebhooksService {
       };
 
       // Send typing indicator before the first sequential message
-      await showTypingOnce();
+      if (canSendAutomatedDm) await showTypingOnce();
 
-      for (let i = 0; i < replyMessages.length; i++) {
+      for (let i = 0; canSendAutomatedDm && i < replyMessages.length; i++) {
         const msg = replyMessages[i];
 
         if (msg.type === 'TEXT') {

@@ -1014,6 +1014,7 @@ export const ar = {
     insertedTestImageToast: "تم إدراج رابط صورة تجريبية في حقل الإدخال",
     insertTestQuickReply: "💬 إدراج رد سريع تجريبي",
     insertedTestQuickReplyToast: "تم إدراج قالب رد سريع تجريبي",
+    testQuickReplyContent: "نعم، بكل سرور!",
     attachRandomFile: "📎 إرفاق ملف عشوائي",
     attachedTestFileToast: "تم إرفاق ملف تجريبي بنجاح",
     messageInputPlaceholder: "اكتب رسالة...",

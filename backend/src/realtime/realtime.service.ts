@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from './realtime.gateway';
+import { assertPublicHttpUrl } from '../common/ssrf-guard';
 
 // Bridges the database to the real-time gateway with a single, central hook.
 // A Prisma middleware fires after every Message.create — regardless of which
@@ -69,6 +70,19 @@ export class RealtimeService implements OnModuleInit {
       });
       if (!tenant?.outboundWebhookUrl || !tenant.outboundWebhookSecret) return;
 
+      // Re-validated on every dispatch, not just at save time: DNS for the
+      // tenant's hostname can change between configuration and delivery
+      // (rebinding), and this hook fires on a hot path so the cost of an
+      // extra lookup is worth closing that window.
+      try {
+        await assertPublicHttpUrl(tenant.outboundWebhookUrl);
+      } catch {
+        this.logger.warn(
+          `Outbound webhook for tenant ${tenantId} now resolves to a disallowed address — skipping delivery`,
+        );
+        return;
+      }
+
       const body = JSON.stringify({
         event: 'message.received',
         timestamp: new Date().toISOString(),
@@ -95,7 +109,10 @@ export class RealtimeService implements OnModuleInit {
 
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 5000);
-      await fetch(tenant.outboundWebhookUrl, {
+      // redirect: 'manual' — a 3xx response is treated as failure rather
+      // than followed, so a validated public URL can't hop to an internal
+      // one via redirect after the check above already passed.
+      const res = await fetch(tenant.outboundWebhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -103,7 +120,16 @@ export class RealtimeService implements OnModuleInit {
         },
         body,
         signal: controller.signal,
+        redirect: 'manual',
       }).finally(() => clearTimeout(timer));
+      if (
+        res.type === 'opaqueredirect' ||
+        (res.status >= 300 && res.status < 400)
+      ) {
+        this.logger.warn(
+          `Outbound webhook for tenant ${tenantId} returned a redirect — not followed`,
+        );
+      }
     } catch (error: any) {
       this.logger.warn(`Outbound webhook delivery failed: ${error.message}`);
     }

@@ -52,8 +52,15 @@ export async function telegramRequest<T = any>(
 // Deterministic per-connection webhook secret (Telegram echoes it back in
 // the X-Telegram-Bot-Api-Secret-Token header) — derived from the server's
 // ENCRYPTION_KEY so nothing extra needs storing.
+//
+// No fallback: silently deriving this from a guessable default string
+// ('hubqa') if the env var is missing would let anyone compute the secret
+// and forge Telegram webhook calls. Fail loudly at startup instead.
 export function telegramWebhookSecret(connectionId: string): string {
-  const key = process.env.ENCRYPTION_KEY || 'hubqa';
+  const key = process.env.ENCRYPTION_KEY;
+  if (!key) {
+    throw new Error('ENCRYPTION_KEY environment variable is not defined');
+  }
   return crypto
     .createHmac('sha256', key)
     .update(`telegram-webhook:${connectionId}`)

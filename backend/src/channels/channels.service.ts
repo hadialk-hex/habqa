@@ -15,7 +15,10 @@ import { ConfigService } from '@nestjs/config';
 import { getPlanLimits } from '../common/plan-limits';
 import { PlatformSettingsService } from '../settings/platform-settings.service';
 import { GRAPH_API_BASE } from '../common/graph-api';
-import { publishInstagramMedia } from '../common/graph-api-client';
+import {
+  graphApiRequest,
+  publishInstagramMedia,
+} from '../common/graph-api-client';
 import { telegramRequest, telegramWebhookSecret } from '../common/telegram-api';
 
 const ALGORITHM = 'aes-256-cbc';
@@ -36,6 +39,22 @@ function encrypt(text: string | null | undefined): string | null | undefined {
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
   return `${iv.toString('hex')}:${encrypted}`;
+}
+
+// OAuth token-exchange calls (Meta's own spec — GET/POST with query/form
+// params, not the Bearer-header JSON shape graphApiRequest assumes) still
+// use raw fetch, but must not hang forever: a stalled response here blocks
+// an interactive OAuth callback with no feedback to the user.
+function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs = 15_000,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(timer),
+  );
 }
 
 function decrypt(
@@ -244,7 +263,7 @@ export class ChannelsService {
 
     const tokenUrl = `${GRAPH_API_BASE}/oauth/access_token?client_id=${clientId}&redirect_uri=${redirectUri}&client_secret=${clientSecret}&code=${code}`;
 
-    const tokenResponse = await fetch(tokenUrl);
+    const tokenResponse = await fetchWithTimeout(tokenUrl);
     if (!tokenResponse.ok) {
       throw new BadRequestException('Failed to exchange Facebook auth code');
     }
@@ -258,7 +277,7 @@ export class ChannelsService {
     let longLivedUserToken = userAccessToken;
     try {
       const llUrl = `${GRAPH_API_BASE}/oauth/access_token?grant_type=fb_exchange_token&client_id=${clientId}&client_secret=${clientSecret}&fb_exchange_token=${userAccessToken}`;
-      const llResponse = await fetch(llUrl);
+      const llResponse = await fetchWithTimeout(llUrl);
       if (llResponse.ok) {
         const llData: any = await llResponse.json();
         if (llData.access_token) longLivedUserToken = llData.access_token;
@@ -268,7 +287,7 @@ export class ChannelsService {
     }
 
     const accountsUrl = `${GRAPH_API_BASE}/me/accounts?access_token=${longLivedUserToken}`;
-    const accountsResponse = await fetch(accountsUrl);
+    const accountsResponse = await fetchWithTimeout(accountsUrl);
     if (!accountsResponse.ok) {
       throw new BadRequestException('Failed to fetch Facebook pages');
     }
@@ -293,13 +312,15 @@ export class ChannelsService {
           // "connected but no messages arrive").
           try {
             const subscribeUrl = `${GRAPH_API_BASE}/${page.id}/subscribed_apps`;
-            const subRes = await fetch(subscribeUrl, {
+            const subRes = await fetchWithTimeout(subscribeUrl, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                Authorization: `Bearer ${page.access_token}`,
+              },
               body: new URLSearchParams({
                 subscribed_fields:
                   'messages,messaging_postbacks,feed,message_reactions',
-                access_token: page.access_token,
               }).toString(),
             });
             const subData: any = await subRes.json().catch(() => ({}));
@@ -360,7 +381,7 @@ export class ChannelsService {
       redirect_uri: redirectUri,
       code,
     });
-    const tokenResponse = await fetch(
+    const tokenResponse = await fetchWithTimeout(
       'https://api.instagram.com/oauth/access_token',
       { method: 'POST', body: form },
     );
@@ -375,7 +396,7 @@ export class ChannelsService {
 
     // 2) Upgrade to a 60-day long-lived token (falls back to the short one)
     let accessToken = shortToken;
-    const longResponse = await fetch(
+    const longResponse = await fetchWithTimeout(
       `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${encodeURIComponent(clientSecret)}&access_token=${encodeURIComponent(shortToken)}`,
     );
     if (longResponse.ok) {
@@ -384,7 +405,7 @@ export class ChannelsService {
     }
 
     // 3) Fetch the professional account's id + username
-    const meResponse = await fetch(
+    const meResponse = await fetchWithTimeout(
       `https://graph.instagram.com/me?fields=user_id,username&access_token=${encodeURIComponent(accessToken)}`,
     );
     if (!meResponse.ok) {
@@ -429,29 +450,16 @@ export class ChannelsService {
       throw new BadRequestException('Access token is missing');
     }
 
-    const url = `${GRAPH_API_BASE}/${conn.platformId}?fields=name,about,picture,fan_count&access_token=${token}`;
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        let errorData: any = {};
-        try {
-          errorData = await response.json();
-        } catch {
-          // ignore
-        }
-        const message =
-          errorData?.error?.message || 'Facebook Graph API request failed';
-        throw new BadRequestException(message);
-      }
-      return await response.json();
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
+    const res = await graphApiRequest(
+      `/${conn.platformId}?fields=name,about,picture,fan_count`,
+      { method: 'GET', token, context: 'getChannelDetails' },
+    );
+    if (!res.ok) {
       throw new BadRequestException(
-        error.message || 'Facebook Graph API request failed',
+        res.error?.message || 'Facebook Graph API request failed',
       );
     }
+    return res.data;
   }
 
   // Connects a tenant's own Telegram bot: validates the token via getMe,
@@ -528,18 +536,22 @@ export class ChannelsService {
       );
     }
     const token = this.getDecryptedAccessToken(conn.accessToken);
-    const url = `${GRAPH_API_BASE}/${conn.platformId}/subscribed_apps?access_token=${token}`;
-    const response = await fetch(url);
-    const data: any = await response.json().catch(() => ({}));
-    if (!response.ok) {
+    const res = await graphApiRequest(`/${conn.platformId}/subscribed_apps`, {
+      method: 'GET',
+      token,
+      context: 'getWebhookStatus',
+      maxRetries: 0,
+    });
+    if (!res.ok) {
       return {
         subscribed: false,
         hasMessagesField: false,
         error:
-          data?.error?.message ||
+          res.error?.message ||
           'فشل الاستعلام من فيسبوك. قد يكون التوكن منتهي الصلاحية — أعد ربط القناة.',
       };
     }
+    const data: any = res.data;
     const apps: any[] = Array.isArray(data?.data) ? data.data : [];
     const fields: string[] = apps.flatMap((a) =>
       Array.isArray(a?.subscribed_fields) ? a.subscribed_fields : [],
@@ -572,20 +584,32 @@ export class ChannelsService {
       );
     }
     const token = this.getDecryptedAccessToken(conn.accessToken);
-    const response = await fetch(
-      `${GRAPH_API_BASE}/${conn.platformId}/subscribed_apps`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          subscribed_fields:
-            'messages,messaging_postbacks,feed,message_reactions',
-          access_token: token,
-        }).toString(),
-      },
-    );
-    const data: any = await response.json().catch(() => ({}));
-    if (!response.ok || data?.success !== true) {
+    const abortController = new AbortController();
+    const timer = setTimeout(() => abortController.abort(), 15_000);
+    let data: any = {};
+    let ok = false;
+    try {
+      const response = await fetch(
+        `${GRAPH_API_BASE}/${conn.platformId}/subscribed_apps`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            Authorization: `Bearer ${token}`,
+          },
+          body: new URLSearchParams({
+            subscribed_fields:
+              'messages,messaging_postbacks,feed,message_reactions',
+          }).toString(),
+          signal: abortController.signal,
+        },
+      );
+      data = await response.json().catch(() => ({}));
+      ok = response.ok;
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!ok || data?.success !== true) {
       throw new BadRequestException(
         data?.error?.message ||
           'رفض فيسبوك طلب الاشتراك. تأكد من منح صلاحية pages_manage_metadata عند الربط.',
@@ -615,36 +639,31 @@ export class ChannelsService {
     const token = this.getDecryptedAccessToken(conn.accessToken);
     const safeLimit = Math.min(Math.max(Number(limit) || 12, 1), 25);
 
-    let url: string;
+    let path: string;
     if (conn.platform === 'INSTAGRAM') {
       const fields =
         'id,caption,media_type,media_url,thumbnail_url,timestamp,permalink,comments_count';
-      url = `${GRAPH_API_BASE}/${conn.platformId}/media?fields=${fields}&limit=${safeLimit}&access_token=${token}`;
+      path = `/${conn.platformId}/media?fields=${fields}&limit=${safeLimit}`;
     } else {
       const fields =
         'id,message,story,created_time,full_picture,permalink_url,comments.summary(true).limit(0)';
-      url = `${GRAPH_API_BASE}/${conn.platformId}/posts?fields=${fields}&limit=${safeLimit}&access_token=${token}`;
+      path = `/${conn.platformId}/posts?fields=${fields}&limit=${safeLimit}`;
     }
     if (after) {
-      url += `&after=${encodeURIComponent(after)}`;
+      path += `&after=${encodeURIComponent(after)}`;
     }
 
-    let data: any;
-    try {
-      const response = await fetch(url);
-      data = await response.json();
-      if (!response.ok) {
-        const message = data?.error?.message || 'فشل جلب المنشورات من فيسبوك';
-        throw new BadRequestException(message);
-      }
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
+    const res = await graphApiRequest(path, {
+      method: 'GET',
+      token,
+      context: 'getChannelPosts',
+    });
+    if (!res.ok) {
       throw new BadRequestException(
-        error.message || 'فشل جلب المنشورات من فيسبوك',
+        res.error?.message || 'فشل جلب المنشورات من فيسبوك',
       );
     }
+    const data: any = res.data;
 
     const items = Array.isArray(data?.data) ? data.data : [];
     const posts = items.map((item: any) => {
@@ -697,10 +716,19 @@ export class ChannelsService {
     };
   }
 
+  // No fallback secret: a hardcoded default would let anyone forge OAuth
+  // state values (CSRF on the connect flow) whenever APP_SECRET is unset —
+  // fail loudly instead of silently degrading to a guessable key.
+  private getStateSecret(): string {
+    const secret = this.configService.get<string>('APP_SECRET');
+    if (!secret) {
+      throw new Error('APP_SECRET environment variable is not defined');
+    }
+    return secret;
+  }
+
   generateOAuthState(tenantId: string): string {
-    const secret =
-      this.configService.get<string>('APP_SECRET') || 'default-app-secret-key';
-    const hmac = crypto.createHmac('sha256', secret);
+    const hmac = crypto.createHmac('sha256', this.getStateSecret());
     hmac.update(tenantId);
     const sig = hmac.digest('hex');
     return `${tenantId}.${sig}`;
@@ -711,9 +739,7 @@ export class ChannelsService {
     const parts = state.split('.');
     if (parts.length !== 2) return null;
     const [tenantId, sig] = parts;
-    const secret =
-      this.configService.get<string>('APP_SECRET') || 'default-app-secret-key';
-    const hmac = crypto.createHmac('sha256', secret);
+    const hmac = crypto.createHmac('sha256', this.getStateSecret());
     hmac.update(tenantId);
     const expectedSig = hmac.digest('hex');
     try {
@@ -760,7 +786,7 @@ export class ChannelsService {
         // we refresh by calling the token endpoint again
         const refreshUrl = `${GRAPH_API_BASE}/oauth/access_token?grant_type=fb_exchange_token&client_id=${this.configService.get('FACEBOOK_APP_ID')}&client_secret=${this.configService.get('FACEBOOK_APP_SECRET')}&fb_exchange_token=${currentToken}`;
 
-        const response = await fetch(refreshUrl);
+        const response = await fetchWithTimeout(refreshUrl);
         if (response.ok) {
           const data: any = await response.json();
           if (data.access_token && data.access_token !== currentToken) {

@@ -360,6 +360,7 @@ export class DashboardService {
       FACEBOOK_PAGE: 0,
       INSTAGRAM: 0,
       WHATSAPP: 0,
+      TELEGRAM: 0,
     };
     for (const c of conns) {
       dist[c.platform] = (dist[c.platform] || 0) + 1;

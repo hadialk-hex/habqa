@@ -353,6 +353,16 @@ export class FlowEngineService {
 
     for (const execution of due) {
       try {
+        // Atomic claim: the WHERE clause re-checks status: 'PAUSED', so if
+        // another process (or an overlapping cron tick) already claimed
+        // this execution, count comes back 0 and we skip it instead of
+        // running the same steps — and sending the same DM — twice.
+        const claim = await this.prisma.flowExecution.updateMany({
+          where: { id: execution.id, status: 'PAUSED' },
+          data: { status: 'RUNNING', pausedUntil: null },
+        });
+        if (claim.count === 0) continue;
+
         const vars: any = execution.variables || {};
         const connection = await this.prisma.platformConnection.findUnique({
           where: { id: vars.connectionId || '' },
@@ -361,10 +371,6 @@ export class FlowEngineService {
           await this.finishExecution(execution.id, 'FAILED');
           continue;
         }
-        await this.prisma.flowExecution.update({
-          where: { id: execution.id },
-          data: { status: 'RUNNING', pausedUntil: null },
-        });
         await this.runSteps(
           execution.id,
           execution.flow.steps,

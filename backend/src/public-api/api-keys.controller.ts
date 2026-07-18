@@ -14,6 +14,7 @@ import {
 import * as crypto from 'crypto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import { assertPublicHttpUrl } from '../common/ssrf-guard';
 
 // Dashboard-side management of the tenant's public-API credentials and
 // outbound webhook. Key material is returned exactly once at creation.
@@ -98,14 +99,10 @@ export class ApiKeysController {
   async setWebhook(@Request() req: any, @Body() body: { url?: string }) {
     this.assertOwnerOrAdmin(req);
     const url = (body?.url || '').trim();
-    // https required in the real world; plain http allowed only for local dev
-    if (
-      url &&
-      !/^https:\/\/.+/.test(url) &&
-      !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(url)
-    ) {
-      throw new BadRequestException('الرابط يجب أن يبدأ بـ https://');
-    }
+    // Rejects non-https and anything resolving to a private/internal IP —
+    // an unrestricted tenant-supplied fetch target is a classic SSRF vector
+    // (cloud metadata endpoint, internal services, etc).
+    if (url) await assertPublicHttpUrl(url);
     // A fresh signing secret is issued whenever the URL is (re)configured;
     // clearing the URL clears the secret too.
     const secret = url ? crypto.randomBytes(24).toString('hex') : null;

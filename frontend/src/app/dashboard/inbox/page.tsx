@@ -935,7 +935,10 @@ export default function InboxPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        setNewMessage("[رد سريع: نعم، بكل سرور!]")
+                        // "[رد سريع: …]" is the internal quick-reply marker (see
+                        // isQuickReply/getQuickReplyText) — always stripped before
+                        // display, so only the visible content needs to follow locale.
+                        setNewMessage(`[رد سريع: ${t("inboxPage.testQuickReplyContent")}]`)
                         setShowAttachmentMenu(false)
                         showToast(t("inboxPage.insertedTestQuickReplyToast"), "success")
                       }}

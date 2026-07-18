@@ -213,6 +213,7 @@ model PlatformConnection {
   rules         AutoReplyRule[]
   conversations Conversation[]
   campaigns     Campaign[]
+  subscribers   Subscriber[]
 
   createdAt     DateTime           @default(now())
   updatedAt     DateTime           @updatedAt
@@ -493,20 +494,29 @@ model FlowExecutionLog {
 // ----------------------------------------------------------------------------
 
 model Subscriber {
-  id        String        @id @default(uuid())
-  tenantId  String
-  name      String?
-  phone     String?
-  email     String?
-  tags      String[]
-  notes     String?
-  platform  PlatformType?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id           String        @id @default(uuid())
+  tenantId     String
+  name         String?
+  phone        String?
+  email        String?
+  tags         String[]
+  notes        String?
+  platform     PlatformType?
+  // Which specific connection this contact belongs to (a tenant can have
+  // several pages/bots), and their platform-native id — PSID for Messenger,
+  // IGSID for Instagram, chat_id for Telegram. WhatsApp keeps using `phone`
+  // as before; externalId is set there too so broadcast sending can read a
+  // single field regardless of platform.
+  connectionId String?
+  externalId   String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection   PlatformConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
+  @@index([connectionId, externalId])
 }
 
 model TeamInvitation {
