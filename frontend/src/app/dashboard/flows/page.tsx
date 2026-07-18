@@ -141,6 +141,84 @@ export default function FlowsPage() {
     }
   }
 
+  // ─── Drip sequence wizard ──────────────────────────────────────────────
+  // Composes a normal Flow (trigger → SEND_MESSAGE → WAIT_DELAY → …) via the
+  // existing save API, so the engine's cron-resumed WAIT_DELAY does all the
+  // scheduling — no new backend needed. The result opens fine in the canvas.
+  interface DripMessage { text: string; delayAmount: number; delayUnit: "minutes" | "hours" | "days" }
+  const [dripOpen, setDripOpen] = useState(false)
+  const [dripName, setDripName] = useState("")
+  const [dripTrigger, setDripTrigger] = useState<"ANY_MESSAGE" | "KEYWORD" | "NEW_SUBSCRIBER">("ANY_MESSAGE")
+  const [dripKeywords, setDripKeywords] = useState("")
+  const [dripMessages, setDripMessages] = useState<DripMessage[]>([
+    { text: "", delayAmount: 1, delayUnit: "days" },
+  ])
+  const [dripSaving, setDripSaving] = useState(false)
+  const [dripError, setDripError] = useState<string | null>(null)
+
+  const saveDrip = async () => {
+    setDripError(null)
+    const messages = dripMessages.filter(m => m.text.trim())
+    if (!dripName.trim() || messages.length === 0) {
+      setDripError(t("flowsPage.dripValidation"))
+      return
+    }
+    if (dripTrigger === "KEYWORD" && !dripKeywords.trim()) {
+      setDripError(t("flowsPage.dripKeywordRequired"))
+      return
+    }
+    setDripSaving(true)
+    try {
+      const steps: any[] = []
+      let prev: any = null
+      messages.forEach((m, i) => {
+        // Every message after the first is preceded by its wait step
+        if (i > 0) {
+          const wait = {
+            id: crypto.randomUUID(),
+            type: "WAIT_DELAY",
+            configuration: { delayAmount: m.delayAmount, delayUnit: m.delayUnit },
+            metadata: { x: 120, y: 80 + steps.length * 180 },
+            branches: [{ label: "Next", condition: {}, nextStepId: null }],
+          }
+          if (prev) prev.branches[0].nextStepId = wait.id
+          steps.push(wait)
+          prev = wait
+        }
+        const send = {
+          id: crypto.randomUUID(),
+          type: "SEND_MESSAGE",
+          configuration: { text: m.text.trim() },
+          metadata: { x: 120, y: 80 + steps.length * 180 },
+          branches: [{ label: "Next", condition: {}, nextStepId: null }],
+        }
+        if (prev) prev.branches[0].nextStepId = send.id
+        steps.push(send)
+        prev = send
+      })
+      await api.post("/flows", {
+        name: dripName.trim(),
+        description: t("flowsPage.dripDescription", { count: messages.length }),
+        isActive: false,
+        triggers: [{
+          type: dripTrigger,
+          configuration: dripTrigger === "KEYWORD" ? { keywords: dripKeywords.trim() } : {},
+        }],
+        steps,
+      })
+      setDripOpen(false)
+      setDripName("")
+      setDripKeywords("")
+      setDripMessages([{ text: "", delayAmount: 1, delayUnit: "days" }])
+      fetchFlows()
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { message?: string } } }
+      setDripError(axiosErr.response?.data?.message || t("flowsPage.dripSaveFailed"))
+    } finally {
+      setDripSaving(false)
+    }
+  }
+
   // Canvas Graph State
   const [nodes, setNodes] = useState<VisualNode[]>([]);
   const [connections, setConnections] = useState<VisualConnection[]>([]);
@@ -773,13 +851,23 @@ export default function FlowsPage() {
               </h1>
               <p className="text-muted-foreground mt-2 font-medium">{t("flowsPage.subtitle")}</p>
             </div>
-            <Button 
-              onClick={handleCreateNewFlow}
-              className="gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all rounded-xl px-6 h-11 font-bold cursor-pointer w-full sm:w-auto"
-            >
-              <Plus className="w-4 h-4" />
-              {t("flowsPage.createFlowBtn")}
-            </Button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={() => setDripOpen(true)}
+                className="gap-2 rounded-xl px-5 h-11 font-bold cursor-pointer flex-1 sm:flex-none border-[#4d9fff]/30 text-[#4d9fff] hover:bg-[#4d9fff]/5"
+              >
+                <Clock className="w-4 h-4" />
+                {t("flowsPage.dripBtn")}
+              </Button>
+              <Button
+                onClick={handleCreateNewFlow}
+                className="gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all rounded-xl px-6 h-11 font-bold cursor-pointer flex-1 sm:flex-none"
+              >
+                <Plus className="w-4 h-4" />
+                {t("flowsPage.createFlowBtn")}
+              </Button>
+            </div>
           </div>
 
           {isLoading ? (
@@ -866,6 +954,91 @@ export default function FlowsPage() {
           )}
         </div>
       )}
+
+      {/* --- DRIP SEQUENCE WIZARD --- */}
+      <Dialog open={dripOpen} onOpenChange={setDripOpen}>
+        <DialogContent className="sm:max-w-[520px] max-h-[85vh] overflow-y-auto" dir={dir}>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black flex items-center gap-3">
+              <div className="p-2 bg-[#4d9fff]/10 rounded-xl">
+                <Clock className="w-5 h-5 text-[#4d9fff]" />
+              </div>
+              {t("flowsPage.dripTitle")}
+            </DialogTitle>
+            <DialogDescription>{t("flowsPage.dripDesc")}</DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-4 py-1">
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-bold">{t("flowsPage.dripNameLabel")}</Label>
+              <Input value={dripName} onChange={e => setDripName(e.target.value)} placeholder={t("flowsPage.dripNamePh")} className="rounded-xl h-10" />
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label className="text-xs font-bold">{t("flowsPage.dripTriggerLabel")}</Label>
+              <div className="flex gap-1 p-1 rounded-xl bg-muted/40 border border-border/40">
+                {([["ANY_MESSAGE", t("flowsPage.dripTriggerAny")], ["KEYWORD", t("flowsPage.dripTriggerKeyword")], ["NEW_SUBSCRIBER", t("flowsPage.dripTriggerNewSub")]] as const).map(([key, label]) => (
+                  <button key={key} type="button" onClick={() => setDripTrigger(key)}
+                    className={`flex-1 h-8 rounded-lg text-[11px] font-bold transition-all ${dripTrigger === key ? "bg-[#4d9fff]/15 text-[#4d9fff]" : "text-muted-foreground hover:text-foreground"}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {dripTrigger === "KEYWORD" && (
+                <Input value={dripKeywords} onChange={e => setDripKeywords(e.target.value)} placeholder={t("flowsPage.dripKeywordsPh")} className="rounded-xl h-10 mt-1" />
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Label className="text-xs font-bold">{t("flowsPage.dripMessagesLabel")}</Label>
+              {dripMessages.map((m, i) => (
+                <div key={i} className="rounded-xl border border-border/50 bg-muted/20 p-3 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black text-[#4d9fff]">{t("flowsPage.dripMessageN", { n: i + 1 })}</span>
+                    {dripMessages.length > 1 && (
+                      <button type="button" onClick={() => setDripMessages(ms => ms.filter((_, j) => j !== i))} className="p-1 rounded-lg text-destructive hover:bg-destructive/10">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {i > 0 && (
+                    <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground">
+                      <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      {t("flowsPage.dripAfter")}
+                      <input type="number" min={1} value={m.delayAmount}
+                        onChange={e => setDripMessages(ms => ms.map((x, j) => j === i ? { ...x, delayAmount: Number(e.target.value) || 1 } : x))}
+                        className="w-16 rounded-lg bg-muted/50 border border-border/50 p-1.5 text-xs outline-none text-center" />
+                      <select value={m.delayUnit}
+                        onChange={e => setDripMessages(ms => ms.map((x, j) => j === i ? { ...x, delayUnit: e.target.value as DripMessage["delayUnit"] } : x))}
+                        className="rounded-lg bg-muted/50 border border-border/50 p-1.5 text-xs outline-none">
+                        <option value="minutes">{t("flowsPage.builderMinutes")}</option>
+                        <option value="hours">{t("flowsPage.builderHours")}</option>
+                        <option value="days">{t("flowsPage.builderDays")}</option>
+                      </select>
+                    </div>
+                  )}
+                  <Textarea value={m.text} rows={2} placeholder={t("flowsPage.dripMessagePh")}
+                    onChange={e => setDripMessages(ms => ms.map((x, j) => j === i ? { ...x, text: e.target.value } : x))}
+                    className="rounded-xl text-sm resize-none" />
+                </div>
+              ))}
+              <Button variant="outline" size="sm" className="rounded-xl gap-1.5 self-start text-xs"
+                onClick={() => setDripMessages(ms => [...ms, { text: "", delayAmount: 1, delayUnit: "days" }])}>
+                <Plus className="w-3.5 h-3.5" />
+                {t("flowsPage.dripAddMessage")}
+              </Button>
+            </div>
+
+            {dripError && <p className="text-xs font-bold text-destructive">{dripError}</p>}
+
+            <Button className="rounded-xl gap-2 h-11 font-bold shadow-lg shadow-primary/20" disabled={dripSaving} onClick={saveDrip}>
+              {dripSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              {t("flowsPage.dripSaveBtn")}
+            </Button>
+            <p className="text-[10px] text-muted-foreground text-center">{t("flowsPage.dripActivateHint")}</p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* --- FLOW ANALYTICS DIALOG --- */}
       <Dialog open={!!analyticsFlow} onOpenChange={(open) => !open && setAnalyticsFlow(null)}>
