@@ -107,6 +107,9 @@ model Tenant {
   isSuspended    Boolean                @default(false) // Suspended by platform admin
   aiEnabled      Boolean                @default(false) // AI fallback replies (Claude)
   aiContext      String?                // Business description the AI uses to answer customers
+  // Outbound webhook: POSTed on every inbound message, HMAC-signed with the secret
+  outboundWebhookUrl    String?
+  outboundWebhookSecret String?
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
 
@@ -125,6 +128,23 @@ model Tenant {
   broadcasts     Broadcast[]
   notifications  Notification[]
   cannedResponses CannedResponse[]
+  apiKeys        ApiKey[]
+}
+
+// Tenant-scoped API keys for the public REST API. Only a SHA-256 hash is
+// stored — the full key (hq_live_…) is shown exactly once at creation.
+model ApiKey {
+  id         String    @id @default(uuid())
+  tenantId   String
+  name       String
+  keyHash    String    @unique
+  prefix     String // first characters, for display (hq_live_ab12…)
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
 }
 
 model TenantMember {

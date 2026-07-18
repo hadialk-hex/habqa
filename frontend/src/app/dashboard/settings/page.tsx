@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Building, User, Lock, CreditCard, Bell, Globe, Save, Camera, Shield, Key, Sparkles } from "lucide-react"
+import { Building, User, Lock, CreditCard, Bell, Globe, Save, Camera, Shield, Key, Sparkles, Code2, Plus, Trash2, Copy, CheckCircle2 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -23,6 +23,7 @@ export default function SettingsPage() {
     { id: 'security', name: t('settingsPage.navSecurity'), icon: Lock },
     { id: 'billing', name: t('settingsPage.navBilling'), icon: CreditCard },
     { id: 'notifications', name: t('settingsPage.navNotifications'), icon: Bell },
+    { id: 'developer', name: t('settingsPage.navDeveloper'), icon: Code2 },
   ]
 
   const planLabels: Record<string, { name: string; sub: string }> = {
@@ -41,6 +42,71 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile')
   const { user, updateUser } = useAuth()
   const { showToast } = useToast()
+
+  // Developer tab: API keys + outbound webhook
+  const [apiKeys, setApiKeys] = useState<any[]>([])
+  const [newKeyName, setNewKeyName] = useState("")
+  const [freshKey, setFreshKey] = useState<string | null>(null)
+  const [webhookUrl, setWebhookUrl] = useState("")
+  const [freshWebhookSecret, setFreshWebhookSecret] = useState<string | null>(null)
+  const [devBusy, setDevBusy] = useState(false)
+  const [copiedDev, setCopiedDev] = useState<string | null>(null)
+
+  const loadDeveloper = async () => {
+    try {
+      const [keys, wh] = await Promise.all([
+        api.get('/api-keys'),
+        api.get('/api-keys/webhook'),
+      ])
+      setApiKeys(keys.data)
+      setWebhookUrl(wh.data.url || "")
+    } catch { /* section stays empty on failure */ }
+  }
+  useEffect(() => { if (activeTab === 'developer') loadDeveloper() }, [activeTab])  
+
+  const copyDev = async (value: string, tag: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiedDev(tag)
+      setTimeout(() => setCopiedDev(null), 2000)
+    } catch { /* clipboard unavailable */ }
+  }
+
+  const handleCreateKey = async () => {
+    setDevBusy(true)
+    try {
+      const res = await api.post('/api-keys', { name: newKeyName.trim() || 'API Key' })
+      setFreshKey(res.data.key)
+      setNewKeyName("")
+      loadDeveloper()
+    } catch (err: any) {
+      showToast(err.response?.data?.message || t('settingsPage.devKeyCreateFailed'), "error")
+    } finally {
+      setDevBusy(false)
+    }
+  }
+
+  const handleRevokeKey = async (id: string) => {
+    try {
+      await api.delete(`/api-keys/${id}`)
+      loadDeveloper()
+    } catch (err: any) {
+      showToast(err.response?.data?.message || t('settingsPage.devKeyRevokeFailed'), "error")
+    }
+  }
+
+  const handleSaveWebhook = async () => {
+    setDevBusy(true)
+    try {
+      const res = await api.put('/api-keys/webhook', { url: webhookUrl.trim() })
+      setFreshWebhookSecret(res.data.secret || null)
+      showToast(t('settingsPage.devWebhookSaved'), "success")
+    } catch (err: any) {
+      showToast(err.response?.data?.message || t('settingsPage.devWebhookSaveFailed'), "error")
+    } finally {
+      setDevBusy(false)
+    }
+  }
   
   // Profile states
   const [firstName, setFirstName] = useState("")
@@ -525,6 +591,100 @@ export default function SettingsPage() {
                 ))}
               </CardContent>
             </Card>
+          )}
+
+          {activeTab === 'developer' && (
+            <div className="space-y-6 animate-fade-in-up">
+              <Card className="border-none shadow-lg">
+                <CardHeader>
+                  <CardTitle className="font-black text-xl flex items-center gap-2">
+                    <Key className="w-5 h-5 text-primary" />
+                    {t('settingsPage.devKeysTitle')}
+                  </CardTitle>
+                  <CardDescription>{t('settingsPage.devKeysSubtitle')}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {freshKey && (
+                    <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-2">
+                      <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">{t('settingsPage.devKeyShownOnce')}</p>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 text-xs bg-background/60 rounded-lg px-3 py-2 break-all" dir="ltr">{freshKey}</code>
+                        <Button variant="outline" size="sm" className="rounded-lg h-8 gap-1 shrink-0" onClick={() => copyDev(freshKey, 'key')}>
+                          {copiedDev === 'key' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Input
+                      value={newKeyName}
+                      onChange={e => setNewKeyName(e.target.value)}
+                      placeholder={t('settingsPage.devKeyNamePh')}
+                      className="rounded-xl h-10"
+                    />
+                    <Button className="rounded-xl gap-1.5 h-10 font-bold shrink-0" disabled={devBusy} onClick={handleCreateKey}>
+                      <Plus className="w-4 h-4" />
+                      {t('settingsPage.devKeyCreateBtn')}
+                    </Button>
+                  </div>
+                  {apiKeys.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-3">{t('settingsPage.devKeysEmpty')}</p>
+                  ) : (
+                    apiKeys.map(k => (
+                      <div key={k.id} className="flex items-center justify-between p-3 rounded-xl border border-border/50">
+                        <div className="min-w-0">
+                          <p className="font-bold text-sm truncate">{k.name}</p>
+                          <p className="text-[11px] text-muted-foreground font-mono" dir="ltr">{k.prefix}…</p>
+                        </div>
+                        <button onClick={() => handleRevokeKey(k.id)} className="p-2 rounded-lg text-destructive hover:bg-destructive/10">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                  <p className="text-[11px] text-muted-foreground leading-relaxed" dir="ltr">
+                    curl -H &quot;x-api-key: hq_live_…&quot; https://hubqa.hex-tic.xyz/api/backend/public/v1/me
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border-none shadow-lg">
+                <CardHeader>
+                  <CardTitle className="font-black text-xl flex items-center gap-2">
+                    <Globe className="w-5 h-5 text-primary" />
+                    {t('settingsPage.devWebhookTitle')}
+                  </CardTitle>
+                  <CardDescription>{t('settingsPage.devWebhookSubtitle')}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {freshWebhookSecret && (
+                    <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 space-y-2">
+                      <p className="text-xs font-black text-emerald-600 dark:text-emerald-400">{t('settingsPage.devWebhookSecretShownOnce')}</p>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 text-xs bg-background/60 rounded-lg px-3 py-2 break-all" dir="ltr">{freshWebhookSecret}</code>
+                        <Button variant="outline" size="sm" className="rounded-lg h-8 gap-1 shrink-0" onClick={() => copyDev(freshWebhookSecret, 'wh')}>
+                          {copiedDev === 'wh' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <Input
+                      value={webhookUrl}
+                      onChange={e => setWebhookUrl(e.target.value)}
+                      placeholder="https://example.com/hubqa-webhook"
+                      className="rounded-xl h-10"
+                      dir="ltr"
+                    />
+                    <Button className="rounded-xl gap-1.5 h-10 font-bold shrink-0" disabled={devBusy} onClick={handleSaveWebhook}>
+                      <Save className="w-4 h-4" />
+                      {t('settingsPage.devWebhookSaveBtn')}
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">{t('settingsPage.devWebhookHint')}</p>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
       </div>

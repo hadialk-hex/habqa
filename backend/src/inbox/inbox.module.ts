@@ -7,5 +7,6 @@ import { ChannelsModule } from '../channels/channels.module';
   imports: [ChannelsModule],
   providers: [InboxService],
   controllers: [InboxController],
+  exports: [InboxService],
 })
 export class InboxModule {}

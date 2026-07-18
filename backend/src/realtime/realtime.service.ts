@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RealtimeGateway } from './realtime.gateway';
 
@@ -28,10 +29,20 @@ export class RealtimeService implements OnModuleInit {
         ) {
           const convo = await this.prisma.conversation.findUnique({
             where: { id: result.conversationId },
-            select: { tenantId: true },
+            select: {
+              tenantId: true,
+              customerId: true,
+              customerName: true,
+              connection: { select: { platform: true } },
+            },
           });
           if (convo?.tenantId) {
             this.gateway.emitNewMessage(convo.tenantId, result);
+            // Developer integrations: forward inbound messages to the
+            // tenant's outbound webhook (fire-and-forget, HMAC-signed).
+            if (result.direction === 'INBOUND') {
+              void this.dispatchOutboundWebhook(convo.tenantId, result, convo);
+            }
           }
         }
       } catch (error) {
@@ -41,5 +52,60 @@ export class RealtimeService implements OnModuleInit {
       return result;
     });
     this.logger.log('Realtime message broadcast hook registered');
+  }
+
+  // POSTs `message.received` to the tenant's configured webhook. The body is
+  // signed with x-hubqa-signature = HMAC-SHA256(secret, rawBody) so the
+  // receiver can verify authenticity. 5s timeout, never throws.
+  private async dispatchOutboundWebhook(
+    tenantId: string,
+    message: any,
+    convo: any,
+  ) {
+    try {
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { outboundWebhookUrl: true, outboundWebhookSecret: true },
+      });
+      if (!tenant?.outboundWebhookUrl || !tenant.outboundWebhookSecret) return;
+
+      const body = JSON.stringify({
+        event: 'message.received',
+        timestamp: new Date().toISOString(),
+        data: {
+          message: {
+            id: message.id,
+            conversationId: message.conversationId,
+            content: message.content,
+            messageType: message.messageType,
+            createdAt: message.createdAt,
+          },
+          conversation: {
+            id: message.conversationId,
+            customerId: convo.customerId,
+            customerName: convo.customerName,
+            platform: convo.connection?.platform,
+          },
+        },
+      });
+      const signature = crypto
+        .createHmac('sha256', tenant.outboundWebhookSecret)
+        .update(body)
+        .digest('hex');
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      await fetch(tenant.outboundWebhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-hubqa-signature': signature,
+        },
+        body,
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timer));
+    } catch (error: any) {
+      this.logger.warn(`Outbound webhook delivery failed: ${error.message}`);
+    }
   }
 }

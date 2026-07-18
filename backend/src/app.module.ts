@@ -32,6 +32,7 @@ import { FlowsModule } from './flows/flows.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { MediaModule } from './media/media.module';
+import { PublicApiModule } from './public-api/public-api.module';
 
 @Module({
   imports: [
@@ -106,6 +107,7 @@ import { MediaModule } from './media/media.module';
     NotificationsModule,
     RealtimeModule,
     MediaModule,
+    PublicApiModule,
   ],
   controllers: [AppController],
   providers: [
