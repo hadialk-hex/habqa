@@ -64,6 +64,10 @@ export class ChannelsController {
       // assets rather than personally-owned Pages — without it, Business
       // Portfolio pages silently return an empty list even after consent.
       'business_management',
+      // Required to read a Page's posts/comments — the rules page's post
+      // picker and comment-reply features call {page-id}/posts, which
+      // Graph rejects with error #10 without this permission.
+      'pages_read_user_content',
     ].join(',');
 
     const url =
