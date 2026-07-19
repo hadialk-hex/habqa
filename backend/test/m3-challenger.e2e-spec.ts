@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DashboardService } from '../src/dashboard/dashboard.service';
 import { BroadcastsService } from '../src/broadcasts/broadcasts.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { InboxService } from '../src/inbox/inbox.service';
 
 describe('Challenger 1 Milestone 3 E2E/Unit Verification Tests', () => {
   let dashboardService: DashboardService;
@@ -41,6 +42,11 @@ describe('Challenger 1 Milestone 3 E2E/Unit Verification Tests', () => {
         DashboardService,
         BroadcastsService,
         { provide: PrismaService, useValue: mockPrisma },
+        // BroadcastsService.execute() now sends through InboxService (see
+        // broadcasts.service.ts) — mocked here since these tests only
+        // exercise the cron/scheduling logic, either via a spied execute()
+        // or with no due broadcasts, never the real send path.
+        { provide: InboxService, useValue: { sendMessage: jest.fn() } },
       ],
     }).compile();
 
