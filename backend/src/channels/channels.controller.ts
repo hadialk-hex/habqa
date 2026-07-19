@@ -19,6 +19,7 @@ import { ChannelsService } from './channels.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AddConnectionDto } from './dto/channels.dto';
 import { PlatformSettingsService } from '../settings/platform-settings.service';
+import { GRAPH_API_VERSION } from '../common/graph-api';
 
 @Controller('channels')
 export class ChannelsController {
@@ -62,7 +63,7 @@ export class ChannelsController {
     ].join(',');
 
     const url =
-      `https://www.facebook.com/v19.0/dialog/oauth` +
+      `https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth` +
       `?client_id=${encodeURIComponent(appId)}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&state=${encodeURIComponent(state)}` +

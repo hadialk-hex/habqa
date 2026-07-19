@@ -212,6 +212,14 @@ export class InboxService {
         this.logger.error(
           `[sendPlatformMessage] FAILED for conversation ${conversationId}: ${errMsg}`,
         );
+        // HUMAN_AGENT requires a manual Meta approval most pages don't have
+        // (docs/meta-api/04-messenger-platform.md) — Meta's own error text
+        // is confusing here, so replace it with an actionable explanation.
+        if (tag === 'HUMAN_AGENT') {
+          throw new Error(
+            'مرت أكثر من 24 ساعة على آخر رسالة من العميل، والرد بعد هذه المدة يتطلب صلاحية "HUMAN_AGENT" الخاصة من Meta — وهي غير مفعّلة على صفحتك حالياً. اطلب تفعيلها من Meta Business Suite، أو انتظر حتى يراسلك العميل مجدداً لإعادة فتح نافذة الرد الحر.',
+          );
+        }
         throw new Error(`Graph API error: ${errMsg}`);
       }
 
