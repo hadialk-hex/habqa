@@ -83,6 +83,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: habqa-backend:latest
     container_name: hubqa_backend
     restart: always
     ports:
@@ -129,6 +130,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    image: habqa-frontend:latest
     container_name: hubqa_frontend
     restart: always
     ports:
