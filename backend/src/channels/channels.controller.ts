@@ -60,6 +60,10 @@ export class ChannelsController {
       'pages_manage_metadata',
       'pages_messaging',
       'pages_read_engagement',
+      // Required for /me/accounts to list Pages that are Business Manager
+      // assets rather than personally-owned Pages — without it, Business
+      // Portfolio pages silently return an empty list even after consent.
+      'business_management',
     ].join(',');
 
     const url =
