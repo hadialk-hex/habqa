@@ -645,8 +645,10 @@ export class ChannelsService {
         'id,caption,media_type,media_url,thumbnail_url,timestamp,permalink,comments_count';
       path = `/${conn.platformId}/media?fields=${fields}&limit=${safeLimit}`;
     } else {
-      const fields =
-        'id,message,story,created_time,full_picture,permalink_url,comments.summary(true).limit(0)';
+      // No comments.summary(true) here — that edge needs the
+      // pages_read_user_content permission on top of pages_read_engagement,
+      // and the count is cosmetic (post picker display only).
+      const fields = 'id,message,story,created_time,full_picture,permalink_url';
       path = `/${conn.platformId}/posts?fields=${fields}&limit=${safeLimit}`;
     }
     if (after) {
