@@ -25,6 +25,7 @@ interface Rule {
   triggerType: string
   postId: string | null
   keywords: string
+  matchType?: string
   replyText: string | null
   replyMedia: string | null
   privateText: string | null
@@ -262,6 +263,7 @@ export default function RulesPage() {
   const [isPickerOpen, setIsPickerOpen] = useState(false)
   const [showManualId, setShowManualId] = useState(false)
   const [keywords, setKeywords] = useState("")
+  const [matchType, setMatchType] = useState("CONTAINS")
   const [replyText, setReplyText] = useState("")
   const [privateText, setPrivateText] = useState("")
   const [mediaType, setMediaType] = useState("NONE")
@@ -409,6 +411,7 @@ export default function RulesPage() {
             ? (selectedPost?.channelId || null)
             : (ruleConnectionId || null),
         keywords,
+        matchType,
         replyText,
         privateText: isSequentialEnabled ? null : (privateText || null),
         replyMedia: isSequentialEnabled ? null : replyMedia,
@@ -478,6 +481,7 @@ export default function RulesPage() {
     }
     setRuleConnectionId(rule.connectionId || "")
     setKeywords(rule.keywords || "")
+    setMatchType(rule.matchType || "CONTAINS")
     setReplyText(rule.replyText || "")
     setPrivateText(rule.privateText || "")
     
@@ -569,6 +573,7 @@ export default function RulesPage() {
     setShowManualId(false)
     setRuleConnectionId("")
     setKeywords("")
+    setMatchType("CONTAINS")
     setReplyText("")
     setPrivateText("")
     setMediaType("NONE")
@@ -973,6 +978,29 @@ export default function RulesPage() {
                     <Label htmlFor="keywords" className="font-bold">{t("rulesPage.keywordsLabel")}</Label>
                     <Input id="keywords" value={keywords} onChange={e => setKeywords(e.target.value)} placeholder={t("rulesPage.keywordsPlaceholder")} className="rounded-xl h-11 font-medium" />
                     <p className="text-xs text-muted-foreground font-medium">{t("rulesPage.keywordsHint")}</p>
+
+                    {/* Match type — only relevant when keywords are set. Arabic
+                        spelling variants are normalized server-side, so these
+                        modes compare on the canonical form. */}
+                    {keywords.trim() && (
+                      <div className="grid gap-2 mt-1">
+                        <Label className="font-bold text-sm">{t("rulesPage.matchTypeLabel")}</Label>
+                        <Select value={matchType} onValueChange={(v) => v && setMatchType(v)}>
+                          <SelectTrigger className="rounded-xl h-11 w-full">
+                            <SelectValue>
+                              {(value: string) => t(`rulesPage.matchType_${value || "CONTAINS"}`)}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="CONTAINS">{t("rulesPage.matchType_CONTAINS")}</SelectItem>
+                            <SelectItem value="EXACT">{t("rulesPage.matchType_EXACT")}</SelectItem>
+                            <SelectItem value="STARTS_WITH">{t("rulesPage.matchType_STARTS_WITH")}</SelectItem>
+                            <SelectItem value="ENDS_WITH">{t("rulesPage.matchType_ENDS_WITH")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground font-medium">{t("rulesPage.matchTypeHint")}</p>
+                      </div>
+                    )}
 
                     {/* --- NEW: Keyword Conflict Warnings --- */}
                     {keywordConflicts.length > 0 && (

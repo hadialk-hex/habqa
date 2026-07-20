@@ -7,6 +7,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { FlowEngineService } from '../flows/flow-engine.service';
 import { getPlanLimits, startOfCurrentMonth } from '../common/plan-limits';
 import { GRAPH_API_BASE } from '../common/graph-api';
+import { parseKeywords, matchesKeywords } from '../common/keyword-match';
 import {
   graphApiRequest,
   sendTypingIndicator,
@@ -664,15 +665,10 @@ export class WebhooksService {
       const isGlobal = !rule.postId;
 
       if (rule.triggerType === 'KEYWORD') {
-        const keywords = rule.keywords
-          ? rule.keywords
-              .split(/[,,ØŒ]/)
-              .map((k) => k.trim())
-              .filter(Boolean)
-          : [];
-        const hasMatch = keywords.some((kw) =>
-          commentText.toLowerCase().includes(kw.toLowerCase()),
-        );
+        const keywords = parseKeywords(rule.keywords);
+        const hasMatch =
+          keywords.length > 0 &&
+          matchesKeywords(commentText, keywords, rule.matchType || 'CONTAINS');
         if (hasMatch) {
           isTriggered = true;
           rank = isSpecificPost ? 4 : isGlobal ? 2 : 0;
@@ -875,15 +871,13 @@ export class WebhooksService {
       orderBy: { priority: 'desc' },
     });
 
-    const rule = rules.find((r) => {
-      const keywords = (r.keywords || '')
-        .split(/[,،]/)
-        .map((k) => k.trim())
-        .filter(Boolean);
-      if (keywords.length === 0) return true; // no filter → always match
-      const lower = (text || '').toLowerCase();
-      return keywords.some((k) => lower.includes(k.toLowerCase()));
-    });
+    const rule = rules.find((r) =>
+      matchesKeywords(
+        text,
+        parseKeywords(r.keywords),
+        r.matchType || 'CONTAINS',
+      ),
+    );
     if (!rule) return false;
 
     if (!(await this.hasReplyQuota(connection.tenantId))) {
