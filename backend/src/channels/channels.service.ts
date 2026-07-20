@@ -286,7 +286,9 @@ export class ChannelsService {
       // Proceed with short-lived token if exchange fails
     }
 
-    const accountsUrl = `${GRAPH_API_BASE}/me/accounts?access_token=${longLivedUserToken}`;
+    const accountsFields =
+      'id,name,access_token,instagram_business_account{id,username}';
+    const accountsUrl = `${GRAPH_API_BASE}/me/accounts?fields=${accountsFields}&access_token=${longLivedUserToken}`;
     const accountsResponse = await fetchWithTimeout(accountsUrl);
     if (!accountsResponse.ok) {
       throw new BadRequestException('Failed to fetch Facebook pages');
@@ -335,6 +337,24 @@ export class ChannelsService {
             this.logger.warn(
               `Webhook subscription request errored for page ${page.id}: ${String(err)}`,
             );
+          }
+
+          // The Page's linked Instagram professional account (if any) is a
+          // separate connection — messaging it uses the same Page Access
+          // Token, so no extra token exchange is needed.
+          if (page.instagram_business_account?.id) {
+            try {
+              await this.upsertConnection(tenantId, {
+                platform: 'INSTAGRAM',
+                platformId: page.instagram_business_account.id,
+                name: page.instagram_business_account.username || page.name,
+                accessToken: page.access_token,
+              });
+            } catch (err) {
+              this.logger.warn(
+                `Failed to connect linked Instagram account for page ${page.id}: ${String(err)}`,
+              );
+            }
           }
 
           connected++;
