@@ -935,7 +935,14 @@ export default function RulesPage() {
                         onValueChange={(v) => setRuleConnectionId(!v || v === "ALL" ? "" : v)}
                       >
                         <SelectTrigger className="rounded-xl h-11">
-                          <SelectValue />
+                          <SelectValue>
+                            {(value: string) => {
+                              if (!value || value === "ALL") return t("rulesPage.channelScopeAll")
+                              const c = ruleChannels.find(ch => ch.id === value)
+                              if (!c) return t("rulesPage.channelScopeAll")
+                              return `${c.name} · ${c.platform === "INSTAGRAM" ? "انستغرام" : "فيسبوك"}`
+                            }}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="ALL">

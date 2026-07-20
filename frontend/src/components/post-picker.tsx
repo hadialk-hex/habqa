@@ -68,6 +68,7 @@ export function PostPicker({ open, onOpenChange, onSelect }: PostPickerProps) {
   const [channels, setChannels] = useState<Channel[]>([])
   const [channelId, setChannelId] = useState<string>("")
   const [posts, setPosts] = useState<PostItem[]>([])
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set())
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
@@ -156,7 +157,27 @@ export function PostPicker({ open, onOpenChange, onSelect }: PostPickerProps) {
           {channels.length > 1 && (
             <Select value={channelId} onValueChange={(val) => val && setChannelId(val)}>
               <SelectTrigger className="rounded-xl h-11">
-                <SelectValue placeholder="اختر الصفحة" />
+                {/* Render the selected channel's name explicitly — Base UI's
+                    default label extraction breaks on the icon+badge markup
+                    and falls back to showing the raw connection id. */}
+                <SelectValue>
+                  {(value: string) => {
+                    const c = channels.find(ch => ch.id === value)
+                    if (!c) return "اختر الصفحة"
+                    return (
+                      <span className="flex items-center gap-2">
+                        <PlatformIcon
+                          platform={c.platform}
+                          className={`w-4 h-4 shrink-0 ${c.platform === "INSTAGRAM" ? "text-[#DD2A7B]" : "text-[#1877F2]"}`}
+                        />
+                        <span>{c.name}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {c.platform === "INSTAGRAM" ? "انستغرام" : "فيسبوك"}
+                        </span>
+                      </span>
+                    )
+                  }}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {channels.map(c => (
@@ -207,9 +228,15 @@ export function PostPicker({ open, onOpenChange, onSelect }: PostPickerProps) {
                   className="text-right group border rounded-xl overflow-hidden hover:border-primary hover:shadow-lg hover:shadow-primary/10 transition-all bg-card relative"
                 >
                   <div className="h-32 bg-muted/40 flex items-center justify-center overflow-hidden">
-                    {post.picture ? (
-                       
-                      <img src={post.picture} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    {post.picture && !failedImages.has(post.id) ? (
+
+                      <img
+                        src={post.picture}
+                        alt=""
+                        referrerPolicy="no-referrer"
+                        onError={() => setFailedImages(prev => new Set(prev).add(post.id))}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
                     ) : (
                       <ImageOff className="w-8 h-8 text-muted-foreground/40" />
                     )}
