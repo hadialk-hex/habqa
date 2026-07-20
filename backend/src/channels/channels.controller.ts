@@ -64,6 +64,9 @@ export class ChannelsController {
       // assets rather than personally-owned Pages — without it, Business
       // Portfolio pages silently return an empty list even after consent.
       'business_management',
+      // Required to actually POST a reply to a comment (auto-reply
+      // feature) — pages_read_engagement only covers reading comments.
+      'pages_manage_engagement',
     ].join(',');
 
     const url =
