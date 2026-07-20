@@ -934,7 +934,7 @@ export default function RulesPage() {
                         value={ruleConnectionId || "ALL"}
                         onValueChange={(v) => setRuleConnectionId(!v || v === "ALL" ? "" : v)}
                       >
-                        <SelectTrigger className="rounded-xl h-11">
+                        <SelectTrigger className="rounded-xl h-11 w-full">
                           <SelectValue>
                             {(value: string) => {
                               if (!value || value === "ALL") return t("rulesPage.channelScopeAll")
