@@ -268,6 +268,12 @@ export default function RulesPage() {
   const [mediaUrl, setMediaUrl] = useState("")
   const [banner, setBanner] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
+  // Channel scope for the rule: "" = all channels (Facebook + Instagram),
+  // otherwise a specific connection id. Only meaningful for GLOBAL/keyword
+  // rules; POST rules derive their channel from the picked post.
+  const [ruleConnectionId, setRuleConnectionId] = useState("")
+  const [ruleChannels, setRuleChannels] = useState<{ id: string; name: string; platform: string }[]>([])
+
   // Sequential message state
   const [isSequentialEnabled, setIsSequentialEnabled] = useState(false)
   const [replyMessages, setReplyMessages] = useState<any[]>([
@@ -310,6 +316,17 @@ export default function RulesPage() {
 
   useEffect(() => {
     fetchRules()
+    // Load the tenant's Facebook/Instagram channels so a rule can target a
+    // specific one, or all of them at once.
+    api.get("/channels")
+      .then(res => {
+        setRuleChannels(
+          res.data.filter((c: { platform: string }) =>
+            c.platform === "FACEBOOK_PAGE" || c.platform === "INSTAGRAM"
+          )
+        )
+      })
+      .catch(() => { /* non-fatal: scope selector just won't show channels */ })
   }, [])
 
   // --- NEW: Keyword conflict detection ---
@@ -385,6 +402,12 @@ export default function RulesPage() {
             ? storyTrigger
             : keywords ? "KEYWORD" : "ANY_COMMENT",
         postId: ruleType === "POST" && effectivePostId ? effectivePostId : null,
+        // POST rules take their channel from the picked post; GLOBAL/STORY
+        // rules use the explicit scope selector ("" = all channels).
+        connectionId:
+          ruleType === "POST"
+            ? (selectedPost?.channelId || null)
+            : (ruleConnectionId || null),
         keywords,
         replyText,
         privateText: isSequentialEnabled ? null : (privateText || null),
@@ -453,6 +476,7 @@ export default function RulesPage() {
     } else {
       setSelectedPost(null)
     }
+    setRuleConnectionId(rule.connectionId || "")
     setKeywords(rule.keywords || "")
     setReplyText(rule.replyText || "")
     setPrivateText(rule.privateText || "")
@@ -543,6 +567,7 @@ export default function RulesPage() {
     setPostId("")
     setSelectedPost(null)
     setShowManualId(false)
+    setRuleConnectionId("")
     setKeywords("")
     setReplyText("")
     setPrivateText("")
@@ -898,6 +923,44 @@ export default function RulesPage() {
                       </TabsContent>
                     </Tabs>
                   </div>
+
+                  {/* Channel scope — only for GLOBAL/STORY rules; POST rules
+                      inherit their channel from the picked post. Hidden when
+                      the tenant has one channel or fewer (nothing to choose). */}
+                  {ruleType !== "POST" && ruleChannels.length > 1 && (
+                    <div className="grid gap-2">
+                      <Label className="font-bold">{t("rulesPage.channelScopeLabel")}</Label>
+                      <Select
+                        value={ruleConnectionId || "ALL"}
+                        onValueChange={(v) => setRuleConnectionId(!v || v === "ALL" ? "" : v)}
+                      >
+                        <SelectTrigger className="rounded-xl h-11">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">
+                            <span className="flex items-center gap-2 font-bold">
+                              <Globe2 className="w-4 h-4 shrink-0 text-primary" />
+                              {t("rulesPage.channelScopeAll")}
+                            </span>
+                          </SelectItem>
+                          {ruleChannels.map(c => (
+                            <SelectItem key={c.id} value={c.id}>
+                              <span className="flex items-center gap-2">
+                                <span>{c.name}</span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {c.platform === "INSTAGRAM" ? "انستغرام" : "فيسبوك"}
+                                </span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground font-medium">
+                        {t("rulesPage.channelScopeHint")}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid gap-2">
                     <Label htmlFor="keywords" className="font-bold">{t("rulesPage.keywordsLabel")}</Label>
