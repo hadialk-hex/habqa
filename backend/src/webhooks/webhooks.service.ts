@@ -1057,12 +1057,37 @@ export class WebhooksService {
   // Sends a DM through Messenger/Instagram and records it in the inbox.
   // Returns false (without throwing) on any send failure so the caller can
   // fall through to the next option.
+  // Normalizes a rule's stored quick-reply titles into the Messenger
+  // quick_replies payload (max 13 chips, titles capped at 20 chars). Returns
+  // undefined when there are none so the message stays a plain text reply.
+  private buildQuickReplies(raw: unknown): any[] | undefined {
+    if (!raw) return undefined;
+    let list: any[] = [];
+    try {
+      list = typeof raw === 'string' ? JSON.parse(raw) : (raw as any[]);
+    } catch {
+      return undefined;
+    }
+    if (!Array.isArray(list) || list.length === 0) return undefined;
+    const chips = list
+      .map((item) => (typeof item === 'string' ? item : item?.title))
+      .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+      .slice(0, 13)
+      .map((title) => ({
+        content_type: 'text',
+        title: title.trim().slice(0, 20),
+        payload: title.trim().slice(0, 1000),
+      }));
+    return chips.length ? chips : undefined;
+  }
+
   private async sendDmAndRecord(
     connection: any,
     conversation: any,
     senderId: string,
     text: string,
     sentByName: string,
+    quickReplies?: unknown,
   ): Promise<boolean> {
     const token = this.channelsService.getDecryptedAccessToken(
       connection.accessToken,
@@ -1072,12 +1097,16 @@ export class WebhooksService {
     await sendTypingIndicator(senderId, token);
     await new Promise((r) => setTimeout(r, 1_000));
 
+    const chips = this.buildQuickReplies(quickReplies);
+    const message: any = { text };
+    if (chips) message.quick_replies = chips;
+
     const result = await graphApiRequest('/me/messages', {
       token,
       body: {
         messaging_type: 'RESPONSE',
         recipient: { id: senderId },
-        message: { text },
+        message,
       },
       context: 'dmAutoReply',
     });
@@ -1171,6 +1200,7 @@ export class WebhooksService {
       senderId,
       replyText,
       'الرد الآلي',
+      rule.quickReplies,
     );
     if (!sent) return false;
 

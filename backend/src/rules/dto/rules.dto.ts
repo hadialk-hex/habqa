@@ -61,6 +61,9 @@ export class CreateRuleDto {
   // deliberately NOT accepted from clients (whitelist strips them)
   @IsOptional()
   replyMessages?: any;
+
+  @IsOptional()
+  quickReplies?: any;
 }
 
 export class UpdateRuleDto {
@@ -117,4 +120,7 @@ export class UpdateRuleDto {
   // deliberately NOT accepted from clients (whitelist strips them)
   @IsOptional()
   replyMessages?: any;
+
+  @IsOptional()
+  quickReplies?: any;
 }

@@ -26,6 +26,7 @@ interface Rule {
   postId: string | null
   keywords: string
   matchType?: string
+  quickReplies?: string[] | null
   replyText: string | null
   replyMedia: string | null
   privateText: string | null
@@ -264,6 +265,8 @@ export default function RulesPage() {
   const [showManualId, setShowManualId] = useState(false)
   const [keywords, setKeywords] = useState("")
   const [matchType, setMatchType] = useState("CONTAINS")
+  const [quickReplies, setQuickReplies] = useState<string[]>([])
+  const [newQuickReply, setNewQuickReply] = useState("")
   const [replyText, setReplyText] = useState("")
   const [privateText, setPrivateText] = useState("")
   const [mediaType, setMediaType] = useState("NONE")
@@ -412,6 +415,7 @@ export default function RulesPage() {
             : (ruleConnectionId || null),
         keywords,
         matchType,
+        quickReplies: quickReplies.length > 0 ? quickReplies : null,
         replyText,
         privateText: isSequentialEnabled ? null : (privateText || null),
         replyMedia: isSequentialEnabled ? null : replyMedia,
@@ -482,6 +486,12 @@ export default function RulesPage() {
     setRuleConnectionId(rule.connectionId || "")
     setKeywords(rule.keywords || "")
     setMatchType(rule.matchType || "CONTAINS")
+    setQuickReplies(
+      Array.isArray(rule.quickReplies)
+        ? rule.quickReplies
+        : (() => { try { const p = typeof rule.quickReplies === "string" ? JSON.parse(rule.quickReplies) : []; return Array.isArray(p) ? p.map((x: any) => typeof x === "string" ? x : x?.title).filter(Boolean) : [] } catch { return [] } })()
+    )
+    setNewQuickReply("")
     setReplyText(rule.replyText || "")
     setPrivateText(rule.privateText || "")
     
@@ -574,6 +584,8 @@ export default function RulesPage() {
     setRuleConnectionId("")
     setKeywords("")
     setMatchType("CONTAINS")
+    setQuickReplies([])
+    setNewQuickReply("")
     setReplyText("")
     setPrivateText("")
     setMediaType("NONE")
@@ -1011,6 +1023,59 @@ export default function RulesPage() {
                             <span>{t("rulesPage.keywordConflictWarning", { keyword: c.keyword, ruleName: c.ruleName })}</span>
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quick reply buttons — tappable chips attached to the
+                      auto-reply so the customer picks instead of typing. */}
+                  <div className="grid gap-2 border-t pt-4">
+                    <Label className="font-bold flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-primary" />
+                      {t("rulesPage.quickRepliesLabel")}
+                    </Label>
+                    <p className="text-xs text-muted-foreground font-medium">{t("rulesPage.quickRepliesHint")}</p>
+                    {quickReplies.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {quickReplies.map((q, i) => (
+                          <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/40 bg-primary/5 text-sm font-bold">
+                            {q}
+                            <button type="button" onClick={() => setQuickReplies(quickReplies.filter((_, idx) => idx !== i))} className="text-muted-foreground hover:text-destructive cursor-pointer">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {quickReplies.length < 13 && (
+                      <div className="flex gap-2">
+                        <Input
+                          value={newQuickReply}
+                          onChange={e => setNewQuickReply(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === "Enter") {
+                              e.preventDefault()
+                              const v = newQuickReply.trim().slice(0, 20)
+                              if (v && !quickReplies.includes(v)) setQuickReplies([...quickReplies, v])
+                              setNewQuickReply("")
+                            }
+                          }}
+                          maxLength={20}
+                          placeholder={t("rulesPage.quickRepliesPlaceholder")}
+                          className="rounded-xl h-11 font-medium"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-xl h-11 shrink-0 font-bold"
+                          onClick={() => {
+                            const v = newQuickReply.trim().slice(0, 20)
+                            if (v && !quickReplies.includes(v)) setQuickReplies([...quickReplies, v])
+                            setNewQuickReply("")
+                          }}
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
                       </div>
                     )}
                   </div>

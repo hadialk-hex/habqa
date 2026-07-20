@@ -64,6 +64,7 @@ export class RulesService {
         replyText: data.replyText,
         replyMedia: data.replyMedia ? data.replyMedia : undefined,
         replyMessages: data.replyMessages ? data.replyMessages : undefined,
+        quickReplies: data.quickReplies ? data.quickReplies : undefined,
         privateText: data.privateText,
         privateMedia: data.privateMedia ? data.privateMedia : undefined,
         priority: data.priority || 0,
@@ -103,6 +104,8 @@ export class RulesService {
       safeData.replyMedia = data.replyMedia || undefined;
     if ('replyMessages' in data)
       safeData.replyMessages = data.replyMessages || undefined;
+    if ('quickReplies' in data)
+      safeData.quickReplies = data.quickReplies || undefined;
     if ('privateMedia' in data)
       safeData.privateMedia = data.privateMedia || undefined;
 

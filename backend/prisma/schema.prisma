@@ -254,6 +254,7 @@ model AutoReplyRule {
   triggerCount    Int       @default(0)
   lastTriggeredAt DateTime?
   replyMessages   Json?
+  quickReplies    Json?     // Array of tappable quick-reply button titles
 
   tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   connection    PlatformConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
