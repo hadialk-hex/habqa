@@ -64,9 +64,13 @@ export class ChannelsController {
       // assets rather than personally-owned Pages — without it, Business
       // Portfolio pages silently return an empty list even after consent.
       'business_management',
-      // Required to actually POST a reply to a comment (auto-reply
-      // feature) — pages_read_engagement only covers reading comments.
-      'pages_manage_engagement',
+      // NOTE: pages_manage_engagement (needed to post comment replies) is
+      // deliberately NOT requested here — it isn't grantable at Standard
+      // Access in Development mode, and Facebook hard-blocks the OAuth
+      // dialog with an "Invalid Scopes" error for any tester/developer
+      // account when it's included (real end users would just have it
+      // silently dropped, but that still leaves the feature non-functional
+      // either way). Re-add once App Review grants Advanced Access.
       // Instagram accounts linked to this Facebook Page — basic profile
       // access and DM read/send (comment replies need
       // instagram_manage_comments, which needs Advanced Access/App Review).
