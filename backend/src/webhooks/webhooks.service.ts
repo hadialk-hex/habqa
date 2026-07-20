@@ -996,6 +996,271 @@ export class WebhooksService {
     }
   }
 
+  // Built-in Arabic + English buying-intent phrases. A tenant can override
+  // with their own list (tenant.intentKeywords); matching is normalized so
+  // spelling variants collapse (see keyword-match.ts).
+  private static readonly DEFAULT_INTENT_KEYWORDS = [
+    'بدي اشتري',
+    'بدي اطلب',
+    'اطلب',
+    'جاهز ادفع',
+    'بدي ادفع',
+    'كيف ادفع',
+    'وين ادفع',
+    'احجز',
+    'بدي احجز',
+    'اشتري',
+    'الدفع',
+    'اشتراك',
+    'بشتري',
+    'رابط الشراء',
+    'اضيفه للسلة',
+    'buy',
+    'order',
+    'checkout',
+    'purchase',
+    'i want to buy',
+  ];
+
+  // Flags a conversation (and notifies the owner) the first time a customer
+  // shows buying intent. Purely additive — never sends a reply or pauses the
+  // bot, just surfaces a hot lead.
+  private async detectPurchaseIntent(
+    connection: any,
+    conversation: any,
+    text: string,
+  ): Promise<void> {
+    if (!text || conversation.purchaseIntent) return;
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: connection.tenantId },
+      select: { intentAlertsEnabled: true, intentKeywords: true },
+    });
+    if (!tenant || !tenant.intentAlertsEnabled) return;
+
+    const keywords = tenant.intentKeywords
+      ? parseKeywords(tenant.intentKeywords)
+      : WebhooksService.DEFAULT_INTENT_KEYWORDS;
+    if (!matchesKeywords(text, keywords, 'CONTAINS')) return;
+
+    await this.prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { purchaseIntent: true },
+    });
+    await this.notify(
+      connection.tenantId,
+      '🔥 عميل مهتم بالشراء',
+      `${conversation.customerName || 'عميل'}: ${text.slice(0, 80)}`,
+      'message',
+    );
+  }
+
+  // Sends a DM through Messenger/Instagram and records it in the inbox.
+  // Returns false (without throwing) on any send failure so the caller can
+  // fall through to the next option.
+  private async sendDmAndRecord(
+    connection: any,
+    conversation: any,
+    senderId: string,
+    text: string,
+    sentByName: string,
+  ): Promise<boolean> {
+    const token = this.channelsService.getDecryptedAccessToken(
+      connection.accessToken,
+    );
+    if (!token) return false;
+
+    await sendTypingIndicator(senderId, token);
+    await new Promise((r) => setTimeout(r, 1_000));
+
+    const result = await graphApiRequest('/me/messages', {
+      token,
+      body: {
+        messaging_type: 'RESPONSE',
+        recipient: { id: senderId },
+        message: { text },
+      },
+      context: 'dmAutoReply',
+    });
+    if (!result.ok) {
+      this.logger.warn(
+        `DM auto-reply send failed for conversation ${conversation.id}: ${
+          result.error?.message || result.status
+        }`,
+      );
+      return false;
+    }
+
+    await this.prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        direction: 'OUTBOUND',
+        content: text,
+        messageType: 'TEXT',
+        sentByName,
+      },
+    });
+    return true;
+  }
+
+  // Runs active keyword / any-message rules against an incoming DM (when the
+  // tenant enabled dmRulesEnabled). Mirrors the comment matcher's ranking:
+  // specific-connection over global, then priority, then oldest. Respects the
+  // hourly/plan quota and the 24h-per-customer automated-DM limit.
+  private async handleDmAutoReply(
+    connection: any,
+    conversation: any,
+    senderId: string,
+    messageText: string,
+  ): Promise<boolean> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: connection.tenantId },
+      select: { dmRulesEnabled: true },
+    });
+    if (!tenant?.dmRulesEnabled || !messageText) return false;
+
+    const rules = await this.prisma.autoReplyRule.findMany({
+      where: {
+        tenantId: connection.tenantId,
+        isActive: true,
+        triggerType: { in: ['KEYWORD', 'ANY_COMMENT'] },
+        OR: [{ connectionId: connection.id }, { connectionId: null }],
+      },
+    });
+
+    const candidates = rules
+      .map((rule) => {
+        let triggered = false;
+        if (rule.triggerType === 'KEYWORD') {
+          const keywords = parseKeywords(rule.keywords);
+          triggered =
+            keywords.length > 0 &&
+            matchesKeywords(
+              messageText,
+              keywords,
+              rule.matchType || 'CONTAINS',
+            );
+        } else {
+          triggered = true; // ANY_COMMENT ⇒ any message
+        }
+        // Prefer connection-specific rules over global ones
+        const rank = rule.connectionId ? 2 : 1;
+        return triggered ? { rule, rank } : null;
+      })
+      .filter((x): x is { rule: (typeof rules)[number]; rank: number } => !!x)
+      .sort((a, b) => {
+        if (b.rank !== a.rank) return b.rank - a.rank;
+        if (b.rule.priority !== a.rule.priority)
+          return b.rule.priority - a.rule.priority;
+        return a.rule.createdAt.getTime() - b.rule.createdAt.getTime();
+      });
+
+    const rule = candidates[0]?.rule;
+    if (!rule) return false;
+
+    const replyText = this.pickVariant(rule.replyText || rule.privateText);
+    if (!replyText) return false;
+
+    if (!(await this.hasReplyQuota(connection.tenantId))) return false;
+    if (await this.hasRecentAutomatedTriggerDm(connection.id, senderId)) {
+      return true; // within the 24h window — treat as handled, don't spam
+    }
+
+    const sent = await this.sendDmAndRecord(
+      connection,
+      conversation,
+      senderId,
+      replyText,
+      'الرد الآلي',
+    );
+    if (!sent) return false;
+
+    await this.prisma.autoReplyRule.update({
+      where: { id: rule.id },
+      data: { triggerCount: { increment: 1 }, lastTriggeredAt: new Date() },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId: connection.tenantId,
+        action: 'RULE_TRIGGERED',
+        entityType: 'AutoReplyRule',
+        entityId: rule.id,
+        newValues: JSON.stringify({ ruleId: rule.id, channel: 'DM' }),
+      },
+    });
+    return true;
+  }
+
+  // Last-resort DM reply when no flow/rule matched: an AI answer if the tenant
+  // enabled AI, otherwise a fixed fallback message if configured. Both are
+  // opt-in and quota-limited.
+  private async maybeDmFallback(
+    connection: any,
+    conversation: any,
+    senderId: string,
+    messageText: string,
+  ): Promise<void> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: connection.tenantId },
+      select: {
+        aiEnabled: true,
+        aiContext: true,
+        fallbackEnabled: true,
+        fallbackText: true,
+      },
+    });
+    if (!tenant) return;
+
+    // Never send twice into the same 24h automated window
+    if (await this.hasRecentAutomatedTriggerDm(connection.id, senderId)) return;
+    if (!(await this.hasReplyQuota(connection.tenantId))) return;
+
+    // 1) AI reply
+    if (
+      tenant.aiEnabled &&
+      tenant.aiContext &&
+      messageText &&
+      this.aiService &&
+      (await this.aiService.isConfigured())
+    ) {
+      const reply = await this.aiService.generateCommentReply(
+        tenant.aiContext,
+        messageText,
+      );
+      if (reply) {
+        const sent = await this.sendDmAndRecord(
+          connection,
+          conversation,
+          senderId,
+          reply,
+          'رد ذكي (AI)',
+        );
+        if (sent) {
+          await this.prisma.auditLog.create({
+            data: {
+              tenantId: connection.tenantId,
+              action: 'AI_REPLY_SENT',
+              entityType: 'Tenant',
+              entityId: connection.tenantId,
+              newValues: JSON.stringify({ channel: 'DM' }),
+            },
+          });
+          return;
+        }
+      }
+    }
+
+    // 2) Fixed fallback text
+    if (tenant.fallbackEnabled && tenant.fallbackText) {
+      await this.sendDmAndRecord(
+        connection,
+        conversation,
+        senderId,
+        this.pickVariant(tenant.fallbackText),
+        'رد تلقائي',
+      );
+    }
+  }
+
   async processPrivateDM(value: any, platform: string, entryId?: string) {
     const senderId = value.sender?.id;
     const recipientId = value.recipient?.id;
@@ -1159,9 +1424,13 @@ export class WebhooksService {
       );
     }
 
-    // Run active flows on incoming DMs (keyword / any-message triggers)
     if (!storyHandled) {
-      await this.flowEngine?.processEvent({
+      // Surface buying intent regardless of what replies (additive, no send)
+      await this.detectPurchaseIntent(connection, conversation, messageText);
+
+      // Visual flows take precedence, then keyword rules, then AI/fallback —
+      // each only fires if the previous one didn't already reply.
+      const flowHandled = await this.flowEngine?.processEvent({
         tenantId: connection.tenantId,
         connection,
         conversationId: conversation.id,
@@ -1169,6 +1438,23 @@ export class WebhooksService {
         text: messageText,
         eventType: 'MESSAGE',
       });
+
+      if (!flowHandled) {
+        const ruleHandled = await this.handleDmAutoReply(
+          connection,
+          conversation,
+          senderId,
+          messageText,
+        );
+        if (!ruleHandled) {
+          await this.maybeDmFallback(
+            connection,
+            conversation,
+            senderId,
+            messageText,
+          );
+        }
+      }
     }
   }
 

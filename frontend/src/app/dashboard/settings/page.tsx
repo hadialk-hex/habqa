@@ -129,6 +129,10 @@ export default function SettingsPage() {
   const [aiContext, setAiContext] = useState("")
   const [aiPlatformConfigured, setAiPlatformConfigured] = useState(true)
   const [isSavingAi, setIsSavingAi] = useState(false)
+  const [dmRulesEnabled, setDmRulesEnabled] = useState(true)
+  const [fallbackEnabled, setFallbackEnabled] = useState(false)
+  const [fallbackText, setFallbackText] = useState("")
+  const [intentAlertsEnabled, setIntentAlertsEnabled] = useState(true)
 
   // Real plan from profile
   const [currentPlan, setCurrentPlan] = useState<string | null>(null)
@@ -139,6 +143,10 @@ export default function SettingsPage() {
         setAiEnabled(res.data.aiEnabled)
         setAiContext(res.data.aiContext || "")
         setAiPlatformConfigured(res.data.platformConfigured)
+        setDmRulesEnabled(res.data.dmRulesEnabled ?? true)
+        setFallbackEnabled(res.data.fallbackEnabled ?? false)
+        setFallbackText(res.data.fallbackText || "")
+        setIntentAlertsEnabled(res.data.intentAlertsEnabled ?? true)
       })
       .catch(() => {})
 
@@ -153,7 +161,7 @@ export default function SettingsPage() {
   const handleSaveAi = async () => {
     try {
       setIsSavingAi(true)
-      await api.put('/dashboard/ai-settings', { aiEnabled, aiContext })
+      await api.put('/dashboard/ai-settings', { aiEnabled, aiContext, dmRulesEnabled, fallbackEnabled, fallbackText, intentAlertsEnabled })
       showToast(t('settingsPage.aiSavedSuccess'), "success")
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { message?: string } } }
@@ -508,8 +516,49 @@ export default function SettingsPage() {
                   </p>
                 </div>
 
+                <div className="flex items-center justify-between p-4 rounded-xl border bg-accent/20">
+                  <div>
+                    <p className="font-bold">{t('settingsPage.dmRulesTitle')}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t('settingsPage.dmRulesSubtitle')}
+                    </p>
+                  </div>
+                  <Switch checked={dmRulesEnabled} onCheckedChange={setDmRulesEnabled} />
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-xl border bg-accent/20">
+                  <div>
+                    <p className="font-bold">{t('settingsPage.intentAlertsTitle')}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {t('settingsPage.intentAlertsSubtitle')}
+                    </p>
+                  </div>
+                  <Switch checked={intentAlertsEnabled} onCheckedChange={setIntentAlertsEnabled} />
+                </div>
+
+                <div className="p-4 rounded-xl border bg-accent/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold">{t('settingsPage.fallbackTitle')}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t('settingsPage.fallbackSubtitle')}
+                      </p>
+                    </div>
+                    <Switch checked={fallbackEnabled} onCheckedChange={setFallbackEnabled} />
+                  </div>
+                  {fallbackEnabled && (
+                    <Textarea
+                      value={fallbackText}
+                      onChange={e => setFallbackText(e.target.value)}
+                      placeholder={t('settingsPage.fallbackPlaceholder')}
+                      className="min-h-[80px] rounded-xl leading-relaxed"
+                      maxLength={1000}
+                    />
+                  )}
+                </div>
+
                 <div className="flex justify-end border-t border-border/50 pt-6">
-                  <Button onClick={handleSaveAi} disabled={isSavingAi || (aiEnabled && !aiContext.trim())} className="rounded-xl gap-2 shadow-lg shadow-primary/20 font-bold px-6 h-11">
+                  <Button onClick={handleSaveAi} disabled={isSavingAi || (aiEnabled && !aiContext.trim()) || (fallbackEnabled && !fallbackText.trim())} className="rounded-xl gap-2 shadow-lg shadow-primary/20 font-bold px-6 h-11">
                     <Save className="w-4 h-4" />
                     {isSavingAi ? t('settingsPage.saving') : t('settingsPage.saveAi')}
                   </Button>

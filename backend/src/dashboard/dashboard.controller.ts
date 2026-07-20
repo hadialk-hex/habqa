@@ -30,7 +30,15 @@ export class DashboardController {
   @Put('ai-settings')
   async updateAiSettings(
     @Request() req: any,
-    @Body() body: { aiEnabled?: boolean; aiContext?: string },
+    @Body()
+    body: {
+      aiEnabled?: boolean;
+      aiContext?: string;
+      dmRulesEnabled?: boolean;
+      fallbackEnabled?: boolean;
+      fallbackText?: string;
+      intentAlertsEnabled?: boolean;
+    },
   ) {
     if (req.user.role !== 'OWNER' && req.user.role !== 'ADMIN') {
       throw new ForbiddenException(

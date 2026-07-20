@@ -107,6 +107,12 @@ model Tenant {
   isSuspended    Boolean                @default(false) // Suspended by platform admin
   aiEnabled      Boolean                @default(false) // AI fallback replies (Claude)
   aiContext      String?                // Business description the AI uses to answer customers
+  // Auto-reply behaviour for direct messages (comments always run rules)
+  dmRulesEnabled    Boolean             @default(true)  // Run keyword rules on incoming DMs too
+  fallbackEnabled   Boolean             @default(false) // Send a default reply when nothing matched
+  fallbackText      String?             // The default reply text
+  intentAlertsEnabled Boolean           @default(true)  // Flag + notify on purchase-intent DMs
+  intentKeywords    String?             // Custom comma-separated intent keywords (else built-in list)
   // Outbound webhook: POSTed on every inbound message, HMAC-signed with the secret
   outboundWebhookUrl    String?
   outboundWebhookSecret String?
@@ -273,6 +279,7 @@ model Conversation {
   customerId    String             // PSID (Page-Scoped ID) or WhatsApp Number
   lastMessageAt DateTime           @default(now())
   status        ConversationStatus @default(OPEN)
+  purchaseIntent Boolean           @default(false) // Customer signalled buying intent
 
   tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   connection    PlatformConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)

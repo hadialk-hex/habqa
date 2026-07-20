@@ -16,10 +16,19 @@ export class DashboardService {
     @Optional() private aiService?: AiService,
   ) {}
 
+  private static readonly AUTO_REPLY_SELECT = {
+    aiEnabled: true,
+    aiContext: true,
+    dmRulesEnabled: true,
+    fallbackEnabled: true,
+    fallbackText: true,
+    intentAlertsEnabled: true,
+  } as const;
+
   async getAiSettings(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { aiEnabled: true, aiContext: true },
+      select: DashboardService.AUTO_REPLY_SELECT,
     });
     if (!tenant) {
       throw new NotFoundException('مساحة العمل غير موجودة');
@@ -33,7 +42,14 @@ export class DashboardService {
 
   async updateAiSettings(
     tenantId: string,
-    data: { aiEnabled?: boolean; aiContext?: string },
+    data: {
+      aiEnabled?: boolean;
+      aiContext?: string;
+      dmRulesEnabled?: boolean;
+      fallbackEnabled?: boolean;
+      fallbackText?: string;
+      intentAlertsEnabled?: boolean;
+    },
   ) {
     const updateData: any = {};
     if (data.aiEnabled !== undefined) {
@@ -42,10 +58,22 @@ export class DashboardService {
     if (data.aiContext !== undefined) {
       updateData.aiContext = String(data.aiContext).slice(0, 4000);
     }
+    if (data.dmRulesEnabled !== undefined) {
+      updateData.dmRulesEnabled = Boolean(data.dmRulesEnabled);
+    }
+    if (data.fallbackEnabled !== undefined) {
+      updateData.fallbackEnabled = Boolean(data.fallbackEnabled);
+    }
+    if (data.fallbackText !== undefined) {
+      updateData.fallbackText = String(data.fallbackText).slice(0, 1000);
+    }
+    if (data.intentAlertsEnabled !== undefined) {
+      updateData.intentAlertsEnabled = Boolean(data.intentAlertsEnabled);
+    }
     const tenant = await this.prisma.tenant.update({
       where: { id: tenantId },
       data: updateData,
-      select: { aiEnabled: true, aiContext: true },
+      select: DashboardService.AUTO_REPLY_SELECT,
     });
     return {
       ...tenant,
