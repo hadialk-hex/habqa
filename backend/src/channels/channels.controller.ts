@@ -67,6 +67,11 @@ export class ChannelsController {
       // Required to actually POST a reply to a comment (auto-reply
       // feature) — pages_read_engagement only covers reading comments.
       'pages_manage_engagement',
+      // Instagram accounts linked to this Facebook Page — basic profile
+      // access and DM read/send (comment replies need
+      // instagram_manage_comments, which needs Advanced Access/App Review).
+      'instagram_basic',
+      'instagram_manage_messages',
     ].join(',');
 
     const url =
